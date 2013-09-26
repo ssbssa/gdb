@@ -271,6 +271,8 @@ if ![info exists INTERNAL_GDBFLAGS] {
     set INTERNAL_GDBFLAGS [append_gdb_data_directory_option $INTERNAL_GDBFLAGS]
 }
 if [ishost "*-*-mingw*"] {
+    verbose "mingw host, needs testsuite-mode"
+    append INTERNAL_GDBFLAGS " -iex {maint set testsuite-mode on} -iex {set interactive-mode on}"
     append INTERNAL_GDBFLAGS " -iex {set new-console off}"
 }
 
