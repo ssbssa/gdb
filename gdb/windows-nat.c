@@ -3373,6 +3373,52 @@ windows_nat_target::thread_name (struct thread_info *thr)
 }
 
 
+/* Set stdout and stderr handles to binary unbuffered mode.  */
+
+static void
+set_output_binary_mode (void)
+{
+  /* In textmode, a '\n' is automatically expanded into "\r\n".  This
+     results in expect seeing "\r\r\n".  The tests aren't prepared
+     currently for other forms of eol.  As a workaround, we force the
+     output to binary mode.  */
+  setmode (fileno (stdout), O_BINARY);
+  setmode (fileno (stderr), O_BINARY);
+}
+
+/* Restore stdout and stderr handles to "normal" mode.  */
+
+static void
+set_output_normal_mode (void)
+{
+  setmode (fileno (stdout), O_TEXT);
+  setmode (fileno (stderr), O_TEXT);
+}
+
+static bool maint_testsuite_mode = false;
+
+/* Sets the maintenance testsuite mode using the static global
+   testuite_mode.  */
+
+static void
+set_maint_testsuite_mode (const char *args, int from_tty,
+			  struct cmd_list_element *c)
+{
+  if (maint_testsuite_mode)
+    set_output_binary_mode ();
+  else
+    set_output_normal_mode ();
+}
+
+static void
+show_maint_testsuite_mode (struct ui_file *file, int from_tty,
+		struct cmd_list_element *c, const char *value)
+{
+  gdb_printf (file, _("Testsuite mode is %s.\n"), value);
+}
+
+
+
 void _initialize_windows_nat ();
 void
 _initialize_windows_nat ()
@@ -3491,6 +3537,18 @@ Show whether to display kernel exceptions in child process."), NULL,
 cannot automatically find executable file or library to read symbols.\n\
 Use \"file\" or \"dll\" command to load executable/libraries directly."));
     }
+
+  add_setshow_boolean_cmd ("testsuite-mode", class_maintenance,
+			   &maint_testsuite_mode, _("\
+Set to adapt to dejagnu testsuite runs."), _("\
+Show whether GDB is adapted to run testsuite."), _("\
+Use \"on\" to enable, \"off\" to disable.\n\
+If enabled, stdout and stderr are set to binary mode,\n\
+to allow better testing."),
+			   set_maint_testsuite_mode,
+			   show_maint_testsuite_mode,
+			   &maintenance_set_cmdlist,
+			   &maintenance_show_cmdlist);
 }
 
 /* Hardware watchpoint support, adapted from go32-nat.c code.  */
