@@ -221,6 +221,10 @@ if ![info exists INTERNAL_GDBFLAGS] {
 
     set INTERNAL_GDBFLAGS [append_gdb_data_directory_option $INTERNAL_GDBFLAGS]
 }
+if [ishost "*-*-mingw*"] {
+    verbose "mingw host, needs testsuite-mode"
+    append INTERNAL_GDBFLAGS " -iex {maint set testsuite-mode on} -iex {set interactive-mode on}"
+}
 
 # The variable gdb_prompt is a regexp which matches the gdb prompt.
 # Set it if it is not already set.  This is also set by default_gdb_init
