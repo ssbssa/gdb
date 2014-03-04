@@ -28,6 +28,7 @@
 #include "symtab.h"
 #include "objfiles.h"
 #include "filenames.h"
+#include "language.h"
 
 #include "tui/tui.h"
 #include "tui/tui-data.h"
@@ -35,6 +36,513 @@
 #include "tui/tui-winsource.h"
 #include "tui/tui-source.h"
 #include "gdb_curses.h"
+
+
+#ifdef TUI_SYNTAX_HIGHLIGHT
+extern int tui_can_syntax_highlight;
+
+static const char *syntax_type_c_3[] = {
+    "int",
+    NULL
+};
+static const char *syntax_type_c_4[] = {
+    "auto",
+    "char",
+    "enum",
+    "long",
+    "void",
+    NULL
+};
+static const char *syntax_type_c_5[] = {
+    "const",
+    "float",
+    "short",
+    "union",
+    NULL
+};
+static const char *syntax_type_c_6[] = {
+    "double",
+    "extern",
+    "inline",
+    "signed",
+    "static",
+    "struct",
+    NULL
+};
+static const char *syntax_type_c_7[] = {
+    "typedef",
+    NULL
+};
+static const char *syntax_type_c_8[] = {
+    "unsigned",
+    "register",
+    "restrict",
+    "volatile",
+    NULL
+};
+static const char **syntax_type_c[] = {
+    NULL,
+    NULL,
+    syntax_type_c_3,
+    syntax_type_c_4,
+    syntax_type_c_5,
+    syntax_type_c_6,
+    syntax_type_c_7,
+    syntax_type_c_8,
+};
+
+static const char *syntax_type_cpp_4[] = {
+    "bool",
+    NULL
+};
+static const char *syntax_type_cpp_5[] = {
+    "class",
+    NULL
+};
+static const char *syntax_type_cpp_6[] = {
+    "export",
+    NULL
+};
+static const char *syntax_type_cpp_7[] = {
+    "alignas",
+    "mutable",
+    "virtual",
+    "wchar_t",
+    NULL
+};
+static const char *syntax_type_cpp_8[] = {
+    "char16_t",
+    "char32_t",
+    "decltype",
+    "explicit",
+    "template",
+    "typename",
+    NULL
+};
+static const char *syntax_type_cpp_9[] = {
+    "constexpr",
+    "namespace",
+    NULL
+};
+static const char *syntax_type_cpp_12[] = {
+    "thread_local",
+    NULL
+};
+static const char **syntax_type_cpp[] = {
+    NULL,
+    NULL,
+    NULL,
+    syntax_type_cpp_4,
+    syntax_type_cpp_5,
+    syntax_type_cpp_6,
+    syntax_type_cpp_7,
+    syntax_type_cpp_8,
+    syntax_type_cpp_9,
+    NULL,
+    NULL,
+    syntax_type_cpp_12,
+};
+
+static const char *syntax_keyword_c_2[] = {
+    "do",
+    "if",
+    NULL
+};
+static const char *syntax_keyword_c_3[] = {
+    "asm",
+    "for",
+    NULL
+};
+static const char *syntax_keyword_c_4[] = {
+    "case",
+    "else",
+    "goto",
+    NULL
+};
+static const char *syntax_keyword_c_5[] = {
+    "break",
+    "while",
+    NULL
+};
+static const char *syntax_keyword_c_6[] = {
+    "return",
+    "sizeof",
+    "switch",
+    NULL
+};
+static const char *syntax_keyword_c_7[] = {
+    "default",
+    NULL
+};
+static const char *syntax_keyword_c_8[] = {
+    "continue",
+    NULL
+};
+static const char **syntax_keyword_c[] = {
+    NULL,
+    syntax_keyword_c_2,
+    syntax_keyword_c_3,
+    syntax_keyword_c_4,
+    syntax_keyword_c_5,
+    syntax_keyword_c_6,
+    syntax_keyword_c_7,
+    syntax_keyword_c_8,
+};
+
+static const char *syntax_keyword_cpp_2[] = {
+    "or",
+    NULL
+};
+static const char *syntax_keyword_cpp_3[] = {
+    "and",
+    "new",
+    "not",
+    "try",
+    "xor",
+    NULL
+};
+static const char *syntax_keyword_cpp_4[] = {
+    "this",
+    NULL
+};
+static const char *syntax_keyword_cpp_5[] = {
+    "bitor",
+    "catch",
+    "compl",
+    "or_eq",
+    "throw",
+    "using",
+    NULL
+};
+static const char *syntax_keyword_cpp_6[] = {
+    "and_eq",
+    "bitand",
+    "delete",
+    "friend",
+    "not_eq",
+    "public",
+    "typeid",
+    "xor_eq",
+    NULL
+};
+static const char *syntax_keyword_cpp_7[] = {
+    "alignof",
+    "private",
+    NULL
+};
+static const char *syntax_keyword_cpp_8[] = {
+    "noexcept",
+    "operator",
+    NULL
+};
+static const char *syntax_keyword_cpp_9[] = {
+    "protected",
+    NULL
+};
+static const char *syntax_keyword_cpp_10[] = {
+    "const_cast",
+    NULL
+};
+static const char *syntax_keyword_cpp_11[] = {
+    "static_cast",
+    NULL
+};
+static const char *syntax_keyword_cpp_12[] = {
+    "dynamic_cast",
+    NULL
+};
+static const char *syntax_keyword_cpp_13[] = {
+    "static_assert",
+    NULL
+};
+static const char *syntax_keyword_cpp_16[] = {
+    "reinterpret_cast",
+    NULL
+};
+static const char **syntax_keyword_cpp[] = {
+    NULL,
+    syntax_keyword_cpp_2,
+    syntax_keyword_cpp_3,
+    syntax_keyword_cpp_4,
+    syntax_keyword_cpp_5,
+    syntax_keyword_cpp_6,
+    syntax_keyword_cpp_7,
+    syntax_keyword_cpp_8,
+    syntax_keyword_cpp_9,
+    syntax_keyword_cpp_10,
+    syntax_keyword_cpp_11,
+    syntax_keyword_cpp_12,
+    syntax_keyword_cpp_13,
+    NULL,
+    NULL,
+    syntax_keyword_cpp_16,
+};
+
+static const char *syntax_preproc_2[] = {
+    "if",
+    NULL
+};
+static const char *syntax_preproc_4[] = {
+    "elif",
+    "else",
+    "line",
+    "warn",
+    NULL
+};
+static const char *syntax_preproc_5[] = {
+    "ifdef",
+    "endif",
+    "error",
+    "undef",
+    NULL
+};
+static const char *syntax_preproc_6[] = {
+    "define",
+    "ifndef",
+    "pragma",
+    NULL
+};
+static const char *syntax_preproc_7[] = {
+    "include",
+    NULL
+};
+static const char **syntax_preproc[] = {
+    NULL,
+    syntax_preproc_2,
+    NULL,
+    syntax_preproc_4,
+    syntax_preproc_5,
+    syntax_preproc_6,
+    syntax_preproc_7,
+};
+
+static const char *syntax_literal_4[] = {
+    "NULL",
+    "true",
+    NULL
+};
+static const char *syntax_literal_5[] = {
+    "false",
+    NULL
+};
+static const char *syntax_literal_7[] = {
+    "nullptr",
+    NULL
+};
+static const char **syntax_literal[] = {
+    NULL,
+    NULL,
+    NULL,
+    syntax_literal_4,
+    syntax_literal_5,
+    NULL,
+    syntax_literal_7,
+};
+
+#define SYNTAX_HIGHLIGHT_EXTRA 16
+
+static int tui_keyword_highlight (const char *word,
+				  char *color_word,
+				  int word_len,
+				  char color,
+				  const char ***keywords,
+				  int maxlen)
+{
+  const char **kw;
+
+  if (word_len>maxlen) return 0;
+
+  kw = keywords[word_len - 1];
+  if (!kw) return 0;
+
+  while (*kw)
+    {
+      if (!memcmp (word, *kw, word_len))
+	{
+	  memset (color_word, color, word_len);
+	  return 1;
+	}
+
+      kw++;
+    }
+
+  return 0;
+}
+
+enum
+{
+  COL_NORMAL,
+  COL_LITERAL,
+  COL_TYPE,
+  COL_KEYWORD,
+  COL_PREPROC,
+  COL_COMMENT,
+};
+
+static void
+tui_syntax_highlight (enum language lang,
+		      const char *src_line,
+		      char *col_line)
+{
+  int preproc = 0;
+
+  if( lang != language_c && lang != language_cplus ) return;
+
+  while (src_line[0])
+    {
+      char c = src_line[0];
+
+      if (!preproc && c != ' ')
+	{
+	  if (c == '#')
+	    {
+	      preproc = 2;
+	      col_line[0] = COL_PREPROC;
+	    }
+	  else
+	    preproc = 1;
+	}
+
+      if (c >= '0' && c <= '9')
+	{
+	  col_line[0] = COL_LITERAL;
+
+	  c = src_line[1];
+	  while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
+		 (c >= 'A' && c <= 'Z') || c == '_')
+	    {
+	      src_line++;
+	      col_line++;
+	      c = src_line[1];
+
+	      col_line[0] = COL_LITERAL;
+	    }
+
+	  preproc = 1;
+	}
+      else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')
+	{
+	  const char *word_start = src_line;
+	  char *col_start = col_line;
+	  int word_len;
+
+	  c = src_line[1];
+	  while ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
+		 (c >= 'A' && c <= 'Z') || c == '_')
+	    {
+	      src_line++;
+	      col_line++;
+	      c = src_line[1];
+	    }
+
+	  word_len = src_line - word_start + 1;
+
+	  do
+	    {
+	      if (preproc==2 &&
+		  tui_keyword_highlight (word_start, col_start, word_len,
+					 COL_PREPROC, syntax_preproc, 7))
+		break;
+
+	      if (tui_keyword_highlight (word_start, col_start, word_len,
+					 COL_TYPE, syntax_type_c, 8))
+		break;
+	      if (lang==language_cplus &&
+		  tui_keyword_highlight (word_start, col_start, word_len,
+					 COL_TYPE, syntax_type_cpp, 12))
+		break;
+
+	      if (tui_keyword_highlight (word_start, col_start, word_len,
+					 COL_KEYWORD, syntax_keyword_c, 8))
+		break;
+	      if (lang==language_cplus &&
+		  tui_keyword_highlight (word_start, col_start, word_len,
+					 COL_KEYWORD, syntax_keyword_cpp, 16))
+		break;
+
+	      if (tui_keyword_highlight (word_start, col_start, word_len,
+					 COL_LITERAL, syntax_literal, 7))
+		break;
+	    }
+	  while (0);
+
+	  preproc = 1;
+	}
+      else if (c == '"')
+	{
+	  const char *string_start = src_line;
+	  char *col_start = col_line;
+
+	  while (src_line[1])
+	    {
+	      src_line++;
+	      col_line++;
+	      c = src_line[0];
+
+	      if (c == '\\' && src_line[1])
+		{
+		  src_line++;
+		  col_line++;
+		  continue;
+		}
+
+	      if (c == '"')
+		break;
+	    }
+
+	  memset (col_start, COL_LITERAL, (src_line - string_start) + 1);
+
+	  preproc = 1;
+	}
+      else if (c == '\'')
+	{
+	  const char *char_start = src_line;
+	  char *col_start = col_line;
+
+	  if (char_start[1] == '\\' && char_start[2] )
+	    src_line = strchr (char_start + 3, '\'');
+	  else if (char_start[1])
+	    src_line = strchr (char_start + 2, '\'');
+	  else
+	    src_line = NULL;
+	  if (!src_line)
+	    src_line = char_start + (strlen (char_start) - 1);
+
+	  col_line += src_line - char_start;
+
+	  memset (col_start, COL_LITERAL, (src_line - char_start) + 1);
+
+	  preproc = 1;
+	}
+      else if (c == '/' && (src_line[1] == '/' || src_line[1] == '*'))
+	{
+	  const char *comment_start = src_line;
+	  char *col_start = col_line;
+
+	  src_line = comment_start[1]=='*' ?
+	    strstr (comment_start + 2, "*/") : NULL;
+	  if (!src_line)
+	    src_line = comment_start + (strlen (comment_start) - 1);
+	  else
+	    src_line++;
+
+	  col_line += src_line - comment_start;
+
+	  memset (col_start, COL_COMMENT, (src_line - comment_start) + 1);
+
+	  preproc = 1;
+	}
+      else if (c != ' ' && c != '#')
+	{
+	  preproc = 1;
+	}
+
+      src_line++;
+      col_line++;
+    }
+}
+#endif
+
 
 /* Function to display source in the source window.  */
 enum tui_status
@@ -49,6 +557,9 @@ tui_set_source_content (struct symtab *s,
       FILE *stream;
       int i, desc, c, line_width, nlines;
       char *src_line = 0;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+      char *col_line = 0;
+#endif
 
       if ((ret = tui_alloc_source_buffer (TUI_SRC_WIN)) == TUI_SUCCESS)
 	{
@@ -96,6 +607,9 @@ tui_set_source_content (struct symtab *s,
                   struct tui_source_info *src
 		    = &TUI_SRC_WIN->detail.source_info;
 		  const char *s_filename = symtab_to_filename_for_display (s);
+#ifdef TUI_SYNTAX_HIGHLIGHT
+		  enum language lang;
+#endif
 
                   if (TUI_SRC_WIN->generic.title)
                     xfree (TUI_SRC_WIN->generic.title);
@@ -104,19 +618,39 @@ tui_set_source_content (struct symtab *s,
 		  xfree (src->fullname);
 		  src->fullname = xstrdup (symtab_to_fullname (s));
 
+#ifdef TUI_SYNTAX_HIGHLIGHT
+		  lang = deduce_language_from_filename (src->fullname);
+		  if (lang == language_unknown)
+		    {
+		      struct frame_info *fi = get_selected_frame_if_set ();
+		      if (fi)
+			lang = get_frame_language (fi);
+		    }
+		  if (lang == language_unknown)
+		    lang = language_cplus;
+#endif
+
 		  /* Determine the threshold for the length of the
                      line and the offset to start the display.  */
 		  offset = src->horizontal_offset;
 		  threshold = (line_width - 1) + offset;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+		  if (tui_can_syntax_highlight)
+		    threshold += SYNTAX_HIGHLIGHT_EXTRA;
+#endif
 		  stream = fdopen (desc, FOPEN_RT);
 		  clearerr (stream);
 		  cur_line = 0;
 		  src->gdbarch = get_objfile_arch (SYMTAB_OBJFILE (s));
 		  src->start_line_or_addr.loa = LOA_LINE;
 		  cur_line_no = src->start_line_or_addr.u.line_no = line_no;
-		  if (offset > 0)
-		    src_line = (char *) xmalloc (
-					   (threshold + 1) * sizeof (char));
+		  src_line =
+		    (char *) xmalloc ((threshold + 1) * sizeof (char));
+#ifdef TUI_SYNTAX_HIGHLIGHT
+		  if (tui_can_syntax_highlight)
+		    col_line =
+		      (char *) xmalloc ((threshold + 1) * sizeof (char));
+#endif
 		  while (cur_line < nlines)
 		    {
 		      struct tui_win_element *element
@@ -125,9 +659,11 @@ tui_set_source_content (struct symtab *s,
 		      /* Get the first character in the line.  */
 		      c = fgetc (stream);
 
-		      if (offset == 0)
-			src_line = TUI_SRC_WIN->generic.content[cur_line]
-				     ->which_element.source.line;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+		      if (tui_can_syntax_highlight)
+			memset (col_line, 0, threshold + 1);
+#endif
+
 		      /* Init the line with the line number.  */
 		      sprintf (src_line, "%-6d", cur_line_no);
 		      cur_len = strlen (src_line);
@@ -218,20 +754,37 @@ tui_set_source_content (struct symtab *s,
 			}
 		      /* Now copy the line taking the offset into
 			 account.  */
-		      if (offset == 0)
-			;
-		      else if (strlen (src_line) > offset)
-			strcpy (TUI_SRC_WIN->generic.content[cur_line]
-				  ->which_element.source.line,
-				&src_line[offset]);
+		      if (strlen (src_line) > offset)
+			{
+#ifdef TUI_SYNTAX_HIGHLIGHT
+			  if (tui_can_syntax_highlight)
+			    {
+			      tui_syntax_highlight (lang,
+						    src_line + cur_len,
+						    col_line + cur_len);
+
+			      src_line[threshold-SYNTAX_HIGHLIGHT_EXTRA] = 0;
+
+			      memcpy (TUI_SRC_WIN->generic.content[cur_line]
+				      ->which_element.source.line +
+				      line_width, &col_line[offset],
+				      strlen(&src_line[offset]));
+			    }
+#endif
+
+			  strcpy (TUI_SRC_WIN->generic.content[cur_line]->which_element.source.line,
+				  &src_line[offset]);
+			}
 		      else
 			TUI_SRC_WIN->generic.content[cur_line]
 			  ->which_element.source.line[0] = (char) 0;
 		      cur_line++;
 		      cur_line_no++;
 		    }
-		  if (offset > 0)
-		    xfree (src_line);
+		  xfree (src_line);
+#ifdef TUI_SYNTAX_HIGHLIGHT
+		  xfree (col_line);
+#endif
 		  fclose (stream);
 		  TUI_SRC_WIN->generic.content_size = nlines;
 		  ret = TUI_SUCCESS;

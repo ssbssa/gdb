@@ -59,6 +59,10 @@
 /* Tells whether the TUI is active or not.  */
 int tui_active = 0;
 static int tui_finish_init = 1;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+int tui_can_syntax_highlight = 0;
+int tui_color_tab[5];
+#endif
 
 enum tui_key_mode tui_current_key_mode = TUI_COMMAND_MODE;
 
@@ -469,6 +473,30 @@ tui_enable (void)
       keypad (TUI_CMD_WIN->generic.handle, TRUE);
       wrefresh (TUI_CMD_WIN->generic.handle);
       tui_finish_init = 0;
+
+#ifdef TUI_SYNTAX_HIGHLIGHT
+      if (has_colors())
+	{
+	  start_color();
+
+	  init_pair (1,COLOR_MAGENTA,COLOR_BLACK);
+	  tui_color_tab[0] = COLOR_PAIR (1) | A_BOLD;
+
+	  init_pair (2,COLOR_GREEN,COLOR_BLACK);
+	  tui_color_tab[1] = COLOR_PAIR (2) | A_BOLD;
+
+	  init_pair (3,COLOR_YELLOW,COLOR_BLACK);
+	  tui_color_tab[2] = COLOR_PAIR (3) | A_BOLD;
+
+	  init_pair (4,COLOR_BLUE,COLOR_BLACK);
+	  tui_color_tab[3] = COLOR_PAIR (4) | A_BOLD;
+
+	  init_pair (5,COLOR_CYAN,COLOR_BLACK);
+	  tui_color_tab[4] = COLOR_PAIR (5) | A_BOLD;
+
+	  tui_can_syntax_highlight = 1;
+	}
+#endif
     }
   else
     {
