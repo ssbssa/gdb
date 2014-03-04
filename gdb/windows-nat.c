@@ -1009,6 +1009,67 @@ signal_event_command (const char *args, int from_tty)
   CloseHandle ((HANDLE) event_id);
 }
 
+static void
+jit_install_command (const char *args, int from_tty)
+{
+  char gdb_file[MAX_PATH];
+  char command_str[MAX_PATH + 100];
+  HKEY hKey;
+  LONG ret;
+
+  dont_repeat ();
+
+  if (!GetModuleFileNameA(NULL, gdb_file, MAX_PATH))
+    error (_("Error getting gdb name: %u."),
+	   (unsigned) GetLastError ());
+
+  strcpy (command_str, "\"");
+  strcat (command_str, gdb_file);
+  strcat (command_str, "\" -q -p %ld -ex \"signal-event %ld\""
+	  " -ex \"b ExitProcess\" -ex \"c\"");
+
+  if (RegCreateKeyEx (HKEY_LOCAL_MACHINE,
+		      "Software\\Microsoft\\Windows NT\\"
+		      "CurrentVersion\\AeDebug",
+		      0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
+		      &hKey, NULL) != ERROR_SUCCESS)
+    error (_("Error creating 'AeDebug' registry key."));
+
+  ret = RegSetValueEx (hKey, "Debugger", 0, REG_SZ,
+		       (const BYTE *)command_str,
+		       strlen (command_str));
+  if (ret == ERROR_SUCCESS)
+    RegSetValueEx (hKey, "Auto", 0, REG_SZ, (const BYTE *)"1", 1);
+
+  RegCloseKey (hKey);
+
+  if (ret != ERROR_SUCCESS)
+    error (_("Error setting 'Debugger' registry value."));
+}
+
+static void
+jit_uninstall_command (const char *args, int from_tty)
+{
+  HKEY hKey;
+  LONG ret;
+
+  dont_repeat ();
+
+  if (RegOpenKeyEx (HKEY_LOCAL_MACHINE,
+		    "Software\\Microsoft\\Windows NT\\"
+		    "CurrentVersion\\AeDebug",
+		    0, KEY_ALL_ACCESS, &hKey) != ERROR_SUCCESS)
+    error (_("Error opening 'AeDebug' registry key."));
+
+  ret = RegDeleteValue (hKey, "Debugger");
+  RegSetValueEx (hKey, "Auto", 0, REG_SZ, (const BYTE *)"0", 1);
+
+  RegCloseKey (hKey);
+
+  if (ret != ERROR_SUCCESS)
+    error (_("Error deleting 'Debugger' registry value."));
+}
+
 /* See nat/windows-nat.h.  */
 
 int
@@ -3090,6 +3151,10 @@ This command is needed in support of setting up GDB as JIT debugger on \
 MS-Windows.  The command should be invoked from the GDB command line using \
 the '-ex' command-line option.  The ID of the event that blocks the \
 crashed process will be supplied by the Windows JIT debugging mechanism."));
+  add_com ("jit-install", class_obscure, jit_install_command,
+	   _("Install as JIT debugger."));
+  add_com ("jit-uninstall", class_obscure, jit_uninstall_command,
+	   _("Uninstall JIT debugger."));
 
 #ifdef __CYGWIN__
   add_setshow_boolean_cmd ("shell", class_support, &useshell, _("\
