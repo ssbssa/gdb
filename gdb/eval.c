@@ -1175,6 +1175,8 @@ evaluate_funcall (type *expect_type, expression *exp, int *pos,
 	  nargs--;
 	  argvec++;
 	}
+      if (argvec[0])
+	TYPE_MAIN_TYPE (value_type (argvec[0]))->flag_static = static_memfuncp != 0;
     }
   else if (op == STRUCTOP_MEMBER || op == STRUCTOP_MPTR)
     {
