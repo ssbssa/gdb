@@ -48,6 +48,8 @@
 #include "i387-tdep.h"
 #include "common/x86-xstate.h"
 #include "x86-tdep.h"
+#include "infcall.h"
+#include "producer.h"
 
 #include "record.h"
 #include "record-full.h"
@@ -2680,6 +2682,27 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   int i;
   int write_pass;
   int args_space = 0;
+  struct type *func_type = value_type (function);
+  int i386_windows_thiscall = 0;
+
+  if (func_type)
+    {
+      func_type = check_typedef (func_type);
+
+      if (TYPE_CODE (func_type) == TYPE_CODE_PTR)
+	func_type = check_typedef (TYPE_TARGET_TYPE (func_type));
+
+      if ((TYPE_CODE (func_type) == TYPE_CODE_METHOD)
+	  && nargs > 0
+	  && !TYPE_MAIN_TYPE (value_type (function))->flag_static)
+	{
+	  struct compunit_symtab *symtab =
+	    find_pc_compunit_symtab (find_function_addr (function, NULL));
+	  if (symtab
+	      && producer_is_gcc_ge_4 (symtab->producer) > 6)
+	    i386_windows_thiscall = 1;
+	}
+    }
 
   /* BND registers can be in arbitrary values at the moment of the
      inferior call.  This can cause boundary violations that are not
@@ -2709,7 +2732,7 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	    args_space += 4;
 	}
 
-      for (i = 0; i < nargs; i++)
+      for (i = i386_windows_thiscall; i < nargs; i++)
 	{
 	  int len = TYPE_LENGTH (value_enclosing_type (args[i]));
 
@@ -2760,6 +2783,10 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 
   /* ...and fake a frame pointer.  */
   regcache->cooked_write (I386_EBP_REGNUM, buf);
+
+  /* 'this' pointer needs to be in ECX.  */
+  if (i386_windows_thiscall)
+    regcache->cooked_write (I386_ECX_REGNUM, value_contents_all (args[0]));
 
   /* MarkK wrote: This "+ 8" is all over the place:
      (i386_frame_this_id, i386_sigtramp_frame_this_id,
