@@ -235,6 +235,12 @@ exec_file_locate_attach (int pid, int defer_bp_reset, int from_tty)
   try_open_exec_file (exec_file_host.get (), current_inferior (), add_flags);
 }
 
+static void
+symbol_file_clear_cleanup (void *ignore)
+{
+  symbol_file_clear (0);
+}
+
 /* Set FILENAME as the new exec file.
 
    This function is intended to be behave essentially the same
@@ -279,6 +285,10 @@ exec_file_attach (const char *filename, int from_tty)
       int scratch_chan;
       struct target_section *sections = NULL, *sections_end = NULL;
       char **matching;
+      struct cleanup *symbol_cleanup;
+
+      /* Clear symbols if executable can't be attached.  */
+      symbol_cleanup = make_cleanup (symbol_file_clear_cleanup, 0);
 
       if (is_target_filename (filename))
 	{
@@ -387,6 +397,8 @@ exec_file_attach (const char *filename, int from_tty)
       /* Tell display code (if any) about the changed file name.  */
       if (deprecated_exec_file_display_hook)
 	(*deprecated_exec_file_display_hook) (filename);
+
+      discard_cleanups (symbol_cleanup);
     }
 
   bfd_cache_close_all ();
