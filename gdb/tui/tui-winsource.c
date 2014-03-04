@@ -267,19 +267,72 @@ tui_erase_source_content (struct tui_win_info *win_info,
 }
 
 
+#ifdef TUI_SYNTAX_HIGHLIGHT
+extern int tui_can_syntax_highlight;
+extern int tui_color_tab[5];
+#endif
+
 /* Redraw the complete line of a source or disassembly window.  */
 static void
 tui_show_source_line (struct tui_win_info *win_info, int lineno)
 {
   struct tui_win_element *line;
   int x;
+  char *src_line;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+  char *col_line;
+#endif
 
   line = win_info->generic.content[lineno - 1];
+  src_line = line->which_element.source.line;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+  col_line = (char *)NULL;
+#endif
+
   if (line->which_element.source.is_exec_point)
     wattron (win_info->generic.handle, A_STANDOUT);
+#ifdef TUI_SYNTAX_HIGHLIGHT
+  else if (win_info == TUI_SRC_WIN && tui_can_syntax_highlight)
+    col_line = src_line + (win_info->generic.width - 1);
 
-  mvwaddstr (win_info->generic.handle, lineno, 1,
-             (char *) line->which_element.source.line);
+  if (col_line)
+    {
+      int len = strlen (src_line);
+      char cur_col = 0;
+
+      wmove (win_info->generic.handle, lineno, 1);
+
+      while (len)
+	{
+	  int output_count = 0;
+
+	  while (output_count < len && col_line[output_count] == cur_col)
+	    output_count++;
+
+	  if (output_count)
+	    {
+	      waddnstr (win_info->generic.handle, src_line, output_count);
+
+	      src_line += output_count;
+	      col_line += output_count;
+	      len -= output_count;
+	    }
+
+	  if (cur_col)
+	    wattroff (win_info->generic.handle, tui_color_tab[cur_col - 1]);
+
+	  cur_col = len ? col_line[0] : 0;
+
+	  if (cur_col)
+	    wattron (win_info->generic.handle, tui_color_tab[cur_col - 1]);
+	}
+    }
+  else
+#endif
+    {
+      mvwaddstr (win_info->generic.handle, lineno, 1, src_line);
+    }
+
   if (line->which_element.source.is_exec_point)
     wattroff (win_info->generic.handle, A_STANDOUT);
 
@@ -608,6 +661,10 @@ tui_alloc_source_buffer (struct tui_win_info *win_info)
      content dimensions, including string null-terminators.  */
   max_lines = win_info->generic.height - 2;
   line_width = win_info->generic.width - 2 + 1;
+#ifdef TUI_SYNTAX_HIGHLIGHT
+  if (win_info == TUI_SRC_WIN)
+    line_width *= 2;
+#endif
 
   /*
    * Allocate the buffer for the source lines.  Do this only once
