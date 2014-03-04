@@ -311,7 +311,7 @@ SUBDIR_TUI_OBS = $(patsubst %.c,%.o,$(SUBDIR_TUI_SRCS))
 
 SUBDIR_TUI_DEPS =
 SUBDIR_TUI_LDFLAGS =
-SUBDIR_TUI_CFLAGS = -DTUI=1
+SUBDIR_TUI_CFLAGS = -DTUI=1 -DTUI_SYNTAX_HIGHLIGHT
 
 #
 # GCC Compile support sub-directory definitions
