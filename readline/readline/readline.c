@@ -50,6 +50,9 @@
 #include <stdio.h>
 #include "posixjmp.h"
 #include <errno.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #if !defined (errno)
 extern int errno;
@@ -1322,6 +1325,60 @@ reset_default_bindings (void)
     }
 }
 
+#ifdef _WIN32
+static void
+console_scroll (int scroll)
+{
+  HANDLE hStdout;
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  SMALL_RECT sr;
+  int half_page;
+
+  if (!scroll) return;
+
+  hStdout = GetStdHandle (STD_OUTPUT_HANDLE);
+  GetConsoleScreenBufferInfo (hStdout, &csbi);
+
+  sr = csbi.srWindow;
+  half_page = (sr.Bottom - sr.Top) / 2;
+
+  if (scroll > 0)
+    scroll = half_page;
+  else
+    scroll = -half_page;
+
+  sr.Top += scroll;
+  sr.Bottom += scroll;
+  if (sr.Top < 0)
+    {
+      sr.Bottom -= sr.Top;
+      sr.Top = 0;
+    }
+  else if (sr.Bottom >= csbi.dwSize.Y - 1)
+    {
+      sr.Top += csbi.dwSize.Y - 1 - sr.Bottom;
+      sr.Bottom = csbi.dwSize.Y - 1;
+    }
+  SetConsoleWindowInfo (hStdout, TRUE, &sr);
+}
+
+static int
+console_paging (int count, int key)
+{
+  switch (key)
+    {
+    case '\x49':
+      console_scroll (-1);
+      break;
+    case '\x51':
+      console_scroll (1);
+      break;
+    }
+
+  return 0;
+}
+#endif
+
 /* Bind some common arrow key sequences in MAP. */
 static void
 bind_arrow_keys_internal (Keymap map)
@@ -1370,6 +1427,9 @@ bind_arrow_keys_internal (Keymap map)
   rl_bind_keyseq_if_unbound ("\340O", rl_end_of_line);
   rl_bind_keyseq_if_unbound ("\340S", rl_delete);
   rl_bind_keyseq_if_unbound ("\340R", rl_overwrite_mode);
+
+  rl_bind_keyseq_if_unbound ("\340I", console_paging);    /* page-up    */
+  rl_bind_keyseq_if_unbound ("\340Q", console_paging);    /* page-down  */
 
   /* These may or may not work because of the embedded NUL. */
   rl_bind_keyseq_if_unbound ("\\000H", rl_get_previous_history);
