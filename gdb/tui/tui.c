@@ -47,6 +47,9 @@
 #include <termio.h>
 #endif
 #include <setjmp.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include "gdb_curses.h"
 #include "interps.h"
@@ -323,6 +326,60 @@ tui_set_key_mode (enum tui_key_mode mode)
   tui_show_locator_content ();
 }
 
+#ifdef _WIN32
+static void
+console_scroll (int scroll)
+{
+  HANDLE hStdout;
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  SMALL_RECT sr;
+  int half_page;
+
+  if (!scroll) return;
+
+  hStdout = GetStdHandle (STD_OUTPUT_HANDLE);
+  GetConsoleScreenBufferInfo (hStdout, &csbi);
+
+  sr = csbi.srWindow;
+  half_page = (sr.Bottom - sr.Top) / 2;
+
+  if (scroll > 0)
+    scroll = half_page;
+  else
+    scroll = -half_page;
+
+  sr.Top += scroll;
+  sr.Bottom += scroll;
+  if (sr.Top < 0)
+    {
+      sr.Bottom -= sr.Top;
+      sr.Top = 0;
+    }
+  else if (sr.Bottom >= csbi.dwSize.Y - 1)
+    {
+      sr.Top += csbi.dwSize.Y - 1 - sr.Bottom;
+      sr.Bottom = csbi.dwSize.Y - 1;
+    }
+  SetConsoleWindowInfo (hStdout, TRUE, &sr);
+}
+
+static int
+console_paging (int count, int key)
+{
+  switch (key)
+    {
+    case '\x49':
+      console_scroll (-1);
+      break;
+    case '\x51':
+      console_scroll (1);
+      break;
+    }
+
+  return 0;
+}
+#endif
+
 /* Initialize readline and configure the keymap for the switching
    key shortcut.  */
 void
@@ -330,6 +387,9 @@ tui_initialize_readline (void)
 {
   int i;
   Keymap tui_ctlx_keymap;
+#ifdef _WIN32
+  Keymap page_keymap;
+#endif
 
   rl_initialize ();
 
@@ -340,6 +400,14 @@ tui_initialize_readline (void)
   tui_keymap = rl_make_bare_keymap ();
   tui_ctlx_keymap = rl_make_bare_keymap ();
   tui_readline_standard_keymap = rl_get_keymap ();
+
+#ifdef _WIN32
+  page_keymap = rl_make_bare_keymap ();
+  rl_generic_bind (ISKMAP, "\xe0", (char*)page_keymap,
+		   tui_readline_standard_keymap);
+  rl_bind_key_in_map ('\x49', console_paging, page_keymap);
+  rl_bind_key_in_map ('\x51', console_paging, page_keymap);
+#endif
 
   for (i = 0; tui_commands[i].cmd; i++)
     rl_bind_key_in_map (tui_commands[i].key, tui_rl_command_key, tui_keymap);
