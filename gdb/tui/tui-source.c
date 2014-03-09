@@ -379,14 +379,50 @@ enum
   COL_COMMENT,
 };
 
+const char *
+find_end_comment (const char *line, const char *line_end);
+const char *
+find_end_string (const char *line, const char *line_end);
+
 static void
 tui_syntax_highlight (enum language lang,
 		      const char *src_line,
-		      char *col_line)
+		      char *col_line,
+		      int syntax_status)
 {
   int preproc = 0;
 
   if( lang != language_c && lang != language_cplus ) return;
+
+  if (syntax_status)
+    {
+      const char *(*find_end_func) (const char *, const char *);
+      char color;
+      int count;
+      const char *line_start = src_line;
+      const char *line_end = line_start + strlen (line_start);
+
+      if (syntax_status == 1)
+	{
+	  find_end_func = &find_end_comment;
+	  color = COL_COMMENT;
+	}
+      else
+	{
+	  find_end_func = &find_end_string;
+	  color = COL_LITERAL;
+	}
+
+      src_line = find_end_func (line_start, line_end);
+      if (!src_line)
+	src_line = line_end;
+
+      count = src_line - line_start;
+      memset (col_line, color, count);
+      col_line += count;
+
+      preproc = 1;
+    }
 
   while (src_line[0])
     {
@@ -759,9 +795,12 @@ tui_set_source_content (struct symtab *s,
 #ifdef TUI_SYNTAX_HIGHLIGHT
 			  if (tui_can_syntax_highlight)
 			    {
-			      tui_syntax_highlight (lang,
-						    src_line + cur_len,
-						    col_line + cur_len);
+			      if (cur_line_no <= s->nlines)
+				tui_syntax_highlight (lang,
+						      src_line + cur_len,
+						      col_line + cur_len,
+						      s->line_charpos[s->nlines
+						      + cur_line_no - 1]);
 
 			      src_line[threshold-SYNTAX_HIGHLIGHT_EXTRA] = 0;
 
