@@ -1136,6 +1136,98 @@ symtab_to_filename_for_display (struct symtab *symtab)
     internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
 }
 
+#ifdef TUI_SYNTAX_HIGHLIGHT
+const char *
+find_end_comment (const char *line, const char *line_end);
+const char *
+find_end_comment (const char *line, const char *line_end)
+{
+  line = (const char *) memmem (line, line_end - line, "*/", 2);
+  if (!line) return NULL;
+  return line + 2;
+}
+
+static const char *
+find_end_string_char (const char *line,const char *line_end,char endchar)
+{
+  while (line < line_end)
+    {
+      char c = line[0];
+
+      if (c == '\\' && line + 1 < line_end)
+	{
+	  line += 2;
+	  continue;
+	}
+
+      if (c == endchar)
+	return line + 1;
+
+      line++;
+    }
+
+  return NULL;
+}
+
+const char *
+find_end_string (const char *line, const char *line_end);
+const char *
+find_end_string (const char *line, const char *line_end)
+{
+  return find_end_string_char (line, line_end, '"');
+}
+
+static int
+find_syntax_status (const char *line, const char *line_end, int prev_status)
+{
+  switch (prev_status)
+    {
+    case 1:
+      line = find_end_comment (line, line_end);
+      if (!line) return 1;
+      break;
+
+    case 2:
+      line = find_end_string (line, line_end);
+      if (!line) return 2;
+      break;
+    }
+
+  while (line < line_end)
+    {
+      char c = line[0];
+
+      if (c == '"')
+	{
+	  line = find_end_string (line + 1, line_end);
+	  if (!line) return 2;
+	  continue;
+	}
+      else if (c == '\'')
+	{
+	  line = find_end_string_char (line + 1, line_end, '\'');
+	  if (!line) break;
+	  continue;
+	}
+      else if (c == '/' && line + 1 < line_end)
+	{
+	  if (line[1] == '*')
+	    {
+	      line = find_end_comment (line + 2, line_end);
+	      if (!line) return 1;
+	      continue;
+	    }
+	  else if (line[1] == '/')
+	    break;
+	}
+
+      line++;
+    }
+
+  return 0;
+}
+#endif
+
 /* Create and initialize the table S->line_charpos that records
    the positions of the lines in the source file, which is assumed
    to be open on descriptor DESC.
@@ -1198,12 +1290,26 @@ find_source_lines (struct symtab *s, int desc)
 	    line_charpos[nlines++] = p - data.data ();
 	  }
       }
+
+#ifndef TUI_SYNTAX_HIGHLIGHT
+    line_charpos =
+      (int *) xrealloc ((char *) line_charpos, nlines * sizeof (int));
+#else
+    line_charpos =
+      (int *) xrealloc ((char *) line_charpos, 2 * nlines * sizeof (int));
+    line_charpos[nlines] = 0;
+    for (size = 1; size < nlines; size++)
+      {
+	line_charpos[nlines + size] =
+	  find_syntax_status (data.data () + line_charpos[size - 1],
+			      data.data () + line_charpos[size],
+			      line_charpos[nlines + size - 1]);
+      }
+#endif
   }
 
   s->nlines = nlines;
-  s->line_charpos =
-    (int *) xrealloc ((char *) line_charpos, nlines * sizeof (int));
-
+  s->line_charpos = line_charpos;
 }
 
 
