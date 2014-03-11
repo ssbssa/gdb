@@ -670,12 +670,7 @@ tui_resize_all (void)
       split_diff = height_diff / num_wins_displayed;
       cmd_split_diff = split_diff;
       if (height_diff % num_wins_displayed)
-	{
-	  if (height_diff < 0)
-	    cmd_split_diff--;
-	  else
-           cmd_split_diff++;
-       }
+	cmd_split_diff += height_diff % num_wins_displayed;
       /* Now adjust each window.  */
       /* erase + clearok are used instead of a straightforward clear as
          AIX 5.3 does not define clear.  */
@@ -765,6 +760,7 @@ tui_resize_all (void)
 
 	  /* Change the command window's height/width.  */
 	  TUI_CMD_WIN->generic.origin.y = locator->origin.y + 1;
+	  TUI_CMD_WIN->generic.width += width_diff;
 	  make_invisible_and_set_new_height (TUI_CMD_WIN,
 					     TUI_CMD_WIN->generic.height
 					     + cmd_split_diff);
