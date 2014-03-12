@@ -46,6 +46,10 @@
 #include <algorithm>
 #include "common/pathstuff.h"
 
+#ifdef TUI
+#include "tui/tui.h"
+#endif
+
 #define OPEN_MODE (O_RDONLY | O_BINARY)
 #define FDOPEN_MODE FOPEN_RB
 
@@ -150,6 +154,10 @@ get_first_line_listed (void)
 static void
 clear_lines_listed_range (void)
 {
+#ifdef TUI
+  if (tui_active) return;
+#endif
+
   first_line_listed = 0;
   last_line_listed = 0;
 }
@@ -1387,6 +1395,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
   current_source_symtab = s;
   current_source_line = line;
   first_line_listed = line;
+  last_line_listed = line;
 
   /* If printing of source lines is disabled, just print file and line
      number.  */
@@ -1755,7 +1764,7 @@ reverse_search_command (const char *regex, int from_tty)
 
   gdb_file_up stream (fdopen (desc.release (), FDOPEN_MODE));
   clearerr (stream.get ());
-  while (line > 1)
+  while (1)
     {
 /* FIXME!!!  We walk right off the end of buf if we get a long line!!!  */
       char buf[4096];		/* Should be reasonable???  */
@@ -1789,6 +1798,7 @@ reverse_search_command (const char *regex, int from_tty)
 	  return;
 	}
       line--;
+      if (line < 1) break;
       if (fseek (stream.get (),
 		 current_source_symtab->line_charpos[line - 1], 0) < 0)
 	{
