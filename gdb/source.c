@@ -51,6 +51,10 @@
 #include "build-id.h"
 #include "debuginfod-support.h"
 
+#ifdef TUI
+#include "tui/tui.h"
+#endif
+
 #define OPEN_MODE (O_RDONLY | O_BINARY)
 #define FDOPEN_MODE FOPEN_RB
 
@@ -182,6 +186,10 @@ get_first_line_listed (void)
 static void
 clear_lines_listed_range (void)
 {
+#ifdef TUI
+  if (tui_active) return;
+#endif
+
   first_line_listed = 0;
   last_line_listed = 0;
 }
