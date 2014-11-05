@@ -3439,6 +3439,8 @@ _initialize_check_for_gdb_ini ()
     return;
 
   homedir = getenv ("HOME");
+  if (!homedir)
+    homedir = getenv ("USERPROFILE");
   if (homedir)
     {
       char *p;
