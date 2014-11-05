@@ -370,6 +370,11 @@ tilde_expand_word (filename)
       if (expansion == 0)
 	expansion = sh_get_home_dir ();
 
+#ifdef __MINGW32__
+      if (expansion == 0)
+	expansion = getenv ("USERPROFILE");
+#endif
+
       return (glue_prefix_and_suffix (expansion, filename, 1));
     }
 
