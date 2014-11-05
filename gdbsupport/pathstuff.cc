@@ -247,6 +247,10 @@ get_standard_cache_dir ()
 #endif
 
   const char *home = getenv ("HOME");
+#ifdef _WIN32
+  if (home == NULL)
+    home = getenv ("USERPROFILE");
+#endif
   if (home != NULL && home[0] != '\0')
     {
       /* Make sure the path is absolute and tilde-expanded.  */
@@ -356,6 +360,10 @@ find_gdb_home_config_file (const char *name, struct stat *buf)
     }
 
   const char *homedir = getenv ("HOME");
+#ifdef _WIN32
+  if (homedir == nullptr)
+    homedir = getenv ("USERPROFILE");
+#endif
   if (homedir != nullptr && homedir[0] != '\0')
     {
       /* Make sure the path is absolute and tilde-expanded.  */
