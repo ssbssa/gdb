@@ -3389,6 +3389,10 @@ _initialize_check_for_gdb_ini (void)
     return;
 
   homedir = getenv ("HOME");
+#ifdef __MINGW32__
+  if (!homedir)
+    homedir = getenv ("USERPROFILE");
+#endif
   if (homedir)
     {
       char *p;

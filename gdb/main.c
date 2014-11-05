@@ -247,6 +247,10 @@ get_init_files (const char **system_gdbinit,
 	}
 
       homedir = getenv ("HOME");
+#ifdef __MINGW32__
+      if (!homedir)
+	homedir = getenv ("USERPROFILE");
+#endif
 
       /* If the .gdbinit file in the current directory is the same as
 	 the $HOME/.gdbinit file, it should not be sourced.  homebuf
