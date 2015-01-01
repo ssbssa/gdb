@@ -1428,6 +1428,9 @@ bind_arrow_keys_internal (Keymap map)
   rl_bind_keyseq_if_unbound ("\340S", rl_delete);
   rl_bind_keyseq_if_unbound ("\340R", rl_overwrite_mode);
 
+  rl_bind_keyseq_if_unbound ("\340s", rl_backward_word);  /* ctrl-left  */
+  rl_bind_keyseq_if_unbound ("\340t", rl_forward_word);   /* ctrl-right */
+
   rl_bind_keyseq_if_unbound ("\340I", console_paging);    /* page-up    */
   rl_bind_keyseq_if_unbound ("\340Q", console_paging);    /* page-down  */
 
