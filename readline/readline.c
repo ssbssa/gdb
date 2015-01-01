@@ -1163,6 +1163,9 @@ bind_arrow_keys_internal (map)
   rl_bind_keyseq_if_unbound ("\340O", rl_end_of_line);
   rl_bind_keyseq_if_unbound ("\340S", rl_delete);
   rl_bind_keyseq_if_unbound ("\340R", rl_overwrite_mode);
+
+  rl_bind_keyseq_if_unbound ("\340s", rl_backward_word);  /* ctrl-left  */
+  rl_bind_keyseq_if_unbound ("\340t", rl_forward_word);   /* ctrl-right */
 #endif
 
   _rl_keymap = xkeymap;
