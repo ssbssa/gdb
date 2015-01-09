@@ -721,7 +721,7 @@ tui_set_source_content (struct symtab *s,
 			cur_line_no;
 		      element->which_element.source.is_exec_point =
 			(filename_cmp (locator->content[0]
-				         ->which_element.locator.full_name,
+				         ->which_element.locator.line_file_name,
 				       symtab_to_fullname (s)) == 0
 				         && cur_line_no
 					      == locator->content[0]
