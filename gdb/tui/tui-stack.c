@@ -329,6 +329,8 @@ tui_set_locator_info (struct gdbarch *gdbarch,
   element->proc_name[0] = (char) 0;
   strcat_to_buf (element->proc_name, MAX_LOCATOR_ELEMENT_LEN, procname);
   element->line_no = lineno;
+  element->line_file_name[0] = 0;
+  strcat_to_buf (element->line_file_name, MAX_LOCATOR_ELEMENT_LEN, fullname);
   element->addr = addr;
   element->gdbarch = gdbarch;
   tui_set_locator_fullname (fullname);
