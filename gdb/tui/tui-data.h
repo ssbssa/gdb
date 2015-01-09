@@ -196,6 +196,7 @@ struct tui_locator_element
   char full_name[MAX_LOCATOR_ELEMENT_LEN];
   char proc_name[MAX_LOCATOR_ELEMENT_LEN];
   int line_no;
+  char line_file_name[MAX_LOCATOR_ELEMENT_LEN];
   CORE_ADDR addr;
   /* Architecture associated with code at this location.  */
   struct gdbarch *gdbarch;
