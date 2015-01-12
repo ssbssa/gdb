@@ -45,6 +45,10 @@
 # include <pc.h>
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /* System-specific feature definitions and include files. */
 #include "rldefs.h"
 #include "rlmbutil.h"
@@ -1251,6 +1255,19 @@ rl_redisplay ()
 
   RL_UNSETSTATE (RL_STATE_REDISPLAYING);
   _rl_release_sigint ();
+
+#ifdef _WIN32
+    {
+      HANDLE out;
+      CONSOLE_SCREEN_BUFFER_INFO csbi;
+
+      out = GetStdHandle (STD_OUTPUT_HANDLE);
+      GetConsoleScreenBufferInfo(out, &csbi);
+      if (csbi.dwCursorPosition.Y >= csbi.srWindow.Top &&
+	  csbi.dwCursorPosition.Y <= csbi.srWindow.Bottom)
+	SetConsoleCursorPosition(out, csbi.dwCursorPosition);
+    }
+#endif
 }
 
 /* PWP: update_line() is based on finding the middle difference of each
