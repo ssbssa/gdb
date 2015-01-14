@@ -599,6 +599,7 @@ addr_info_make_relative (section_addr_info *addrs, bfd *abfd)
 
 	  if (!(sect_name == ".gnu.liblist"
 		|| sect_name == ".gnu.conflict"
+		|| sect_name == ".gnu_debuglink"
 		|| (sect_name == ".bss"
 		    && i > 0
 		    && (*addrs)[i - 1].name == ".dynbss"
