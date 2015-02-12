@@ -899,8 +899,13 @@ tui_set_source_content_nil (struct tui_win_info *win_info,
 	  for (i = xpos + warning_length; i < line_width; i++)
 	    src_line[i] = ' ';
 
-	  src_line[i] = '\n';
+	  src_line[i] = (char) 0;
 
+#ifdef TUI_SYNTAX_HIGHLIGHT
+	  memset (src_line + line_width, 0, line_width);
+	  src_line[line_width + xpos] = COL_LITERAL;
+	  src_line[line_width + xpos + warning_length - 1] = COL_LITERAL;
+#endif
 	}			/* end if */
 
       curr_line++;
