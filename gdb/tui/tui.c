@@ -636,6 +636,19 @@ tui_disable (void)
 
   tui_active = 0;
   tui_update_gdb_sizes ();
+
+#ifdef __MINGW32__
+    {
+      int width, height;
+      rl_reset_screen_size ();
+      rl_get_screen_size (&height, &width);
+      if (width != tui_term_width () || height != tui_term_height ())
+	{
+	  tui_set_win_resized_to (TRUE);
+	  set_screen_width_and_height (width, height);
+	}
+    }
+#endif
 }
 
 /* Command wrapper for enabling tui mode.  */
