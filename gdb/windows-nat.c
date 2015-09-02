@@ -75,6 +75,11 @@
 #include "ser-event.h"
 #include "inf-loop.h"
 
+#include "readline/readline.h"
+#ifdef TUI
+#include "tui/tui-win.h"
+#endif
+
 using namespace windows_nat;
 
 /* Maintain a linked list of "so" information.  */
@@ -1045,6 +1050,101 @@ jit_install_command (const char *args, int from_tty)
 
   if (ret != ERROR_SUCCESS)
     error (_("Error setting 'Debugger' registry value."));
+}
+
+static void
+console_resize (int *wp, int *hp, int bh)
+{
+  HANDLE hStdout;
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  COORD c;
+  int w, h, bottom;
+  SMALL_RECT sr;
+
+  if (!wp || !hp) return;
+
+  w = *wp;
+  h = *hp;
+
+  hStdout = GetStdHandle (STD_OUTPUT_HANDLE);
+  GetConsoleScreenBufferInfo (hStdout, &csbi);
+
+  if (w < 0 || h < 0)
+    {
+      COORD coord = GetLargestConsoleWindowSize (hStdout);
+      if (w < 0) w = coord.X;
+      if (h < 0) h = coord.Y;
+    }
+
+  if (w <= 0) w = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+  if (h <= 0) h = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+  if (bh <= 0) bh = csbi.dwSize.Y;
+
+  if (bh < h) bh = h;
+  c = csbi.dwSize;
+  if (w > c.X || bh > c.Y)
+    {
+      if (w > c.X) c.X = w;
+      if (bh > c.Y) c.Y = bh;
+      SetConsoleScreenBufferSize (hStdout, c);
+    }
+
+  bottom = csbi.srWindow.Top + h - 1;
+  if (bottom >= c.Y) bottom = c.Y - 1;
+
+  sr.Left = 0;
+  sr.Top = bottom - (h - 1);
+  sr.Right = w - 1;
+  sr.Bottom = bottom;
+  SetConsoleWindowInfo (hStdout, TRUE, &sr);
+
+  if( w < c.X || bh < c.Y )
+    {
+      c.X = w;
+      c.Y = bh;
+      SetConsoleScreenBufferSize (hStdout, c);
+    }
+
+  *wp = w;
+  *hp = h;
+}
+
+static void
+console_resize_command (const char *args, int from_tty)
+{
+  dont_repeat ();
+
+  if (args == NULL) return;
+
+  if (args[0])
+    {
+      int w, h, hb;
+      w = atoi (args);
+      std::string arg0 = extract_arg (&args);
+      h = hb = 0;
+      if (args[0])
+	{
+	  h = atoi (args);
+	  extract_arg (&args);
+	  if (args[0])
+	    hb = atoi (args);
+	}
+      if (arg0 == "full")
+	{
+	  if (w == 0) w = -1;
+	  if (h == 0) h = -1;
+	}
+      console_resize (&w, &h, hb);
+
+#ifdef TUI
+      tui_set_win_resized_to (true);
+      RL_SETSTATE (RL_STATE_REDISPLAYING);
+      tui_async_resize_screen (0);
+      RL_UNSETSTATE (RL_STATE_REDISPLAYING);
+#else
+      rl_resize_terminal ();
+#endif
+    }
 }
 
 static void
@@ -3155,6 +3255,10 @@ crashed process will be supplied by the Windows JIT debugging mechanism."));
 	   _("Install as JIT debugger."));
   add_com ("jit-uninstall", class_obscure, jit_uninstall_command,
 	   _("Uninstall JIT debugger."));
+
+  add_com ("console", class_obscure, console_resize_command,
+	       _("Resize console."));
+
 
 #ifdef __CYGWIN__
   add_setshow_boolean_cmd ("shell", class_support, &useshell, _("\

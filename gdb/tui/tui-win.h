@@ -40,6 +40,7 @@ extern int tui_active_border_attrs;
 
 extern bool tui_update_variables ();
 
+extern void tui_async_resize_screen (void *);
 extern void tui_initialize_win (void);
 
 /* Update gdb's knowledge of the terminal size.  */
