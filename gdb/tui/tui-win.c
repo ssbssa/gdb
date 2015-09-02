@@ -555,9 +555,10 @@ tui_sigwinch_handler (int signal)
   mark_async_signal_handler (tui_sigwinch_token);
   tui_set_win_resized_to (true);
 }
+#endif
 
 /* Callback for asynchronously resizing TUI following a SIGWINCH signal.  */
-static void
+void
 tui_async_resize_screen (gdb_client_data arg)
 {
   rl_resize_terminal ();
@@ -588,9 +589,10 @@ tui_async_resize_screen (gdb_client_data arg)
       tui_redisplay_readline ();
     }
 
+#ifdef SIGWINCH
   child_terminal_on_sigwinch ();
-}
 #endif
+}
 
 /* Initialize TUI's SIGWINCH signal handler.  Note that the handler is not
    uninstalled when we exit TUI, so the handler should not assume that TUI is
