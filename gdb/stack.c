@@ -1646,6 +1646,10 @@ trailing_outermost_frame (int count)
   return trailing;
 }
 
+#ifdef TUI
+extern int tui_new_selected_frame;
+#endif
+
 /* The core of all the "select-frame" sub-commands.  Just wraps a call to
    SELECT_FRAME.  */
 
@@ -1656,6 +1660,10 @@ select_frame_command_core (struct frame_info *fi, bool ignored)
   select_frame (fi);
   if (get_selected_frame_if_set () != prev_frame)
     gdb::observers::user_selected_context_changed.notify (USER_SELECTED_FRAME);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 /* See stack.h.  */
@@ -1680,6 +1688,10 @@ frame_command_core (struct frame_info *fi, bool ignored)
     gdb::observers::user_selected_context_changed.notify (USER_SELECTED_FRAME);
   else
     print_selected_thread_frame (current_uiout, USER_SELECTED_FRAME);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 /* The three commands 'frame', 'select-frame', and 'info frame' all have a
@@ -2394,6 +2406,10 @@ up_silently_base (const char *count_exp)
   if (count != 0 && count_exp == NULL)
     error (_("Initial frame selected; you cannot go up."));
   select_frame (frame);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 static void
@@ -2433,6 +2449,10 @@ down_silently_base (const char *count_exp)
     }
 
   select_frame (frame);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 static void

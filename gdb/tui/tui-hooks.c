@@ -183,6 +183,8 @@ tui_inferior_exit (struct inferior *inf)
 
 /* Observer for the before_prompt notification.  */
 
+int tui_new_selected_frame;
+
 static void
 tui_before_prompt (const char *current_gdb_prompt)
 {
@@ -191,7 +193,12 @@ tui_before_prompt (const char *current_gdb_prompt)
      refresh registers here unless the frame actually changed by one of these
      commands.  Registers will otherwise be refreshed after a normal stop or by
      our tui_register_changed_hook.  */
-  tui_refresh_frame_and_register_information (/*registers_too_p=*/0);
+  if (tui_new_selected_frame)
+    {
+      tui_set_locator_fullname ("");
+      tui_refresh_frame_and_register_information (/*registers_too_p=*/0);
+      tui_new_selected_frame = 0;
+    }
 }
 
 /* Observer for the normal_stop notification.  */
