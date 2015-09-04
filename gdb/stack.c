@@ -2193,6 +2193,10 @@ find_relative_frame (struct frame_info *frame, int *level_offset_ptr)
   return frame;
 }
 
+#ifdef TUI
+extern int tui_new_selected_frame;
+#endif
+
 /* The "select_frame" command.  With no argument this is a NOP.
    Select the frame at level LEVEL_EXP if it is a valid level.
    Otherwise, treat LEVEL_EXP as an address expression and select it.
@@ -2208,6 +2212,10 @@ select_frame_command (const char *level_exp, int from_tty)
   select_frame (parse_frame_specification (level_exp, NULL));
   if (get_selected_frame_if_set () != prev_frame)
     gdb::observers::user_selected_context_changed.notify (USER_SELECTED_FRAME);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 /* The "frame" command.  With no argument, print the selected frame
@@ -2224,6 +2232,10 @@ frame_command (const char *level_exp, int from_tty)
     gdb::observers::user_selected_context_changed.notify (USER_SELECTED_FRAME);
   else
     print_selected_thread_frame (current_uiout, USER_SELECTED_FRAME);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 /* Select the frame up one or COUNT_EXP stack levels from the
@@ -2242,6 +2254,10 @@ up_silently_base (const char *count_exp)
   if (count != 0 && count_exp == NULL)
     error (_("Initial frame selected; you cannot go up."));
   select_frame (frame);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 static void
@@ -2281,6 +2297,10 @@ down_silently_base (const char *count_exp)
     }
 
   select_frame (frame);
+
+#ifdef TUI
+  tui_new_selected_frame = 1;
+#endif
 }
 
 static void
