@@ -1735,6 +1735,10 @@ thread_apply_command (const char *tidlist, int from_tty)
     }
 }
 
+#ifdef TUI
+extern int tui_new_selected_frame;
+#endif
+
 /* Switch to the specified thread, or print the current thread.  */
 
 void
@@ -1780,6 +1784,10 @@ thread_command (const char *tidstr, int from_tty)
 	  gdb::observers::user_selected_context_changed.notify
 	    (USER_SELECTED_THREAD | USER_SELECTED_FRAME);
 	}
+
+#ifdef TUI
+      tui_new_selected_frame = 1;
+#endif
     }
 }
 
