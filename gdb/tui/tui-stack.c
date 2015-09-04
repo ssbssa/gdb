@@ -44,9 +44,6 @@
    Returns a pointer to a static area holding the result.  */
 static char *tui_get_function_from_frame (struct frame_info *fi);
 
-/* Set the full_name portion of the locator.  */
-static void tui_set_locator_fullname (const char *fullname);
-
 /* Update the locator, with the provided arguments.  */
 static int tui_set_locator_info (struct gdbarch *gdbarch,
 				 const char *fullname,
@@ -272,7 +269,7 @@ tui_show_locator_content (void)
 
 
 /* Set the filename portion of the locator.  */
-static void
+void
 tui_set_locator_fullname (const char *fullname)
 {
   struct tui_gen_win_info *locator = tui_locator_win_info_ptr ();
