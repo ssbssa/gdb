@@ -32,6 +32,7 @@
 #include "gdb_bfd.h"
 #include "solib.h"
 #include "solib-target.h"
+#include "frame-unwind.h"
 #include "gdbcore.h"
 #include "coff/internal.h"
 #include "libcoff.h"
@@ -1780,3 +1781,239 @@ even if their meaning is unknown."),
      isn't another convenience variable of the same name.  */
   create_internalvar_type_lazy ("_tlb", &tlb_funcs, NULL);
 }
+
+struct cygwin_sigwrapper_frame_cache
+{
+  CORE_ADDR sp;
+  CORE_ADDR pc;
+  CORE_ADDR prev_pc;
+  int tlsoffset;
+};
+
+/* Return non-zero if the instructions at PC match the series
+   described in PATTERN, or zero otherwise.  PATTERN is an array of
+   'struct insn_pattern' objects, terminated by an entry whose mask is
+   zero.
+
+   When the match is successful, fill INSN[i] with what PATTERN[i]
+   matched.  */
+static int
+insns_match_pattern (struct gdbarch *gdbarch, CORE_ADDR pc,
+                     const struct insn_pattern *pattern, int length,
+                     gdb_byte *insn)
+{
+  int i;
+  CORE_ADDR npc = pc;
+
+  for (i = 0; i < length; i++)
+    {
+      gdb_byte buf;
+      target_read_memory (npc, &buf, 1);
+      insn[i] = buf;
+      if ((insn[i] & pattern[i].mask) == pattern[i].data)
+        npc += 1;
+      else
+	return 0;
+    }
+  return 1;
+}
+
+const struct insn_pattern_sequence *sigbe_pattern;
+const struct insn_pattern_sequence *sigdelayed_pattern;
+
+void cygwin_sigwrapper_frame_unwind_set_sigbe_pattern (
+				const struct insn_pattern_sequence *pattern)
+{
+  sigbe_pattern = pattern;
+}
+
+void cygwin_sigwrapper_frame_unwind_set_sigdelayed_pattern (
+				const struct insn_pattern_sequence *pattern)
+{
+  sigdelayed_pattern = pattern;
+}
+
+static void
+cygwin_sigwrapper_frame_analyze (struct gdbarch *gdbarch, CORE_ADDR start,
+				 CORE_ADDR end, int *tlsoffset)
+{
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  CORE_ADDR addr;
+
+  *tlsoffset = 0;
+
+  for (addr = start; addr < end; addr++)
+    {
+      if (sigbe_pattern)
+	{
+	  int len = sigbe_pattern->length;
+	  gdb_byte insn[len];
+
+	  if (insns_match_pattern (gdbarch, addr, sigbe_pattern->pattern,
+				   len, insn))
+	    {
+	      *tlsoffset = extract_signed_integer (&(insn[len - 4]), 4,
+						   byte_order);
+	      break;
+	    }
+	}
+
+      if (sigdelayed_pattern)
+	{
+	  int len = sigdelayed_pattern->length;
+	  gdb_byte insn[len];
+
+	  if (insns_match_pattern (gdbarch, addr, sigdelayed_pattern->pattern,
+				   len, insn))
+	  {
+	    *tlsoffset = extract_signed_integer (&(insn[len - 4]), 4,
+						 byte_order);
+	    break;
+	  }
+	}
+    }
+
+  /*
+    XXX: Perhaps we should also note the address of the xaddq instruction which
+    pops the RA from the sigstack.  If PC is after that, we should look in the
+    appropriate register to get the RA, not on the sigstack.
+  */
+}
+
+/* Fill THIS_CACHE using the cygwin sigwrapper unwinding data
+   for THIS_FRAME.  */
+
+static struct cygwin_sigwrapper_frame_cache *
+cygwin_sigwrapper_frame_cache (frame_info_ptr this_frame, void **this_cache)
+{
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  struct cygwin_sigwrapper_frame_cache *cache = (struct cygwin_sigwrapper_frame_cache *)*this_cache;
+  ptid_t ptid;
+  CORE_ADDR thread_local_base;
+  CORE_ADDR stacktop;
+  CORE_ADDR signalstackptr;
+  const int len = gdbarch_addr_bit (gdbarch)/8;
+  gdb_byte buf[len];
+
+  /* Get current PC and SP.  */
+  cache->pc = get_frame_pc (this_frame);
+  get_frame_register (this_frame, gdbarch_sp_regnum(gdbarch), buf);
+  cache->sp = extract_unsigned_integer (buf, len, byte_order);
+
+  /* Get address of top of stack from thread information block */
+  ptid = inferior_ptid;
+  target_get_tib_address (ptid, &thread_local_base);
+
+  read_memory(thread_local_base + len, buf, len);
+  stacktop = extract_unsigned_integer(buf, len, byte_order);
+
+  if (frame_debug)
+    gdb_printf (gdb_stdlog,
+			"cygwin_sigwrapper_frame_prev_register TEB.stacktop=%s\n",
+			paddress (gdbarch, stacktop ));
+
+  /* Find cygtls, relative to stacktop, and read signalstackptr from cygtls */
+  read_memory(stacktop + cache->tlsoffset, buf, len);
+  signalstackptr = extract_unsigned_integer(buf, len, byte_order);
+
+  if (frame_debug)
+    gdb_printf (gdb_stdlog,
+			"cygwin_sigwrapper_frame_prev_register sigsp=%s\n",
+			paddress (gdbarch, signalstackptr));
+
+  /* Read return address from signal stack */
+  read_memory (signalstackptr - len, buf, len);
+  cache->prev_pc = extract_unsigned_integer (buf, len, byte_order);
+
+  if (frame_debug)
+    gdb_printf (gdb_stdlog,
+			"cygwin_sigwrapper_frame_prev_register ra=%s\n",
+			paddress (gdbarch, cache->prev_pc));
+
+  return cache;
+}
+
+static struct value *
+cygwin_sigwrapper_frame_prev_register (frame_info_ptr this_frame, void **this_cache,
+					     int regnum)
+{
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  struct cygwin_sigwrapper_frame_cache *cache =
+    cygwin_sigwrapper_frame_cache (this_frame, this_cache);
+
+  if (frame_debug)
+    gdb_printf (gdb_stdlog,
+			"cygwin_sigwrapper_frame_prev_register %s for pc=%s\n",
+			gdbarch_register_name (gdbarch, regnum),
+			paddress (gdbarch, cache->prev_pc));
+
+  if (regnum == gdbarch_pc_regnum (gdbarch))
+    return frame_unwind_got_address (this_frame, regnum, cache->prev_pc);
+
+  return frame_unwind_got_register (this_frame, regnum, regnum);
+}
+
+static void
+cygwin_sigwrapper_frame_this_id (frame_info_ptr this_frame, void **this_cache,
+				      struct frame_id *this_id)
+{
+  *this_id = frame_id_build_unavailable_stack (get_frame_func (this_frame));
+}
+
+static int
+cygwin_sigwrapper_frame_sniffer (const struct frame_unwind *self,
+				       frame_info_ptr this_frame,
+				       void **this_cache)
+{
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  struct cygwin_sigwrapper_frame_cache* cache;
+  const char *name;
+  int tlsoffset;
+  CORE_ADDR start, end;
+
+  CORE_ADDR pc = get_frame_pc (this_frame);
+  find_pc_partial_function (pc, &name, &start, &end);
+
+  if (!name)
+    return 0;
+
+  if ((strcmp(name, "_sigbe") != 0) && (strcmp(name, "__sigbe") != 0) &&
+      (strcmp(name, "sigdelayed") != 0) && (strcmp(name, "_sigdelayed") != 0))
+    return 0;
+
+  if (frame_debug)
+    gdb_printf (gdb_stdlog,
+			"cygwin_sigwrapper_frame_sniffer name=%s, start=%s, end=%s\n",
+			name, paddress (gdbarch, start), paddress (gdbarch, end));
+
+  cygwin_sigwrapper_frame_analyze(gdbarch, start, end, &tlsoffset);
+  if (tlsoffset == 0)
+    return 0;
+
+  if (frame_debug)
+    gdb_printf (gdb_stdlog,
+			"cygwin_sigwrapper_frame_sniffer sigstackptroffset=%x\n",
+			tlsoffset);
+
+  cache = FRAME_OBSTACK_ZALLOC (struct cygwin_sigwrapper_frame_cache);
+  cache->tlsoffset = tlsoffset;
+
+  *this_cache = cache;
+  cygwin_sigwrapper_frame_cache (this_frame, this_cache);
+
+  return 1;
+}
+
+/* Cygwin sigwapper unwinder.  */
+
+const struct frame_unwind cygwin_sigwrapper_frame_unwind =
+{
+  "cygwin sigwrapper",
+  NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
+  &cygwin_sigwrapper_frame_this_id,
+  &cygwin_sigwrapper_frame_prev_register,
+  NULL,
+  &cygwin_sigwrapper_frame_sniffer
+};
