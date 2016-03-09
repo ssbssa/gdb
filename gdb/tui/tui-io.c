@@ -332,6 +332,8 @@ tui_prep_terminal (int notused1)
      rl_prompt because it points to an alloca buffer).  */
   xfree (tui_rl_saved_prompt);
   tui_rl_saved_prompt = rl_prompt != NULL ? xstrdup (rl_prompt) : NULL;
+
+  mouse_set (MOUSE_WHEEL_SCROLL);
 }
 
 /* Readline callback to restore the terminal.  It is called once each
@@ -339,6 +341,7 @@ tui_prep_terminal (int notused1)
 static void
 tui_deprep_terminal (void)
 {
+  mouse_set (0);
 }
 
 #ifdef TUI_USE_PIPE_FOR_READLINE
