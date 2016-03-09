@@ -607,6 +607,8 @@ tui_disable (void)
   rl_startup_hook = 0;
   rl_already_prompted = 0;
 
+  mouse_set (0);
+
   /* Leave curses and restore previous gdb terminal setting.  */
   endwin ();
 

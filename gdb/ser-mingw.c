@@ -599,6 +599,12 @@ console_select_thread (void *arg)
 		  break;
 		}
 	    }
+	  else if (record.EventType == MOUSE_EVENT &&
+		   record.Event.MouseEvent.dwEventFlags == MOUSE_WHEELED)
+	    {
+	      SetEvent (state->read_event);
+	      break;
+	    }
 
 	  /* Otherwise discard it and wait again.  */
 	  ReadConsoleInput (h, &record, 1, &n_records);

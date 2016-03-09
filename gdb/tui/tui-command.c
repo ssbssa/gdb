@@ -76,6 +76,13 @@ tui_dispatch_ctrl_char (unsigned int ch)
     case KEY_LEFT:
       tui_scroll_right (win_info, 1);
       break;
+    case KEY_MOUSE:
+      request_mouse_pos ();
+      if (MOUSE_WHEEL_UP)
+	tui_scroll_backward (win_info, 3);
+      else if (MOUSE_WHEEL_DOWN)
+	tui_scroll_forward (win_info, 3);
+      break;
     case '\f':
       break;
     default:
