@@ -588,6 +588,7 @@ tui_redisplay_readline (void)
 static void
 tui_prep_terminal (int notused1)
 {
+  mouse_set (MOUSE_WHEEL_SCROLL);
 }
 
 /* Readline callback to restore the terminal.  It is called once each
@@ -595,6 +596,7 @@ tui_prep_terminal (int notused1)
 static void
 tui_deprep_terminal (void)
 {
+  mouse_set (0);
 }
 
 #ifdef TUI_USE_PIPE_FOR_READLINE
@@ -926,6 +928,13 @@ tui_dispatch_ctrl_char (unsigned int ch)
       break;
     case KEY_LEFT:
       win_info->right_scroll (1);
+      break;
+    case KEY_MOUSE:
+      request_mouse_pos ();
+      if (MOUSE_WHEEL_UP)
+	win_info->backward_scroll (3);
+      else if (MOUSE_WHEEL_DOWN)
+	win_info->forward_scroll (3);
       break;
     case '\f':
       break;
