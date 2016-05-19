@@ -236,6 +236,7 @@ delete_thread_info (thread_info *thread)
 
   remove_thread (thread);
   CloseHandle (th->h);
+  free (th->name);
   free (th);
 }
 
@@ -334,6 +335,62 @@ child_xfer_memory (CORE_ADDR memaddr, char *our, int len,
     return done;
   else
     return success ? done : -1;
+}
+
+#undef	MIN
+#define MIN(A, B) (((A) <= (B)) ? (A) : (B))
+
+static int
+target_read_string (CORE_ADDR memaddr, char **string, int len)
+{
+  int tlen, offset, i;
+  gdb_byte buf[4];
+  char *buffer;
+  int buffer_allocated;
+  char *bufptr;
+  unsigned int nbytes_read = 0;
+
+  buffer_allocated = 4;
+  buffer = (char *) xmalloc (buffer_allocated);
+  bufptr = buffer;
+
+  while (len > 0)
+    {
+      tlen = MIN (len, 4 - (memaddr & 3));
+      offset = memaddr & 3;
+
+      i = child_xfer_memory (memaddr & ~3, (char *) buf, sizeof buf, 0, 0);
+      if (i != sizeof buf)
+	goto done;
+
+      if (bufptr - buffer + tlen > buffer_allocated)
+	{
+	  unsigned int bytes;
+
+	  bytes = bufptr - buffer;
+	  buffer_allocated *= 2;
+	  buffer = (char *) xrealloc (buffer, buffer_allocated);
+	  bufptr = buffer + bytes;
+	}
+
+      for (i = 0; i < tlen; i++)
+	{
+	  *bufptr++ = buf[i + offset];
+	  if (buf[i + offset] == '\000')
+	    {
+	      nbytes_read += i + 1;
+	      goto done;
+	    }
+	}
+
+      memaddr += tlen;
+      len -= tlen;
+      nbytes_read += tlen;
+    }
+
+done:
+  *string = buffer;
+  return nbytes_read;
 }
 
 /* Clear out any old thread list and reinitialize it to a pristine
@@ -1227,6 +1284,17 @@ handle_unload_dll (void)
   unloaded_dll (NULL, load_addr);
 }
 
+#pragma pack(push,8)
+typedef struct tagTHREADNAME_INFO
+{
+  DWORD dwType;
+  LPCSTR szName;
+  DWORD dwThreadID;
+  DWORD dwFlags;
+} THREADNAME_INFO;
+#pragma pack(pop)
+#define EXCEPTION_THREAD_NAME 0x406d1388
+
 static void
 handle_exception (struct target_waitstatus *ourstatus)
 {
@@ -1320,6 +1388,41 @@ handle_exception (struct target_waitstatus *ourstatus)
       OUTMSG2 (("EXCEPTION_NONCONTINUABLE_EXCEPTION"));
       ourstatus->value.sig = GDB_SIGNAL_ILL;
       break;
+    case EXCEPTION_THREAD_NAME:
+      if (current_event.u.Exception.ExceptionRecord.NumberParameters
+	  == sizeof (THREADNAME_INFO) / sizeof (ULONG_PTR))
+	{
+	  THREADNAME_INFO *tni = (THREADNAME_INFO *)
+	    current_event.u.Exception.ExceptionRecord.ExceptionInformation;
+
+	  DWORD thread_id = tni->dwThreadID;
+	  ptid_t ptid;
+	  win32_thread_info *th;
+	  if (thread_id == (DWORD)-1)
+	    thread_id = current_event.dwThreadId;
+	  ptid = ptid_t (current_event.dwProcessId, thread_id, 0);
+	  th = thread_rec (ptid, FALSE);
+
+	  if (th && tni->dwType == 0x1000 && !tni->dwFlags)
+	    {
+	      char *thread_name = NULL;
+	      if (!tni->szName ||
+		  target_read_string((size_t)tni->szName, &thread_name,
+				     1024))
+		{
+		  if (thread_name && !*thread_name)
+		    {
+		      xfree (thread_name);
+		      thread_name = NULL;
+		    }
+		  if (th->name)
+		    xfree (th->name);
+		  th->name = thread_name;
+		}
+	    }
+	}
+      ourstatus->kind = TARGET_WAITKIND_SPURIOUS;
+      return;
     default:
       if (current_event.u.Exception.dwFirstChance)
 	{
@@ -1833,6 +1936,13 @@ win32_sw_breakpoint_from_kind (int kind, int *size)
   return the_low_target.breakpoint;
 }
 
+static const char *
+win32_thread_name (ptid_t thread)
+{
+  win32_thread_info *th = thread_rec (thread, 0);
+  return th ? th->name : NULL;
+}
+
 static struct target_ops win32_target_ops = {
   win32_create_inferior,
   NULL,  /* post_create_inferior */
@@ -1910,6 +2020,7 @@ static struct target_ops win32_target_ops = {
   NULL, /* multifs_readlink */
   NULL, /* breakpoint_kind_from_pc */
   win32_sw_breakpoint_from_kind,
+  win32_thread_name,
 };
 
 /* Initialize the Win32 backend.  */
