@@ -314,6 +314,66 @@ child_xfer_memory (CORE_ADDR memaddr, char *our, int len,
     return success ? done : -1;
 }
 
+#undef MIN
+#define MIN(A, B) (((A) <= (B)) ? (A) : (B))
+
+static gdb::unique_xmalloc_ptr<char>
+target_read_string (CORE_ADDR memaddr, int len)
+{
+  int tlen, offset, i;
+  gdb_byte buf[4];
+  char *buffer;
+  int buffer_allocated;
+  char *bufptr;
+  unsigned int nbytes_read = 0;
+
+  buffer_allocated = 4;
+  buffer = (char *) xmalloc (buffer_allocated);
+  bufptr = buffer;
+
+  while (len > 0)
+    {
+      tlen = MIN (len, 4 - (memaddr & 3));
+      offset = memaddr & 3;
+
+      i = child_xfer_memory (memaddr & ~3, (char *) buf, sizeof buf, 0, 0);
+      if (i != sizeof buf)
+       goto done;
+
+      if (bufptr - buffer + tlen > buffer_allocated)
+       {
+         unsigned int bytes;
+
+         bytes = bufptr - buffer;
+         buffer_allocated *= 2;
+         buffer = (char *) xrealloc (buffer, buffer_allocated);
+         bufptr = buffer + bytes;
+       }
+
+      for (i = 0; i < tlen; i++)
+       {
+         *bufptr++ = buf[i + offset];
+         if (buf[i + offset] == '\000')
+           {
+             nbytes_read += i + 1;
+             goto done;
+           }
+       }
+
+      memaddr += tlen;
+      len -= tlen;
+      nbytes_read += tlen;
+    }
+
+done:
+  if (nbytes_read == 0)
+    {
+      xfree (buffer);
+      return gdb::unique_xmalloc_ptr<char> ();
+    }
+  return gdb::unique_xmalloc_ptr<char> (buffer);
+}
+
 /* Clear out any old thread list and reinitialize it to a pristine
    state. */
 static void
@@ -1028,11 +1088,41 @@ fake_breakpoint_event (void)
   for_each_thread (suspend_one_thread);
 }
 
+#pragma pack(push,8)
+typedef struct tagTHREADNAME_INFO
+{
+  DWORD dwType;
+  LPCSTR szName;
+  DWORD dwThreadID;
+  DWORD dwFlags;
+} THREADNAME_INFO;
+#pragma pack(pop)
+#define EXCEPTION_THREAD_NAME 0x406d1388
+
 /* See nat/windows-nat.h.  */
 
 bool
 windows_nat::handle_ms_vc_exception (const EXCEPTION_RECORD *rec)
 {
+  if (rec->NumberParameters >= sizeof (THREADNAME_INFO) / sizeof (ULONG_PTR))
+    {
+      THREADNAME_INFO *tni = (THREADNAME_INFO *)
+	current_event.u.Exception.ExceptionRecord.ExceptionInformation;
+
+      DWORD thread_id = tni->dwThreadID;
+      ptid_t ptid;
+      windows_thread_info *th;
+      if (thread_id == (DWORD)-1)
+	thread_id = current_event.dwThreadId;
+      ptid = ptid_t (current_event.dwProcessId, thread_id, 0);
+      th = thread_rec (ptid, DONT_INVALIDATE_CONTEXT);
+
+      if (th && tni->dwType == 0x1000 && !tni->dwFlags)
+	th->name = target_read_string ((size_t) tni->szName, 1024);
+
+      return true;
+    }
+
   return false;
 }
 
@@ -1476,6 +1566,13 @@ bool
 win32_process_target::supports_stopped_by_sw_breakpoint ()
 {
   return true;
+}
+
+const char *
+win32_process_target::thread_name (ptid_t thread)
+{
+  windows_thread_info *th = thread_rec (thread, DONT_INVALIDATE_CONTEXT);
+  return th ? th->name.get () : nullptr;
 }
 
 CORE_ADDR
