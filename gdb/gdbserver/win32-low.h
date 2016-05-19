@@ -37,6 +37,9 @@ typedef struct win32_thread_info
   /* Thread Information Block address.  */
   CORE_ADDR thread_local_base;
 
+  /* Thread name.  */
+  char *name;
+
   /* Non zero if SuspendThread was called on this thread.  */
   int suspended;
 
