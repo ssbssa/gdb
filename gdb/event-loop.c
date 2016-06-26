@@ -319,7 +319,7 @@ gdb_do_one_event (void)
 	case 1:
 	  /* Are there events already waiting to be collected on the
 	     monitored file descriptors?  */
-	  res = gdb_wait_for_event (0);
+	  res = 0;
 	  break;
 	case 2:
 	  /* Are there any asynchronous event handlers ready?  */
