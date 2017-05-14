@@ -294,6 +294,7 @@ solib_target_free_so (struct so_list *so)
 
   gdb_assert (li->name.empty ());
 
+  xfree (li->offsets);
   delete li;
 }
 
