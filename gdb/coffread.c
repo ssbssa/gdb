@@ -384,10 +384,8 @@ static void
 coff_start_symtab (struct objfile *objfile, const char *name)
 {
   start_symtab (objfile,
-  /* We fill in the filename later.  start_symtab puts this pointer
-     into last_source_file and we put it in subfiles->name, which
-     end_symtab frees; that's why it must be malloc'd.  */
-		 xstrdup (name),
+  /* We fill in the filename later.  */
+		 name,
   /* We never know the directory name for COFF.  */
 		 NULL,
   /* The start address is irrelevant, since we set
