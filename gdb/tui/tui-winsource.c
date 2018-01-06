@@ -72,11 +72,10 @@ void
 tui_update_source_window (struct tui_win_info *win_info,
 			  struct gdbarch *gdbarch,
 			  struct symtab *s,
-			  struct tui_line_or_address line_or_addr,
-			  int noerror)
+			  struct tui_line_or_address line_or_addr)
 {
   win_info->detail.source_info.horizontal_offset = 0;
-  tui_update_source_window_as_is (win_info, gdbarch, s, line_or_addr, noerror);
+  tui_update_source_window_as_is (win_info, gdbarch, s, line_or_addr);
 
   return;
 }
@@ -88,13 +87,12 @@ void
 tui_update_source_window_as_is (struct tui_win_info *win_info, 
 				struct gdbarch *gdbarch,
 				struct symtab *s,
-				struct tui_line_or_address line_or_addr, 
-				int noerror)
+				struct tui_line_or_address line_or_addr)
 {
   enum tui_status ret;
 
   if (win_info->generic.type == SRC_WIN)
-    ret = tui_set_source_content (s, line_or_addr.u.line_no, noerror);
+    ret = tui_set_source_content (s, line_or_addr.u.line_no);
   else
     ret = tui_set_disassem_content (gdbarch, line_or_addr.u.addr);
 
@@ -153,7 +151,7 @@ tui_update_source_windows_with_addr (struct gdbarch *gdbarch, CORE_ADDR addr)
 	  sal = find_pc_line (addr, 0);
 	  l.loa = LOA_LINE;
 	  l.u.line_no = sal.line;
-	  tui_show_symtab_source (gdbarch, sal.symtab, l, FALSE);
+	  tui_show_symtab_source (gdbarch, sal.symtab, l);
 	  break;
 	}
     }
@@ -195,7 +193,7 @@ tui_update_source_windows_with_line (struct symtab *s, int line)
     default:
       l.loa = LOA_LINE;
       l.u.line_no = line;
-      tui_show_symtab_source (gdbarch, s, l, FALSE);
+      tui_show_symtab_source (gdbarch, s, l);
       if (tui_current_layout () == SRC_DISASSEM_COMMAND)
 	{
 	  find_line_pc (s, line, &pc);
@@ -332,8 +330,7 @@ tui_refill_source_window (struct tui_win_info *win_info)
 				  win_info->detail.source_info.gdbarch,
 				  s,
 				  win_info->generic.content[0]
-				    ->which_element.source.line_or_addr,
-				  FALSE);
+				    ->which_element.source.line_or_addr);
 }
 
 /* Scroll the source forward or backward horizontally.  */

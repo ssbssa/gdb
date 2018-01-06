@@ -124,8 +124,7 @@ copy_source_line (const char **ptr, int line_no, int first_col,
 /* Function to display source in the source window.  */
 enum tui_status
 tui_set_source_content (struct symtab *s, 
-			int line_no,
-			int noerror)
+			int line_no)
 {
   enum tui_status ret = TUI_FAILURE;
 
@@ -144,14 +143,6 @@ tui_set_source_content (struct symtab *s,
 	  if (!g_source_cache.get_source_lines (s, line_no, line_no + nlines,
 						&srclines))
 	    {
-	      if (!noerror)
-		{
-		  const char *filename = symtab_to_filename_for_display (s);
-		  char *name = (char *) alloca (strlen (filename) + 100);
-
-		  sprintf (name, "%s:%d", filename, line_no);
-		  print_sys_errmsg (name, errno);
-		}
 	      ret = TUI_FAILURE;
 	    }
 	  else
@@ -286,11 +277,10 @@ tui_set_source_content_nil (struct tui_win_info *win_info,
    initializes the horizontal scroll to 0.  */
 void
 tui_show_symtab_source (struct gdbarch *gdbarch, struct symtab *s,
-			struct tui_line_or_address line, 
-			int noerror)
+			struct tui_line_or_address line)
 {
   TUI_SRC_WIN->detail.source_info.horizontal_offset = 0;
-  tui_update_source_window_as_is (TUI_SRC_WIN, gdbarch, s, line, noerror);
+  tui_update_source_window_as_is (TUI_SRC_WIN, gdbarch, s, line);
 }
 
 
@@ -339,9 +329,9 @@ tui_vertical_source_scroll (enum tui_scroll_direction scroll_direction,
 	{
 	  l.u.line_no = content[0]->which_element.source.line_or_addr.u.line_no
 	    - num_to_scroll;
-	  if (l.u.line_no <= 0)
-	    l.u.line_no = 1;
 	}
+      if (l.u.line_no <= 0)
+	l.u.line_no = 1;
 
       print_source_lines (s, l.u.line_no, l.u.line_no + 1, 0);
     }

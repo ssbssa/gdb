@@ -1414,7 +1414,7 @@ make_visible_with_new_height (struct tui_win_info *win_info)
 	  line_or_addr = win_info->detail.source_info.start_line_or_addr;
 	  tui_free_win_content (&win_info->generic);
 	  tui_update_source_window (win_info, gdbarch,
-				    cursal.symtab, line_or_addr, TRUE);
+				    cursal.symtab, line_or_addr);
 	}
       else if (deprecated_safe_get_selected_frame () != NULL)
 	{
@@ -1435,7 +1435,7 @@ make_visible_with_new_height (struct tui_win_info *win_info)
 	      line.loa = LOA_ADDRESS;
 	      find_line_pc (s, cursal.line, &line.u.addr);
 	    }
-	  tui_update_source_window (win_info, gdbarch, s, line, TRUE);
+	  tui_update_source_window (win_info, gdbarch, s, line);
 	}
       if (tui_win_has_locator (win_info))
 	{

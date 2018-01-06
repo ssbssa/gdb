@@ -431,7 +431,7 @@ tui_show_frame_info (struct frame_info *fi)
 		    && tui_line_is_displayed (item->locator.line_no,
 					      win_info, TRUE)))
 		tui_update_source_window (win_info, get_frame_arch (fi),
-					  sal.symtab, l, TRUE);
+					  sal.symtab, l);
 	      else
 		{
 		  l.u.line_no = item->locator.line_no;
@@ -449,7 +449,7 @@ tui_show_frame_info (struct frame_info *fi)
 		  if (!tui_addr_is_displayed (item->locator.addr,
 					      win_info, TRUE))
 		    tui_update_source_window (win_info, get_frame_arch (fi),
-					      sal.symtab, a, TRUE);
+					      sal.symtab, a);
 		  else
 		    {
 		      a.u.addr = item->locator.addr;
