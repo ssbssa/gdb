@@ -41,12 +41,10 @@ extern int tui_update_breakpoint_info (struct tui_win_info *win,
 extern void tui_display_main (void);
 extern void tui_update_source_window (struct tui_win_info *, 
 				      struct gdbarch *, struct symtab *,
-				      struct tui_line_or_address, 
-				      int);
+				      struct tui_line_or_address);
 extern void tui_update_source_window_as_is (struct tui_win_info *,
 					    struct gdbarch *, struct symtab *,
-					    struct tui_line_or_address, 
-					    int);
+					    struct tui_line_or_address);
 extern void tui_update_source_windows_with_addr (struct gdbarch *, CORE_ADDR);
 extern void tui_update_source_windows_with_line (struct symtab *, 
 						 int);
