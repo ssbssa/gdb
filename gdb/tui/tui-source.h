@@ -31,10 +31,9 @@ extern void tui_set_source_content_nil (struct tui_win_info *,
 					const char *);
 
 extern enum tui_status tui_set_source_content (struct symtab *, 
-					       int, int);
+					       int);
 extern void tui_show_symtab_source (struct gdbarch *, struct symtab *,
-				    struct tui_line_or_address,
-				    int);
+				    struct tui_line_or_address);
 extern int tui_source_is_displayed (const char *);
 extern void tui_vertical_source_scroll (enum tui_scroll_direction,
 					int);
