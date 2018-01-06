@@ -272,7 +272,7 @@ tui_show_disassem (struct gdbarch *gdbarch, CORE_ADDR start_addr)
   val.loa = LOA_ADDRESS;
   val.u.addr = start_addr;
   tui_add_win_to_layout (DISASSEM_WIN);
-  tui_update_source_window (TUI_DISASM_WIN, gdbarch, s, val, FALSE);
+  tui_update_source_window (TUI_DISASM_WIN, gdbarch, s, val);
 
   /* If the focus was in the src win, put it in the asm win, if the
      source view isn't split.  */
@@ -302,7 +302,7 @@ tui_show_disassem_and_update_source (struct gdbarch *gdbarch,
       sal = find_pc_line (start_addr, 0);
       val.loa = LOA_LINE;
       val.u.line_no = sal.line;
-      tui_update_source_window (TUI_SRC_WIN, gdbarch, sal.symtab, val, TRUE);
+      tui_update_source_window (TUI_SRC_WIN, gdbarch, sal.symtab, val);
       if (sal.symtab)
 	{
 	  set_current_source_symtab_and_line (sal);
@@ -394,6 +394,6 @@ tui_vertical_disassem_scroll (enum tui_scroll_direction scroll_direction,
       val.loa = LOA_ADDRESS;
       val.u.addr = tui_find_disassembly_address (gdbarch, pc, dir);
       tui_update_source_window_as_is (TUI_DISASM_WIN, gdbarch,
-				      NULL, val, FALSE);
+				      NULL, val);
     }
 }
