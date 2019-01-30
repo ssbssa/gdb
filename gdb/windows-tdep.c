@@ -34,6 +34,9 @@
 #include "solib.h"
 #include "solib-target.h"
 #include "gdbcore.h"
+#include "charset.h"
+#include "coff/internal.h"
+#include "libcoff.h"
 
 struct cmd_list_element *info_w32_cmdlist;
 
@@ -615,10 +618,13 @@ core_process_module_section (bfd *abfd, asection *sect, void *obj)
   char *module_name;
   size_t module_name_size;
   CORE_ADDR base_addr;
+  int is_module, is_coremodule;
 
   gdb_byte *buf = NULL;
 
-  if (!startswith (sect->name, ".module"))
+  is_module = startswith (sect->name, ".module");
+  is_coremodule = startswith (sect->name, ".coremodule/");
+  if (!is_module && !is_coremodule)
     return;
 
   buf = (gdb_byte *) xmalloc (bfd_get_section_size (sect) + 1);
@@ -631,6 +637,33 @@ core_process_module_section (bfd *abfd, asection *sect, void *obj)
 				 buf, 0, bfd_get_section_size (sect)))
     goto out;
 
+
+  if (is_coremodule)
+    {
+      auto_obstack host_name;
+      convert_between_encodings (target_wide_charset (data->gdbarch),
+				 host_charset (),
+				 buf, bfd_get_section_size (sect), 2,
+				 &host_name, translit_char);
+      obstack_grow_str0 (&host_name, "");
+      module_name = (char *) obstack_base (&host_name);
+
+      sscanf (sect->name + 12, "%llx", &base_addr);
+
+      if (data->module_count != 0)
+	windows_xfer_shared_library (module_name, base_addr,
+				     data->gdbarch, data->obstack);
+      else if (exec_bfd && symfile_objfile)
+	{
+	  CORE_ADDR vmaddr = pe_data (exec_bfd)->pe_opthdr.ImageBase;
+	  if (vmaddr != base_addr)
+	    objfile_rebase (symfile_objfile, base_addr - vmaddr);
+	}
+      data->module_count++;
+
+      xfree (buf);
+      return;
+    }
 
 
   /* A DWORD (data_type) followed by struct windows_core_module_info.  */
