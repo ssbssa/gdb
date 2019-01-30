@@ -102,6 +102,26 @@ static const int FULL_TIB_SIZE = 0x1000;
 
 static int maint_display_all_tib = 0;
 
+static struct gdbarch_data *windows_gdbarch_data_handle;
+
+struct windows_gdbarch_data
+  {
+    struct type *siginfo_type;
+  };
+
+static void *
+init_windows_gdbarch_data (struct gdbarch *gdbarch)
+{
+  return GDBARCH_OBSTACK_ZALLOC (gdbarch, struct windows_gdbarch_data);
+}
+
+static struct windows_gdbarch_data *
+get_windows_gdbarch_data (struct gdbarch *gdbarch)
+{
+  return ((struct windows_gdbarch_data *)
+	  gdbarch_data (gdbarch, windows_gdbarch_data_handle));
+}
+
 /* Define Thread Local Base pointer type.  */
 
 static struct type *
@@ -462,6 +482,45 @@ init_w32_command_list (void)
     }
 }
 
+static struct type *
+windows_get_siginfo_type (struct gdbarch *gdbarch)
+{
+  struct windows_gdbarch_data *windows_gdbarch_data;
+  struct type *uint_type, *void_ptr_type;
+  struct type *siginfo_ptr_type, *siginfo_type;
+  int i;
+
+  windows_gdbarch_data = get_windows_gdbarch_data (gdbarch);
+  if (windows_gdbarch_data->siginfo_type != NULL)
+    return windows_gdbarch_data->siginfo_type;
+
+  uint_type = arch_integer_type (gdbarch, gdbarch_int_bit (gdbarch),
+				 1, "unsigned int");
+  void_ptr_type = lookup_pointer_type (builtin_type (gdbarch)->builtin_void);
+
+  siginfo_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_STRUCT);
+  TYPE_NAME (siginfo_type) = xstrdup ("EXCEPTION_RECORD");
+
+  siginfo_ptr_type = arch_type (gdbarch, TYPE_CODE_PTR,
+				gdbarch_ptr_bit (gdbarch), NULL);
+  TYPE_TARGET_TYPE (siginfo_ptr_type) = siginfo_type;
+
+  append_composite_type_field (siginfo_type, "ExceptionCode", uint_type);
+  append_composite_type_field (siginfo_type, "ExceptionFlags", uint_type);
+  append_composite_type_field (siginfo_type, "ExceptionRecord",
+			       siginfo_ptr_type);
+  append_composite_type_field (siginfo_type, "ExceptionAddress", void_ptr_type);
+  append_composite_type_field (siginfo_type, "NumberParameters", uint_type);
+  append_composite_type_field_aligned (siginfo_type, "ExceptionInformation",
+				       lookup_array_range_type (void_ptr_type,
+								0, 14),
+				       TYPE_LENGTH (void_ptr_type));
+
+  windows_gdbarch_data->siginfo_type = siginfo_type;
+
+  return siginfo_type;
+}
+
 /* To be called from the various GDB_OSABI_CYGWIN handlers for the
    various Windows architectures and machine types.  */
 
@@ -479,6 +538,8 @@ windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
     (gdbarch, windows_iterate_over_objfiles_in_search_order);
 
   set_solib_ops (gdbarch, &solib_target_so_ops);
+
+  set_gdbarch_get_siginfo_type (gdbarch, windows_get_siginfo_type);
 }
 
 /* Implementation of `tlb' variable.  */
@@ -493,6 +554,9 @@ static const struct internalvar_funcs tlb_funcs =
 void
 _initialize_windows_tdep (void)
 {
+  windows_gdbarch_data_handle =
+    gdbarch_data_register_post_init (init_windows_gdbarch_data);
+
   init_w32_command_list ();
   add_cmd ("thread-information-block", class_info, display_tib,
 	   _("Display thread information block."),
