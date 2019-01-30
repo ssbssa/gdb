@@ -761,7 +761,7 @@ const bfd_target
     _bfd_dummy_target,
     COFF_CHECK_FORMAT,
     bfd_generic_archive_p,
-    COFF_CHECK_FORMAT
+    coff_core_file_p
   },
   {				/* bfd_set_format */
     _bfd_bool_bfd_false_error,
@@ -833,7 +833,7 @@ const bfd_target
     _bfd_dummy_target,
     COFF_CHECK_FORMAT,
     bfd_generic_archive_p,
-    COFF_CHECK_FORMAT
+    coff_core_file_p
   },
   {				/* bfd_set_format */
     _bfd_bool_bfd_false_error,
