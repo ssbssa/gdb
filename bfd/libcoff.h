@@ -650,6 +650,10 @@ extern bool _bfd_coff_gc_sections
 extern const char *_bfd_coff_group_name
   (bfd *, const asection *) ATTRIBUTE_HIDDEN;
 
+extern bfd_cleanup coff_core_file_p
+  (bfd *);
+
+
 /* Functions in xcofflink.c.  */
 
 extern long _bfd_xcoff_get_dynamic_symtab_upper_bound
