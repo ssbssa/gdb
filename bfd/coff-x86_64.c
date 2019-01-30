@@ -905,7 +905,7 @@ const bfd_target
     _bfd_dummy_target,
     amd64coff_object_p,
     bfd_generic_archive_p,
-    amd64coff_object_p
+    coff_core_file_p
   },
   {				/* bfd_set_format.  */
     _bfd_bool_bfd_false_error,
@@ -978,7 +978,7 @@ const bfd_target
     _bfd_dummy_target,
     amd64coff_object_p,
     bfd_generic_archive_p,
-    amd64coff_object_p
+    coff_core_file_p
   },
   {				/* bfd_set_format.  */
     _bfd_bool_bfd_false_error,
