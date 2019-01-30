@@ -3287,16 +3287,436 @@ _bfd_coff_free_cached_info (bfd *abfd)
 	  pe_data (abfd)->comdat_hash = NULL;
 	}
 
-      _bfd_dwarf2_cleanup_debug_info (abfd, &tdata->dwarf2_find_line_info);
-      _bfd_stab_cleanup (abfd, &tdata->line_info);
+      if (bfd_get_format (abfd) == bfd_object)
+	{
+	  _bfd_dwarf2_cleanup_debug_info (abfd, &tdata->dwarf2_find_line_info);
+	  _bfd_stab_cleanup (abfd, &tdata->line_info);
+	}
 
       /* PR 25447:
 	 Do not clear the keep_syms and keep_strings flags.
 	 These may have been set by pe_ILF_build_a_bfd() indicating
 	 that the syms and strings pointers are not to be freed.  */
-      if (!_bfd_coff_free_symbols (abfd))
+      if (bfd_get_format (abfd) == bfd_object
+	  && !_bfd_coff_free_symbols (abfd))
 	return false;
     }
 
   return _bfd_generic_bfd_free_cached_info (abfd);
+}
+
+/* Read minidump file.  */
+
+#pragma pack(push,4)
+
+typedef struct
+{
+  uint8_t sig[4];
+  uint32_t ver;
+  uint32_t streamCount;
+  uint32_t streamRva;
+  uint32_t checksum;
+  uint32_t timestamp;
+  uint64_t flags;
+}
+dump_header;
+
+typedef struct
+{
+  uint32_t size;
+  uint32_t rva;
+}
+dump_loc_desc;
+
+typedef struct
+{
+  uint32_t type;
+  dump_loc_desc loc;
+}
+dump_directory;
+
+typedef enum
+{
+  UnusedStream,
+  ReservedStream0,
+  ReservedStream1,
+  ThreadListStream,
+  ModuleListStream,
+  MemoryListStream,
+  ExceptionStream,
+  SystemInfoStream,
+  ThreadExListStream,
+  Memory64ListStream,
+  CommentStreamA,
+  CommentStreamW,
+  HandleDataStream,
+  FunctionTableStream,
+  UnloadedModuleListStream,
+  MiscInfoStream,
+  MemoryInfoListStream,
+  ThreadInfoListStream,
+  HandleOperationListStream,
+  TokenStream,
+  JavaScriptDataStream,
+  SystemMemoryInfoStream,
+  ProcessVmCountersStream,
+  IptTraceStream,
+  ThreadNamesStream,
+  ceStreamNull,
+  ceStreamSystemInfo,
+  ceStreamException,
+  ceStreamModuleList,
+  ceStreamProcessList,
+  ceStreamThreadList,
+  ceStreamThreadContextList,
+  ceStreamThreadCallStackList,
+  ceStreamMemoryVirtualList,
+  ceStreamMemoryPhysicalList,
+  ceStreamBucketParameters,
+  ceStreamProcessModuleMap,
+  ceStreamDiagnosisList,
+  LastReservedStream
+}
+dump_stream_type;
+
+typedef struct
+{
+  uint64_t startAddress;
+  dump_loc_desc memory;
+}
+dump_memory_desc;
+
+typedef struct
+{
+  uint32_t threadId;
+  uint32_t suspendCount;
+  uint32_t priorityClass;
+  uint32_t priority;
+  uint64_t teb;
+  dump_memory_desc stack;
+  dump_loc_desc context;
+}
+dump_thread;
+
+typedef struct
+{
+  uint64_t startAddress;
+  uint64_t size;
+}
+dump_memory_desc64;
+
+typedef struct
+{
+  uint64_t rangeCount;
+  uint64_t baseRva;
+}
+dump_memory64_list;
+
+typedef struct
+{
+  uint32_t code;
+  uint32_t flags;
+  uint64_t record;
+  uint64_t address;
+  uint32_t parameterCount;
+  uint32_t unusedAlign;
+  uint64_t information[15];
+}
+dump_exception;
+
+typedef struct
+{
+  uint32_t threadId;
+  uint32_t unusedAlign;
+  dump_exception record;
+  dump_loc_desc context;
+}
+dump_exception_stream;
+
+typedef struct
+{
+  uint32_t signature;
+  uint32_t structVersion;
+  uint32_t fileVersionMS;
+  uint32_t fileVersionLS;
+  uint32_t productVersionMS;
+  uint32_t productVersionLS;
+  uint32_t fileFlagsMask;
+  uint32_t fileFlags;
+  uint32_t fileOS;
+  uint32_t fileType;
+  uint32_t fileSubtype;
+  uint32_t fileDateMS;
+  uint32_t fileDateLS;
+}
+dump_file_info;
+
+typedef struct
+{
+  uint64_t base;
+  uint32_t size;
+  uint32_t checksum;
+  uint32_t timestamp;
+  uint32_t nameRva;
+  dump_file_info versionInfo;
+  dump_loc_desc cvRecord;
+  dump_loc_desc miscRecord;
+  uint64_t reserved0;
+  uint64_t reserved1;
+}
+dump_module;
+
+#pragma pack(pop)
+
+
+static asection *
+make_bfd_asection (bfd *abfd, const char *name, flagword flags,
+		   file_ptr filepos, bfd_size_type size, bfd_vma vma)
+{
+  asection *asect;
+  char *newname;
+
+  newname = bfd_alloc (abfd, (bfd_size_type) strlen (name) + 1);
+  if (!newname)
+    return NULL;
+
+  strcpy (newname, name);
+
+  asect = bfd_make_section_anyway_with_flags (abfd, newname, flags);
+  if (!asect)
+    return NULL;
+
+  asect->filepos = filepos;
+  asect->size = size;
+  asect->vma = vma;
+
+  return asect;
+}
+
+bfd_cleanup
+coff_core_file_p (bfd *abfd)
+{
+  dump_header header;
+  asection *sec;
+  uint32_t s;
+  uint32_t moduleListRva = 0;
+  uint32_t memoryListRva = 0;
+  uint32_t memory64ListRva = 0;
+  uint32_t exceptionRva = 0;
+  uint32_t threadListRva = 0;
+  uint32_t systemInfoRva = 0;
+
+  if (bfd_read (&header, sizeof header, abfd) != sizeof header)
+    goto fail;
+
+  if (header.sig[0] != 'M' || header.sig[1] != 'D' ||
+      header.sig[2] != 'M' || header.sig[3] != 'P')
+    goto fail;
+
+  for (s = 0; s < header.streamCount; s++)
+    {
+      dump_directory dir;
+      if (bfd_read (&dir, sizeof dir, abfd) != sizeof dir)
+	goto fail;
+
+      switch (dir.type)
+	{
+	case ModuleListStream:
+	  moduleListRva = dir.loc.rva;
+	  break;
+	case MemoryListStream:
+	  memoryListRva = dir.loc.rva;
+	  break;
+	case Memory64ListStream:
+	  memory64ListRva = dir.loc.rva;
+	  break;
+	case ExceptionStream:
+	  exceptionRva = dir.loc.rva;
+	  break;
+	case ThreadListStream:
+	  threadListRva = dir.loc.rva;
+	  break;
+	case SystemInfoStream:
+	  systemInfoRva = dir.loc.rva;
+	  break;
+	}
+    }
+
+  if (moduleListRva)
+    {
+      uint32_t moduleCount;
+      dump_module module;
+      char secname[32];
+      uint32_t size;
+      uint32_t m;
+
+      if (bfd_seek (abfd, moduleListRva, SEEK_SET) != 0
+	  || bfd_read (&moduleCount, sizeof moduleCount, abfd)
+	  != sizeof moduleCount)
+	goto fail;
+
+      for (m = 0; m < moduleCount; m++)
+	{
+	  if (bfd_read (&module, sizeof module, abfd) != sizeof module)
+	    goto fail;
+
+	  if (bfd_seek (abfd, module.nameRva, SEEK_SET) != 0
+	      || bfd_read (&size, sizeof size, abfd) != sizeof size)
+	    goto fail;
+
+	  sprintf (secname, ".coremodule/%llx",
+		   (unsigned long long) module.base);
+
+	  sec = make_bfd_asection (abfd, secname,
+				   SEC_HAS_CONTENTS,
+				   module.nameRva + 4,
+				   size,
+				   0);
+	  if (!sec)
+	    goto fail;
+
+	  if (bfd_seek (abfd, moduleListRva + 4 + (m + 1) * sizeof module,
+			SEEK_SET) != 0)
+	    goto fail;
+	}
+    }
+
+  if (memoryListRva)
+    {
+      dump_memory_desc desc;
+      uint32_t rangeCount;
+      uint32_t r;
+
+      if (bfd_seek (abfd, memoryListRva, SEEK_SET) != 0
+	  || bfd_read (&rangeCount, sizeof rangeCount, abfd)
+	  != sizeof rangeCount)
+	goto fail;
+
+      for (r = 0; r < rangeCount; r++)
+	{
+	  if (bfd_read (&desc, sizeof desc, abfd) != sizeof desc)
+	    goto fail;
+
+	  sec = make_bfd_asection (abfd, ".data",
+				   SEC_ALLOC + SEC_LOAD + SEC_HAS_CONTENTS,
+				   desc.memory.rva,
+				   desc.memory.size,
+				   desc.startAddress);
+	  if (!sec)
+	    goto fail;
+	}
+    }
+
+  if (memory64ListRva)
+    {
+      dump_memory64_list list64;
+      dump_memory_desc64 desc64;
+      uint64_t r;
+
+      if (bfd_seek (abfd, memory64ListRva, SEEK_SET) != 0
+	  || bfd_read (&list64, sizeof list64, abfd) != sizeof list64)
+	goto fail;
+
+      for (r = 0; r < list64.rangeCount; r++)
+	{
+	  if (bfd_read (&desc64, sizeof desc64, abfd) != sizeof desc64)
+	    goto fail;
+
+	  sec = make_bfd_asection (abfd, ".data",
+				   SEC_ALLOC + SEC_LOAD + SEC_HAS_CONTENTS,
+				   list64.baseRva,
+				   desc64.size,
+				   desc64.startAddress);
+	  if (!sec)
+	    goto fail;
+
+	  list64.baseRva += desc64.size;
+	}
+    }
+
+  uint32_t exceptionThreadId = 0;
+  if (exceptionRva)
+    {
+      dump_exception_stream exception;
+      char secname[32];
+
+      if (bfd_seek (abfd, exceptionRva, SEEK_SET) != 0
+	  || bfd_read (&exception, sizeof exception, abfd) != sizeof exception)
+	goto fail;
+
+      sec = make_bfd_asection (abfd, ".reg",
+			       SEC_HAS_CONTENTS,
+			       exception.context.rva,
+			       exception.context.size,
+			       0);
+      if (!sec)
+	goto fail;
+
+      sprintf (secname, ".reg/%u", exception.threadId);
+      sec = make_bfd_asection (abfd, secname,
+			       SEC_HAS_CONTENTS,
+			       exception.context.rva,
+			       exception.context.size,
+			       0);
+      if (!sec)
+	goto fail;
+
+      exceptionThreadId = exception.threadId;
+    }
+
+  if (threadListRva)
+    {
+      uint32_t threadCount;
+      dump_thread thread;
+      char secname[32];
+      uint32_t t;
+
+      if (bfd_seek (abfd, threadListRva, SEEK_SET) != 0
+	  || bfd_read (&threadCount, sizeof threadCount, abfd)
+	  != sizeof threadCount)
+	goto fail;
+
+      for (t = 0; t < threadCount; t++)
+	{
+	  if (bfd_read (&thread, sizeof thread, abfd) != sizeof thread)
+	    goto fail;
+
+	  sec = make_bfd_asection (abfd, ".stack",
+				   SEC_ALLOC + SEC_LOAD + SEC_HAS_CONTENTS,
+				   thread.stack.memory.rva,
+				   thread.stack.memory.size,
+				   thread.stack.startAddress);
+	  if (!sec)
+	    goto fail;
+
+	  if (thread.threadId != exceptionThreadId)
+	    {
+	      sprintf (secname, ".reg/%u", thread.threadId);
+	      sec = make_bfd_asection (abfd, secname,
+				       SEC_HAS_CONTENTS,
+				       thread.context.rva,
+				       thread.context.size,
+				       0);
+	      if (!sec)
+		goto fail;
+	    }
+	}
+    }
+
+  if (systemInfoRva)
+    {
+      uint16_t arch;
+      if (bfd_seek (abfd, systemInfoRva, SEEK_SET) != 0
+	  || bfd_read (&arch, sizeof arch, abfd) != sizeof arch
+	  || (arch != 0 && arch != 9))
+	goto fail;
+
+      bfd_default_set_arch_mach (abfd, bfd_arch_i386,
+				 arch == 9 ? bfd_mach_x86_64 : 0);
+    }
+
+  return _bfd_no_cleanup;
+
+fail:
+  return NULL;
 }
