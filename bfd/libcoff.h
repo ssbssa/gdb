@@ -639,6 +639,10 @@ extern bool bfd_coff_gc_sections
 extern const char *bfd_coff_group_name
   (bfd *, const asection *);
 
+extern bfd_cleanup coff_core_file_p
+  (bfd *);
+
+
 /* Functions in xcofflink.c.  */
 
 extern long _bfd_xcoff_get_dynamic_symtab_upper_bound
