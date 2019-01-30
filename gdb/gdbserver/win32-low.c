@@ -74,6 +74,7 @@ static int attaching = 0;
 static HANDLE current_process_handle = NULL;
 static DWORD current_process_id = 0;
 static DWORD main_thread_id = 0;
+static EXCEPTION_RECORD siginfo_er;
 static enum gdb_signal last_sig = GDB_SIGNAL_0;
 
 /* The current debug event from WaitForDebugEvent.  */
@@ -800,6 +801,7 @@ win32_clear_inferiors (void)
     CloseHandle (current_process_handle);
 
   for_each_thread (delete_thread_info);
+  siginfo_er.ExceptionCode = 0;
   clear_inferiors ();
 }
 
@@ -1228,6 +1230,9 @@ static void
 handle_exception (struct target_waitstatus *ourstatus)
 {
   DWORD code = current_event.u.Exception.ExceptionRecord.ExceptionCode;
+
+  memcpy (&siginfo_er, &current_event.u.Exception.ExceptionRecord,
+	  sizeof siginfo_er);
 
   ourstatus->kind = TARGET_WAITKIND_STOPPED;
 
@@ -1754,6 +1759,27 @@ wince_hostio_last_error (char *buf)
 }
 #endif
 
+static int
+win32_xfer_siginfo (const char *annex, unsigned char *readbuf,
+		    unsigned const char *writebuf, CORE_ADDR offset, int len)
+{
+  if (!siginfo_er.ExceptionCode)
+    return -1;
+
+  if (!readbuf)
+    return -1;
+
+  if (offset > sizeof (siginfo_er))
+    return -1;
+
+  if (offset + len > sizeof (siginfo_er))
+    len = sizeof (siginfo_er) - offset;
+
+  memcpy (readbuf, (char *) &siginfo_er + offset, len);
+
+  return len;
+}
+
 /* Write Windows OS Thread Information Block address.  */
 
 static int
@@ -1816,7 +1842,7 @@ static struct target_ops win32_target_ops = {
   hostio_last_error_from_errno,
 #endif
   NULL, /* qxfer_osdata */
-  NULL, /* qxfer_siginfo */
+  win32_xfer_siginfo,
   NULL, /* supports_non_stop */
   NULL, /* async */
   NULL, /* start_non_stop */
