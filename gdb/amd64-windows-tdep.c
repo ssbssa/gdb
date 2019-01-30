@@ -33,6 +33,76 @@
 #include "value.h"
 #include <algorithm>
 
+#define AMD64_WINDOWS_SIZEOF_GREGSET 1232
+
+static int amd64_windows_gregset_reg_offset[] =
+{
+  120, /* rax */
+  144, /* rbx */
+  128, /* rcx */
+  136, /* rdx */
+
+  168, /* rsi */
+  176, /* rdi */
+  160, /* rbp */
+  152, /* rsp */
+
+  184, /* r8 */
+  192, /* r9 */
+  200, /* r10 */
+  208, /* r11 */
+  216, /* r12 */
+  224, /* r13 */
+  232, /* r14 */
+  240, /* r15 */
+
+  248, /* rip */
+  68, /* eflags */
+  56, /* cs */
+  66, /* ss */
+
+  58, /* ds */
+  60, /* es */
+  62, /* fs */
+  64, /* gs */
+
+  288, /* st0 */
+  304, /* st1 */
+  320, /* st2 */
+  336, /* st3 */
+  352, /* st4 */
+  368, /* st5 */
+  384, /* st6 */
+  400, /* st7 */
+
+  256, /* fctrl */
+  258, /* fstat */
+  260, /* ftag */
+  268, /* fiseg */
+  268, /* fioff */
+  276, /* foseg */
+  272, /* fooff */
+  262, /* fop */
+
+  416, /* xmm0 */
+  432, /* xmm1 */
+  448, /* xmm2 */
+  464, /* xmm3 */
+  480, /* xmm4 */
+  496, /* xmm5 */
+  512, /* xmm6 */
+  528, /* xmm7 */
+  544, /* xmm8 */
+  560, /* xmm9 */
+  576, /* xmm10 */
+  592, /* xmm11 */
+  608, /* xmm12 */
+  624, /* xmm13 */
+  640, /* xmm14 */
+  656, /* xmm15 */
+  280, /* mxcsr */
+};
+
 /* The registers used to pass integer arguments during a function call.  */
 static int amd64_windows_dummy_call_integer_regs[] =
 {
@@ -1212,6 +1282,8 @@ amd64_windows_auto_wide_charset (void)
 static void
 amd64_windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 {
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+
   /* The dwarf2 unwinder (appended very early by i386_gdbarch_init) is
      preferred over the SEH one.  The reasons are:
      - binaries without SEH but with dwarf2 debug info are correcly handled
@@ -1241,6 +1313,10 @@ amd64_windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 				    amd64_windows_skip_trampoline_code);
 
   set_gdbarch_skip_prologue (gdbarch, amd64_windows_skip_prologue);
+
+  tdep->gregset_reg_offset = amd64_windows_gregset_reg_offset;
+  tdep->gregset_num_regs = ARRAY_SIZE (amd64_windows_gregset_reg_offset);
+  tdep->sizeof_gregset = AMD64_WINDOWS_SIZEOF_GREGSET;
 
   set_gdbarch_auto_wide_charset (gdbarch, amd64_windows_auto_wide_charset);
 }
