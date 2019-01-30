@@ -594,6 +594,10 @@ extern bool bfd_coff_gc_sections
 extern const char *bfd_coff_group_name
   (bfd *, const asection *);
 
+extern bfd_cleanup coff_core_file_p
+  (bfd *);
+
+
 #define coff_get_section_contents_in_window \
   _bfd_generic_get_section_contents_in_window
 
