@@ -482,12 +482,74 @@ init_w32_command_list (void)
     }
 }
 
+struct enum_value_name
+{
+  uint32_t value;
+  const char *name;
+};
+
+static struct type *
+create_enum (struct gdbarch *gdbarch, int bit, const char *name,
+	     const struct enum_value_name *values, int count)
+{
+  struct type *type;
+  int i;
+
+  type = arch_type (gdbarch, TYPE_CODE_ENUM, bit, name);
+  TYPE_NFIELDS (type) = count;
+  TYPE_FIELDS (type) = (struct field *)
+    TYPE_ZALLOC (type, sizeof (struct field) * count);
+  TYPE_UNSIGNED (type) = 1;
+
+  for (i = 0; i < count; i++)
+  {
+    TYPE_FIELD_NAME (type, i) = values[i].name;
+    SET_FIELD_ENUMVAL (TYPE_FIELD (type, i), values[i].value);
+  }
+
+  return type;
+}
+
+static const struct enum_value_name exception_values[] =
+{
+  { 0xC0000005, "ACCESS_VIOLATION" },
+  { 0xC00000FD, "STACK_OVERFLOW" },
+  { 0xC000008D, "FLOAT_DENORMAL_OPERAND" },
+  { 0xC000008C, "ARRAY_BOUNDS_EXCEEDED" },
+  { 0xC000008F, "FLOAT_INEXACT_RESULT" },
+  { 0xC0000090, "FLOAT_INVALID_OPERATION" },
+  { 0xC0000091, "FLOAT_OVERFLOW" },
+  { 0xC0000092, "FLOAT_STACK_CHECK" },
+  { 0xC0000093, "FLOAT_UNDERFLOW" },
+  { 0xC000008E, "FLOAT_DIVIDE_BY_ZERO" },
+  { 0xC0000094, "INTEGER_DIVIDE_BY_ZERO" },
+  { 0xC0000095, "INTEGER_OVERFLOW" },
+  { 0x80000003, "BREAKPOINT" },
+  { 0x40010005, "DBG_CONTROL_C" },
+  { 0x40010008, "DBG_CONTROL_BREAK" },
+  { 0x80000004, "SINGLE_STEP" },
+  { 0xC000001D, "ILLEGAL_INSTRUCTION" },
+  { 0xC0000096, "PRIV_INSTRUCTION" },
+  { 0xC0000025, "NONCONTINUABLE_EXCEPTION" },
+  { 0x40000015, "FATAL_APP_EXIT" },
+  { 0x80000002, "DATATYPE_MISALIGNMENT" },
+  { 0xC0000006, "IN_PAGE_ERROR" },
+  { 0xC0000026, "INVALID_DISPOSITION" },
+};
+
+static const struct enum_value_name violation_values[] =
+{
+  { 0, "READ_ACCESS_VIOLATION" },
+  { 1, "WRITE_ACCESS_VIOLATION" },
+  { 8, "DATA_EXECUTION_PREVENTION_VIOLATION" },
+};
+
 static struct type *
 windows_get_siginfo_type (struct gdbarch *gdbarch)
 {
   struct windows_gdbarch_data *windows_gdbarch_data;
-  struct type *uint_type, *void_ptr_type;
-  struct type *siginfo_ptr_type, *siginfo_type;
+  struct type *uint_type, *void_ptr_type, *code_enum, *violation_enum;
+  struct type *violation_type, *para_type, *siginfo_ptr_type, *siginfo_type;
   int i;
 
   windows_gdbarch_data = get_windows_gdbarch_data (gdbarch);
@@ -498,6 +560,24 @@ windows_get_siginfo_type (struct gdbarch *gdbarch)
 				 1, "unsigned int");
   void_ptr_type = lookup_pointer_type (builtin_type (gdbarch)->builtin_void);
 
+  code_enum = create_enum (gdbarch, gdbarch_int_bit (gdbarch),
+			   "ExceptionCode", exception_values,
+			   ARRAY_SIZE (exception_values));
+
+  violation_enum = create_enum (gdbarch, gdbarch_ptr_bit (gdbarch),
+				"ViolationType", violation_values,
+				ARRAY_SIZE (violation_values));
+
+  violation_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_STRUCT);
+  append_composite_type_field (violation_type, "Type", violation_enum);
+  append_composite_type_field (violation_type, "Address", void_ptr_type);
+
+  para_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_UNION);
+  append_composite_type_field (para_type, "ExceptionInformation",
+			       lookup_array_range_type (void_ptr_type, 0, 14));
+  append_composite_type_field (para_type, "AccessViolationInformation",
+			       violation_type);
+
   siginfo_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_STRUCT);
   TYPE_NAME (siginfo_type) = xstrdup ("EXCEPTION_RECORD");
 
@@ -505,16 +585,14 @@ windows_get_siginfo_type (struct gdbarch *gdbarch)
 				gdbarch_ptr_bit (gdbarch), NULL);
   TYPE_TARGET_TYPE (siginfo_ptr_type) = siginfo_type;
 
-  append_composite_type_field (siginfo_type, "ExceptionCode", uint_type);
+  append_composite_type_field (siginfo_type, "ExceptionCode", code_enum);
   append_composite_type_field (siginfo_type, "ExceptionFlags", uint_type);
   append_composite_type_field (siginfo_type, "ExceptionRecord",
 			       siginfo_ptr_type);
   append_composite_type_field (siginfo_type, "ExceptionAddress", void_ptr_type);
   append_composite_type_field (siginfo_type, "NumberParameters", uint_type);
-  append_composite_type_field_aligned (siginfo_type, "ExceptionInformation",
-				       lookup_array_range_type (void_ptr_type,
-								0, 14),
-				       TYPE_LENGTH (void_ptr_type));
+  append_composite_type_field_aligned (siginfo_type, "",
+				       para_type, TYPE_LENGTH (void_ptr_type));
 
   windows_gdbarch_data->siginfo_type = siginfo_type;
 
