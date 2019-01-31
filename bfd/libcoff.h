@@ -641,6 +641,14 @@ extern const char *bfd_coff_group_name
 
 extern bfd_cleanup coff_core_file_p
   (bfd *);
+extern char *coff_core_file_failing_command
+  (bfd *);
+extern int coff_core_file_failing_signal
+  (bfd *);
+extern int coff_core_file_pid
+  (bfd *);
+extern bool coff_core_file_matches_executable_p
+  (bfd *, bfd *);
 
 
 #define coff_get_section_contents_in_window \
