@@ -94,6 +94,8 @@ public:
   bool has_registers () override;
   bool info_proc (const char *, enum info_proc_what) override;
 
+  bool get_tib_address (ptid_t ptid, CORE_ADDR *addr) override;
+
   /* A few helpers.  */
 
   /* Getter, see variable definition.  */
@@ -1051,6 +1053,24 @@ bool
 core_target::has_registers ()
 {
   return (core_bfd != NULL);
+}
+
+bool
+core_target::get_tib_address (ptid_t ptid, CORE_ADDR *addr)
+{
+  char secname[32];
+  struct bfd_section *section;
+
+  sprintf (secname, ".coretlb/%d", ptid.lwp ());
+
+  section = bfd_get_section_by_name (core_bfd, secname);
+  if (section == NULL)
+    return false;
+
+  if (bfd_section_size (core_bfd, section) < sizeof addr)
+    return false;
+
+  return bfd_get_section_contents (core_bfd, section, addr, 0, sizeof addr);
 }
 
 /* Implement the to_info_proc method.  */
