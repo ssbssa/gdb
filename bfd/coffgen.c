@@ -3575,6 +3575,14 @@ coff_core_file_p (bfd *abfd)
       if (!sec)
 	goto fail;
 
+      sec = make_bfd_asection (abfd, ".coreexception",
+			       SEC_HAS_CONTENTS,
+			       exceptionRva + 8,
+			       sizeof exception.record,
+			       0);
+      if (!sec)
+	goto fail;
+
       exceptionThreadId = exception.threadId;
 
       /* some exception codes are bigger than INT_MAX, so this makes sure
