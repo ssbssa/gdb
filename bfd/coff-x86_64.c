@@ -957,7 +957,7 @@ const bfd_target
 
   BFD_JUMP_TABLE_GENERIC (coff),
   BFD_JUMP_TABLE_COPY (coff),
-  BFD_JUMP_TABLE_CORE (_bfd_nocore),
+  BFD_JUMP_TABLE_CORE (coff),
   BFD_JUMP_TABLE_ARCHIVE (_bfd_archive_coff),
   BFD_JUMP_TABLE_SYMBOLS (coff),
   BFD_JUMP_TABLE_RELOCS (coff),

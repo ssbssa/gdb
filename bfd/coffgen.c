@@ -43,6 +43,7 @@
 #include "coff/internal.h"
 #include "libcoff.h"
 #include "hashtab.h"
+#include "libiberty.h"
 
 /* Extract a long section name at STRINDEX and copy it to the bfd objstack.
    Return NULL in case of error.  */
@@ -3307,6 +3308,14 @@ _bfd_coff_free_cached_info (bfd *abfd)
 
 /* Read minidump file.  */
 
+typedef struct
+{
+  int pid;
+  int signal;
+  char *exe_name;
+}
+pe_core_data;
+
 #pragma pack(push,4)
 
 typedef struct
@@ -3466,6 +3475,14 @@ typedef struct
 }
 dump_module;
 
+typedef struct
+{
+  uint32_t infoSize;
+  uint32_t flags;
+  uint32_t processId;
+}
+dump_misc;
+
 #pragma pack(pop)
 
 
@@ -3505,6 +3522,7 @@ coff_core_file_p (bfd *abfd)
   uint32_t exceptionRva = 0;
   uint32_t threadListRva = 0;
   uint32_t systemInfoRva = 0;
+  uint32_t miscInfoRva = 0;
 
   if (bfd_read (&header, sizeof header, abfd) != sizeof header)
     goto fail;
@@ -3512,6 +3530,12 @@ coff_core_file_p (bfd *abfd)
   if (header.sig[0] != 'M' || header.sig[1] != 'D' ||
       header.sig[2] != 'M' || header.sig[3] != 'P')
     goto fail;
+
+  pe_core_data *pcd = bfd_zalloc (abfd, sizeof (pe_core_data));
+  if (!pcd)
+    goto fail;
+
+  abfd->tdata.any = pcd;
 
   for (s = 0; s < header.streamCount; s++)
     {
@@ -3539,6 +3563,9 @@ coff_core_file_p (bfd *abfd)
 	case SystemInfoStream:
 	  systemInfoRva = dir.loc.rva;
 	  break;
+	case MiscInfoStream:
+	  miscInfoRva = dir.loc.rva;
+	  break;
 	}
     }
 
@@ -3563,6 +3590,33 @@ coff_core_file_p (bfd *abfd)
 	  if (bfd_seek (abfd, module.nameRva, SEEK_SET) != 0
 	      || bfd_read (&size, sizeof size, abfd) != sizeof size)
 	    goto fail;
+
+	  if (!m && size > 1)
+	    {
+	      uint16_t *wide_name = bfd_malloc (size + 2);
+	      if (wide_name == NULL)
+		goto fail;
+
+	      if (bfd_read (wide_name, size, abfd) == size)
+		{
+		  uint32_t len = size / 2;
+		  wide_name[len] = 0;
+		  pcd->exe_name = bfd_zalloc (abfd, len + 1);
+		  if (pcd->exe_name)
+		    {
+#ifdef __MINGW32__
+		      wcstombs (pcd->exe_name, wide_name, len);
+#else
+		      uint32_t n;
+		      for (n = 0; n < size; n++)
+			pcd->exe_name[n] =
+			  wide_name[n] < 0x80 ? wide_name[n] : '?';
+#endif
+		    }
+		}
+
+	      free (wide_name);
+	    }
 
 	  sprintf (secname, ".coremodule/%llx",
 		   (unsigned long long) module.base);
@@ -3662,6 +3716,13 @@ coff_core_file_p (bfd *abfd)
 	goto fail;
 
       exceptionThreadId = exception.threadId;
+
+      /* some exception codes are bigger than INT_MAX, so this makes sure
+	 bits 24 - 27 are 0, and move the highest 4 bits down.
+	 windows_gdb_signal_from_target() uses these changed values. */
+      if (!(exception.record.code & 0x0F000000))
+	pcd->signal = ((exception.record.code & 0xF0000000) >> 4)
+	  | (exception.record.code & 0x00FFFFFF);
     }
 
   if (threadListRva)
@@ -3715,8 +3776,54 @@ coff_core_file_p (bfd *abfd)
 				 arch == 9 ? bfd_mach_x86_64 : 0);
     }
 
+  if (miscInfoRva)
+    {
+      dump_misc misc;
+      if (bfd_seek (abfd, miscInfoRva, SEEK_SET) != 0
+	  || bfd_read (&misc, sizeof misc, abfd) != sizeof misc
+	  || misc.infoSize < sizeof misc
+	  || !(misc.flags & 1))
+	goto fail;
+
+      pcd->pid = misc.processId;
+    }
+
   return _bfd_no_cleanup;
 
 fail:
   return NULL;
+}
+
+
+char *
+coff_core_file_failing_command (bfd *abfd)
+{
+  return ((pe_core_data *) abfd->tdata.any)->exe_name;
+}
+
+int
+coff_core_file_failing_signal (bfd *abfd)
+{
+  return ((pe_core_data *) abfd->tdata.any)->signal;
+}
+
+int
+coff_core_file_pid (bfd *abfd)
+{
+  return ((pe_core_data *) abfd->tdata.any)->pid;
+}
+
+bool
+coff_core_file_matches_executable_p (bfd *core_bfd,
+				     bfd *exec_bfd)
+{
+  const char *core_exe = ((pe_core_data *) core_bfd->tdata.any)->exe_name;
+  const char *exec_exe = bfd_get_filename (exec_bfd);
+  if (!core_exe)
+    return true;
+
+  core_exe = dos_lbasename (core_exe);
+  exec_exe = lbasename (exec_exe);
+
+  return strcasecmp (core_exe, exec_exe) == 0;
 }
