@@ -137,6 +137,8 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   struct type *peb_type, *peb_ptr_type, *list_type;
   struct type *module_list_ptr_type;
   struct type *tib_type, *seh_type, *tib_ptr_type, *seh_ptr_type;
+  struct type *word_type, *wchar_type, *wchar_ptr_type;
+  struct type *uni_str_type, *rupp_type, *rupp_ptr_type;
 
   /* Do not rebuild type if same gdbarch as last time.  */
   if (last_tlb_type && last_gdbarch == gdbarch)
@@ -146,7 +148,15 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
 				 1, "DWORD_PTR");
   dword32_type = arch_integer_type (gdbarch, 32,
 				 1, "DWORD32");
+  word_type = arch_integer_type (gdbarch, 16,
+				 1, "WORD");
+  wchar_type = arch_integer_type (gdbarch, 16,
+				  1, "wchar_t");
   void_ptr_type = lookup_pointer_type (builtin_type (gdbarch)->builtin_void);
+  wchar_ptr_type = arch_type (gdbarch, TYPE_CODE_PTR,
+			      TYPE_LENGTH (void_ptr_type) * TARGET_CHAR_BIT,
+			      NULL);
+  TYPE_TARGET_TYPE (wchar_ptr_type) = wchar_type;
 
   /* list entry */
 
@@ -191,6 +201,43 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
 				NULL);
   TYPE_TARGET_TYPE (peb_ldr_ptr_type) = peb_ldr_type;
 
+  /* struct UNICODE_STRING */
+  uni_str_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_STRUCT);
+  TYPE_NAME (uni_str_type) = xstrdup ("unicode_string");
+
+  append_composite_type_field (uni_str_type, "length", word_type);
+  append_composite_type_field (uni_str_type, "maximum_length", word_type);
+  append_composite_type_field_aligned (uni_str_type, "buffer",
+				       wchar_ptr_type,
+				       TYPE_LENGTH (wchar_ptr_type));
+
+  /* struct _RTL_USER_PROCESS_PARAMETERS */
+  rupp_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_STRUCT);
+  TYPE_NAME (rupp_type) = xstrdup ("rtl_user_process_parameters");
+
+  append_composite_type_field (rupp_type, "maximum_length", dword32_type);
+  append_composite_type_field (rupp_type, "length", dword32_type);
+  append_composite_type_field (rupp_type, "flags", dword32_type);
+  append_composite_type_field (rupp_type, "debug_flags", dword32_type);
+  append_composite_type_field (rupp_type, "console_handle", void_ptr_type);
+  append_composite_type_field (rupp_type, "console_flags", dword32_type);
+  append_composite_type_field_aligned (rupp_type, "standard_input",
+				       void_ptr_type,
+				       TYPE_LENGTH (void_ptr_type));
+  append_composite_type_field (rupp_type, "standard_output", void_ptr_type);
+  append_composite_type_field (rupp_type, "standard_error", void_ptr_type);
+  append_composite_type_field (rupp_type, "current_directory", uni_str_type);
+  append_composite_type_field (rupp_type, "current_directory_handle",
+			       void_ptr_type);
+  append_composite_type_field (rupp_type, "dll_path", uni_str_type);
+  append_composite_type_field (rupp_type, "image_path_name", uni_str_type);
+  append_composite_type_field (rupp_type, "command_line", uni_str_type);
+
+  rupp_ptr_type = arch_type (gdbarch, TYPE_CODE_PTR,
+			     TYPE_LENGTH (void_ptr_type) * TARGET_CHAR_BIT,
+			     NULL);
+  TYPE_TARGET_TYPE (rupp_ptr_type) = rupp_type;
+
 
   /* struct process environment block */
   peb_type = arch_composite_type (gdbarch, NULL, TYPE_CODE_STRUCT);
@@ -201,7 +248,7 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   append_composite_type_field (peb_type, "mutant", void_ptr_type);
   append_composite_type_field (peb_type, "image_base_address", void_ptr_type);
   append_composite_type_field (peb_type, "ldr", peb_ldr_ptr_type);
-  append_composite_type_field (peb_type, "process_parameters", void_ptr_type);
+  append_composite_type_field (peb_type, "process_parameters", rupp_ptr_type);
   append_composite_type_field (peb_type, "sub_system_data", void_ptr_type);
   append_composite_type_field (peb_type, "process_heap", void_ptr_type);
   append_composite_type_field (peb_type, "fast_peb_lock", void_ptr_type);
