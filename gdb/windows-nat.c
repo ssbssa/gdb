@@ -985,11 +985,34 @@ do_minidump (const char *args, bool full)
       error (_("Failed to open '%s' for output."), filename.get ());
     }
 
+  CONTEXT context;
+  EXCEPTION_POINTERS ep;
+  MINIDUMP_EXCEPTION_INFORMATION mei;
+  MINIDUMP_EXCEPTION_INFORMATION *meip = NULL;
+  if (siginfo_er.ExceptionCode)
+    {
+      windows_thread_info *th = thread_rec (current_event.dwThreadId, 0);
+      if (th)
+	{
+	  context.ContextFlags = CONTEXT_DEBUGGER_DR;
+	  CHECK (GetThreadContext (th->h, &context));
+
+	  ep.ExceptionRecord = &siginfo_er;
+	  ep.ContextRecord = &context;
+
+	  mei.ThreadId = current_event.dwThreadId;
+	  mei.ExceptionPointers = &ep;
+	  mei.ClientPointers = FALSE;
+
+	  meip = &mei;
+	}
+    }
+
   CHECK (fMiniDumpWriteDump (current_process_handle,
 			     current_event.dwProcessId,
 			     file,
 			     full ? MiniDumpWithFullMemory : MiniDumpNormal,
-			     NULL, /* ExceptionParam */
+			     meip,
 			     NULL, /* UserStreamParam */
 			     NULL)); /* CallbackParam */
 
