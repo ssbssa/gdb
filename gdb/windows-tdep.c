@@ -730,6 +730,51 @@ i386_windows_core_pid_to_str (struct gdbarch *gdbarch, ptid_t ptid)
   return normal_pid_to_str (ptid);
 }
 
+static enum gdb_signal
+windows_gdb_signal_from_target (struct gdbarch *gdbarch,
+				int signal)
+{
+  unsigned int usignal = signal;
+  switch (usignal)
+    {
+    case 0:
+      return GDB_SIGNAL_0;
+
+    case 0xC000005: /* EXCEPTION_ACCESS_VIOLATION */
+    case 0xC0000FD: /* STATUS_STACK_OVERFLOW */
+      return GDB_SIGNAL_SEGV;
+
+    case 0xC00008C: /* EXCEPTION_ARRAY_BOUNDS_EXCEEDED */
+    case 0xC00008D: /* STATUS_FLOAT_DENORMAL_OPERAND */
+    case 0xC00008E: /* STATUS_FLOAT_DIVIDE_BY_ZERO */
+    case 0xC00008F: /* STATUS_FLOAT_INEXACT_RESULT */
+    case 0xC000090: /* STATUS_FLOAT_INVALID_OPERATION */
+    case 0xC000091: /* STATUS_FLOAT_OVERFLOW */
+    case 0xC000092: /* STATUS_FLOAT_STACK_CHECK */
+    case 0xC000093: /* STATUS_FLOAT_UNDERFLOW */
+    case 0xC000094: /* STATUS_INTEGER_DIVIDE_BY_ZERO */
+    case 0xC000095: /* STATUS_INTEGER_OVERFLOW */
+      return GDB_SIGNAL_FPE;
+
+    case 0x8000003: /* EXCEPTION_BREAKPOINT */
+    case 0x8000004: /* EXCEPTION_SINGLE_STEP */
+      return GDB_SIGNAL_TRAP;
+
+    case 0x4010005: /* DBG_CONTROL_C */
+    case 0x4010008: /* DBG_CONTROL_BREAK */
+      return GDB_SIGNAL_INT;
+
+    case 0xC00001D: /* EXCEPTION_ILLEGAL_INSTRUCTION */
+    case 0xC000096: /* EXCEPTION_PRIV_INSTRUCTION */
+    case 0xC000025: /* EXCEPTION_NONCONTINUABLE_EXCEPTION */
+      return GDB_SIGNAL_ILL;
+
+    case 0x4000015: /* FATAL_APP_EXIT */
+      return GDB_SIGNAL_ABRT;
+    }
+  return GDB_SIGNAL_UNKNOWN;
+}
+
 /* To be called from the various GDB_OSABI_CYGWIN handlers for the
    various Windows architectures and machine types.  */
 
@@ -754,6 +799,8 @@ windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_core_xfer_shared_libraries
     (gdbarch, windows_core_xfer_shared_libraries);
   set_gdbarch_core_pid_to_str (gdbarch, i386_windows_core_pid_to_str);
+  set_gdbarch_gdb_signal_from_target (gdbarch,
+				      windows_gdb_signal_from_target);
 }
 
 /* Implementation of `tlb' variable.  */
