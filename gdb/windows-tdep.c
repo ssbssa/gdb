@@ -789,6 +789,49 @@ windows_gdb_signal_from_target (struct gdbarch *gdbarch,
   return GDB_SIGNAL_UNKNOWN;
 }
 
+static LONGEST
+windows_core_xfer_siginfo (struct gdbarch *gdbarch, gdb_byte *readbuf,
+			   ULONGEST offset, ULONGEST len)
+{
+  asection *section = bfd_get_section_by_name (core_bfd, ".coreexception");
+  if (section == NULL)
+    return -1;
+
+  /* The exception record of the minidump file is always in 64bit format.  */
+  if (gdbarch_ptr_bit (gdbarch) == 32)
+    {
+      uint32_t rec[38];
+      int r;
+
+#define EXC_SIZE_32 80
+#define EXC_SIZE_64 152
+
+      if (offset > EXC_SIZE_32)
+	return -1;
+
+      if (bfd_get_section_size (section) != EXC_SIZE_64)
+	return -1;
+
+      if (!bfd_get_section_contents (core_bfd, section, rec, 0, EXC_SIZE_64))
+	return -1;
+
+      for (r = 2; r < 19; r++)
+	rec[r + 1] = rec[r * 2];
+
+      if (len > EXC_SIZE_32 - offset)
+	len = EXC_SIZE_32 - offset;
+
+      memcpy (readbuf, (char *) rec + offset, len);
+
+      return len;
+    }
+
+  if (!bfd_get_section_contents (core_bfd, section, readbuf, offset, len))
+    return -1;
+
+  return len;
+}
+
 /* To be called from the various GDB_OSABI_CYGWIN handlers for the
    various Windows architectures and machine types.  */
 
@@ -815,6 +858,7 @@ windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_core_pid_to_str (gdbarch, i386_windows_core_pid_to_str);
   set_gdbarch_gdb_signal_from_target (gdbarch,
 				      windows_gdb_signal_from_target);
+  set_gdbarch_core_xfer_siginfo (gdbarch, windows_core_xfer_siginfo);
 }
 
 /* Implementation of `tlb' variable.  */
