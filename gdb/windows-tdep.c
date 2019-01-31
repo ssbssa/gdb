@@ -999,6 +999,57 @@ windows_core_xfer_siginfo (struct gdbarch *gdbarch, gdb_byte *readbuf,
   return len;
 }
 
+static const char *
+windows_core_thread_name (struct gdbarch *gdbarch, struct thread_info *thr)
+{
+  if (thr->ptid.lwp () == 0)
+    return NULL;
+
+  static char name_buf[80];
+  gdb_byte *buf;
+  struct bfd_section *sect;
+  thread_section_name section_name (".corethread", thr->ptid);
+
+  sect = bfd_get_section_by_name (core_bfd, section_name.c_str ());
+  if (sect == NULL || bfd_section_size (sect) == 0)
+    return NULL;
+
+  buf = (gdb_byte *) xmalloc (bfd_section_size (sect) + 1);
+  if (!buf)
+  {
+    printf_unfiltered ("memory allocation failed for %s\n",
+        sect->name);
+    return NULL;
+  }
+  if (bfd_get_section_contents (core_bfd, sect,
+        buf, 0, bfd_section_size (sect)))
+  {
+    char *thread_name;
+    size_t thread_name_size;
+    auto_obstack host_name;
+
+    convert_between_encodings (target_wide_charset (gdbarch),
+        host_charset (),
+        buf, bfd_section_size (sect), 2,
+        &host_name, translit_char);
+    obstack_grow_str0 (&host_name, "");
+    thread_name = (char *) obstack_base (&host_name);
+    thread_name_size = strlen (thread_name);
+    if (thread_name_size > sizeof name_buf - 1)
+      thread_name_size = sizeof name_buf - 1;
+    memcpy (name_buf, thread_name, thread_name_size);
+    name_buf[thread_name_size] = 0;
+
+    xfree (buf);
+
+    return name_buf;
+  }
+
+  xfree (buf);
+
+  return NULL;
+}
+
 static struct target_so_ops windows_so_ops;
 
 /* Common parts for gdbarch initialization for the Windows and Cygwin OS
@@ -1027,6 +1078,7 @@ windows_init_abi_common (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_gdb_signal_from_target (gdbarch,
 				      windows_gdb_signal_from_target);
   set_gdbarch_core_xfer_siginfo (gdbarch, windows_core_xfer_siginfo);
+  set_gdbarch_core_thread_name (gdbarch, windows_core_thread_name);
 }
 
 /* See windows-tdep.h.  */

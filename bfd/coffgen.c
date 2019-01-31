@@ -3343,6 +3343,13 @@ typedef struct
 }
 dump_misc;
 
+typedef struct
+{
+  uint32_t threadId;
+  uint64_t rva;
+}
+dump_thread_name;
+
 #pragma pack(pop)
 
 
@@ -3383,6 +3390,7 @@ coff_core_file_p (bfd *abfd)
   uint32_t threadListRva = 0;
   uint32_t systemInfoRva = 0;
   uint32_t miscInfoRva = 0;
+  uint32_t threadNamesRva = 0;
 
   if (bfd_bread (&header, sizeof header, abfd) != sizeof header)
     goto fail;
@@ -3425,6 +3433,9 @@ coff_core_file_p (bfd *abfd)
 	  break;
 	case MiscInfoStream:
 	  miscInfoRva = dir.loc.rva;
+	  break;
+	case ThreadNamesStream:
+	  threadNamesRva = dir.loc.rva;
 	  break;
 	}
     }
@@ -3654,6 +3665,43 @@ coff_core_file_p (bfd *abfd)
 	goto fail;
 
       pcd->pid = misc.processId;
+    }
+
+  if (threadNamesRva)
+    {
+      uint32_t nameCount;
+      dump_thread_name name;
+      char secname[32];
+      uint32_t size;
+      uint32_t n;
+
+      if (bfd_seek (abfd, threadNamesRva, SEEK_SET) != 0
+	  || bfd_bread (&nameCount, sizeof nameCount, abfd) != sizeof nameCount)
+	goto fail;
+
+      for (n = 0; n < nameCount; n++)
+	{
+	  if (bfd_bread (&name, sizeof name, abfd) != sizeof name)
+	    goto fail;
+
+	  if (bfd_seek (abfd, name.rva, SEEK_SET) != 0
+	      || bfd_bread (&size, sizeof size, abfd) != sizeof size)
+	    goto fail;
+
+	  sprintf (secname, ".corethread/%u", name.threadId);
+
+	  sec = make_bfd_asection (abfd, secname,
+				   SEC_HAS_CONTENTS,
+				   name.rva + 4,
+				   size,
+				   0);
+	  if (!sec)
+	    goto fail;
+
+	  if (bfd_seek (abfd, threadNamesRva + 4 + (n + 1) * sizeof name,
+			SEEK_SET) != 0)
+	    goto fail;
+	}
     }
 
   return _bfd_no_cleanup;
