@@ -580,6 +580,14 @@ extern bfd_boolean bfd_coff_gc_sections
 
 extern const bfd_target *coff_core_file_p
   (bfd *);
+extern char *coff_core_file_failing_command
+  (bfd *);
+extern int coff_core_file_failing_signal
+  (bfd *);
+extern int coff_core_file_pid
+  (bfd *);
+extern bfd_boolean coff_core_file_matches_executable_p
+  (bfd *, bfd *);
 
 
 #define coff_get_section_contents_in_window \
