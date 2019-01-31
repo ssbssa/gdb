@@ -3780,6 +3780,15 @@ coff_core_file_p (bfd *abfd)
 	      if (!sec)
 		goto fail;
 	    }
+
+	  sprintf (secname, ".coretlb/%u", thread.threadId);
+	  sec = make_bfd_asection (abfd, secname,
+				   SEC_HAS_CONTENTS,
+				   threadListRva + 4 + t * sizeof thread + 16,
+				   8,
+				   0);
+	  if (!sec)
+	    goto fail;
 	}
     }
 
