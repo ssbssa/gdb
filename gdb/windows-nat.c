@@ -68,6 +68,7 @@
 #include "complaints.h"
 #include "inf-child.h"
 #include "gdb_tilde_expand.h"
+#include "readline/tilde.h"
 
 #define AdjustTokenPrivileges		dyn_AdjustTokenPrivileges
 #define DebugActiveProcessStop		dyn_DebugActiveProcessStop
@@ -115,6 +116,12 @@ static GetCurrentConsoleFont_ftype *GetCurrentConsoleFont;
 
 typedef COORD WINAPI (GetConsoleFontSize_ftype) (HANDLE, DWORD);
 static GetConsoleFontSize_ftype *GetConsoleFontSize;
+
+typedef BOOL WINAPI (MiniDumpWriteDump_ftype) (HANDLE, DWORD, HANDLE,
+					       MINIDUMP_TYPE,
+					       PMINIDUMP_EXCEPTION_INFORMATION,
+					       PMINIDUMP_USER_STREAM_INFORMATION,
+					       PMINIDUMP_CALLBACK_INFORMATION);
 
 #undef STARTUPINFO
 #undef CreateProcess
@@ -943,6 +950,53 @@ signal_event_command (const char *args, int from_tty)
 
   SetEvent ((HANDLE) event_id);
   CloseHandle ((HANDLE) event_id);
+}
+
+static void
+minidump_command (const char *args, int from_tty)
+{
+  gdb::unique_xmalloc_ptr<char> filename;
+
+  if (!target_has_execution)
+    noprocess ();
+
+  HMODULE dbghelp = LoadLibrary ("dbghelp.dll");
+  if (!dbghelp)
+    error (_("Cannot load dbghelp.dll."));
+
+  MiniDumpWriteDump_ftype *fMiniDumpWriteDump =
+    (MiniDumpWriteDump_ftype *) GetProcAddress (dbghelp, "MiniDumpWriteDump");
+  if (!fMiniDumpWriteDump)
+    {
+      FreeLibrary (dbghelp);
+      error (_("Cannot find 'MiniDumpWriteDump' function in dbghelp.dll."));
+    }
+
+  if (args && *args)
+    filename.reset (tilde_expand (args));
+  else
+    filename.reset (xstrprintf ("core.%d.dmp", inferior_ptid.pid ()));
+
+  HANDLE file = CreateFile (filename.get (), GENERIC_WRITE, 0, NULL,
+			    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (file == INVALID_HANDLE_VALUE)
+    {
+      FreeLibrary (dbghelp);
+      error (_("Failed to open '%s' for output."), filename.get ());
+    }
+
+  CHECK (fMiniDumpWriteDump (current_process_handle,
+			     current_event.dwProcessId,
+			     file,
+			     MiniDumpNormal,
+			     NULL, /* ExceptionParam */
+			     NULL, /* UserStreamParam */
+			     NULL)); /* CallbackParam */
+
+  FreeLibrary (dbghelp);
+  CloseHandle (file);
+
+  fprintf_filtered (gdb_stdout, "Saved minidump file %s\n", filename.get ());
 }
 
 /* Handle DEBUG_STRING output from child process.
@@ -3086,6 +3140,8 @@ This command is needed in support of setting up GDB as JIT debugger on \
 MS-Windows.  The command should be invoked from the GDB command line using \
 the '-ex' command-line option.  The ID of the event that blocks the \
 crashed process will be supplied by the Windows JIT debugging mechanism."));
+  add_com ("minidump", class_files, minidump_command,
+	   _("Save minidump file of the debugged process."));
 
 #ifdef __CYGWIN__
   add_setshow_boolean_cmd ("shell", class_support, &useshell, _("\
