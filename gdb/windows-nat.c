@@ -953,7 +953,7 @@ signal_event_command (const char *args, int from_tty)
 }
 
 static void
-minidump_command (const char *args, int from_tty)
+do_minidump (const char *args, bool full)
 {
   gdb::unique_xmalloc_ptr<char> filename;
 
@@ -988,7 +988,7 @@ minidump_command (const char *args, int from_tty)
   CHECK (fMiniDumpWriteDump (current_process_handle,
 			     current_event.dwProcessId,
 			     file,
-			     MiniDumpNormal,
+			     full ? MiniDumpWithFullMemory : MiniDumpNormal,
 			     NULL, /* ExceptionParam */
 			     NULL, /* UserStreamParam */
 			     NULL)); /* CallbackParam */
@@ -997,6 +997,18 @@ minidump_command (const char *args, int from_tty)
   CloseHandle (file);
 
   fprintf_filtered (gdb_stdout, "Saved minidump file %s\n", filename.get ());
+}
+
+static void
+minidump_command (const char *args, int from_tty)
+{
+  do_minidump (args, false);
+}
+
+static void
+minidump_full_command (const char *args, int from_tty)
+{
+  do_minidump (args, true);
 }
 
 /* Handle DEBUG_STRING output from child process.
@@ -3142,6 +3154,8 @@ the '-ex' command-line option.  The ID of the event that blocks the \
 crashed process will be supplied by the Windows JIT debugging mechanism."));
   add_com ("minidump", class_files, minidump_command,
 	   _("Save minidump file of the debugged process."));
+  add_com ("minidump-full", class_files, minidump_full_command,
+	   _("Save minidump file with full memory of the debugged process."));
 
 #ifdef __CYGWIN__
   add_setshow_boolean_cmd ("shell", class_support, &useshell, _("\
