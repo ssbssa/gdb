@@ -243,6 +243,7 @@ static HANDLE current_process_handle;	/* Currently executing process */
 static windows_thread_info *current_thread;	/* Info on currently selected thread */
 static DWORD main_thread_id;		/* Thread ID of the main thread */
 static EXCEPTION_RECORD siginfo_er;
+static CORE_ADDR current_exec_base;
 
 /* Counts of things.  */
 static int exception_count = 0;
@@ -1673,6 +1674,8 @@ get_windows_debug_event (struct target_ops *ops,
 				       main_thread_id),
 			       0);
       main_thread_id = current_event.dwThreadId;
+      current_exec_base =
+	(CORE_ADDR) current_event.u.CreateProcessInfo.lpBaseOfImage;
       /* Add the main thread.  */
       th = windows_add_thread (ptid_t (current_event.dwProcessId, 0,
 				       current_event.dwThreadId),
@@ -3085,6 +3088,35 @@ windows_xfer_siginfo (gdb_byte *readbuf, ULONGEST offset, ULONGEST len,
   return TARGET_XFER_OK;
 }
 
+static enum target_xfer_status
+windows_xfer_auxv (gdb_byte *readbuf, ULONGEST offset, ULONGEST len,
+		   ULONGEST *xfered_len)
+{
+  CORE_ADDR buf[4];
+
+  if (!readbuf)
+    return TARGET_XFER_E_IO;
+
+  if (offset > sizeof (buf))
+    return TARGET_XFER_E_IO;
+
+  if (offset == sizeof (buf))
+    return TARGET_XFER_EOF;
+
+  if (offset + len > sizeof (buf))
+    len = sizeof (buf) - offset;
+
+  buf[0] = 9; /* AT_ENTRY */
+  buf[1] = current_exec_base;
+  buf[2] = 0; /* AT_NULL */
+  buf[3] = 0;
+
+  memcpy (readbuf, (char *) buf + offset, len);
+  *xfered_len = len;
+
+  return TARGET_XFER_OK;
+}
+
 enum target_xfer_status
 windows_nat_target::xfer_partial (enum target_object object,
 				  const char *annex, gdb_byte *readbuf,
@@ -3102,6 +3134,9 @@ windows_nat_target::xfer_partial (enum target_object object,
 
     case TARGET_OBJECT_SIGNAL_INFO:
       return windows_xfer_siginfo (readbuf, offset, len, xfered_len);
+
+    case TARGET_OBJECT_AUXV:
+      return windows_xfer_auxv (readbuf, offset, len, xfered_len);
 
     default:
       if (beneath () == NULL)
