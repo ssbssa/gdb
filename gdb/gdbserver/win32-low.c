@@ -75,6 +75,7 @@ static HANDLE current_process_handle = NULL;
 static DWORD current_process_id = 0;
 static DWORD main_thread_id = 0;
 static EXCEPTION_RECORD siginfo_er;
+static CORE_ADDR current_exec_base;
 static enum gdb_signal last_sig = GDB_SIGNAL_0;
 
 /* The current debug event from WaitForDebugEvent.  */
@@ -1497,6 +1498,8 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
 
       current_process_handle = current_event.u.CreateProcessInfo.hProcess;
       main_thread_id = current_event.dwThreadId;
+      current_exec_base =
+	(CORE_ADDR) current_event.u.CreateProcessInfo.lpBaseOfImage;
 
       /* Add the main thread.  */
       child_add_thread (current_event.dwProcessId,
@@ -1707,6 +1710,33 @@ win32_request_interrupt (void)
   soft_interrupt_requested = 1;
 }
 
+static int
+win32_read_auxv (CORE_ADDR offset, unsigned char *myaddr, unsigned int len)
+{
+  size_t buf[4];
+
+  if (!myaddr)
+    return -1;
+
+  if (offset > sizeof (buf))
+    return -1;
+
+  if (offset == sizeof (buf))
+    return 0;
+
+  if (offset + len > sizeof (buf))
+    len = sizeof (buf) - offset;
+
+  buf[0] = 9; /* AT_ENTRY */
+  buf[1] = current_exec_base;
+  buf[2] = 0; /* AT_NULL */
+  buf[3] = 0;
+
+  memcpy (myaddr, (char *) buf + offset, len);
+
+  return len;
+}
+
 #ifdef _WIN32_WCE
 int
 win32_error_to_fileio_error (DWORD err)
@@ -1829,7 +1859,7 @@ static struct target_ops win32_target_ops = {
   win32_write_inferior_memory,
   NULL, /* lookup_symbols */
   win32_request_interrupt,
-  NULL, /* read_auxv */
+  win32_read_auxv,
   win32_supports_z_point_type,
   win32_insert_point,
   win32_remove_point,
