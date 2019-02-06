@@ -37,6 +37,8 @@
 #include "charset.h"
 #include "coff/internal.h"
 #include "libcoff.h"
+#include "solist.h"
+#include "auxv.h"
 
 struct cmd_list_element *info_w32_cmdlist;
 
@@ -547,6 +549,20 @@ init_w32_command_list (void)
     }
 }
 
+static void
+windows_solib_create_inferior_hook (int from_tty)
+{
+  CORE_ADDR exec_base;
+  /* 9 -> AT_ENTRY */
+  if (target_auxv_search (current_top_target (), 9, &exec_base) == 1
+      && exec_base && symfile_objfile)
+    {
+      CORE_ADDR vmaddr = pe_data (exec_bfd)->pe_opthdr.ImageBase;
+      if (vmaddr != exec_base)
+	objfile_rebase (symfile_objfile, exec_base - vmaddr);
+    }
+}
+
 struct enum_value_name
 {
   uint32_t value;
@@ -946,6 +962,8 @@ windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_iterate_over_objfiles_in_search_order
     (gdbarch, windows_iterate_over_objfiles_in_search_order);
 
+  solib_target_so_ops.solib_create_inferior_hook =
+    windows_solib_create_inferior_hook;
   set_solib_ops (gdbarch, &solib_target_so_ops);
 
   set_gdbarch_get_siginfo_type (gdbarch, windows_get_siginfo_type);

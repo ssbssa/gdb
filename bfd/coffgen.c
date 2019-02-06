@@ -3370,6 +3370,7 @@ coff_core_file_p (bfd *abfd)
   uint32_t systemInfoRva = 0;
   uint32_t miscInfoRva = 0;
   uint32_t threadNamesRva = 0;
+  uint64_t exec_base = 0;
 
   if (bfd_bread (&header, sizeof header, abfd) != sizeof header)
     goto fail;
@@ -3436,6 +3437,9 @@ coff_core_file_p (bfd *abfd)
 	{
 	  if (bfd_bread (&module, sizeof module, abfd) != sizeof module)
 	    goto fail;
+
+	  if (!m)
+	    exec_base = module.base;
 
 	  if (bfd_seek (abfd, module.nameRva, SEEK_SET) != 0
 	      || bfd_bread (&size, sizeof size, abfd) != sizeof size)
@@ -3644,6 +3648,42 @@ coff_core_file_p (bfd *abfd)
 
       bfd_default_set_arch_mach (abfd, bfd_arch_i386,
 				 arch == 9 ? bfd_mach_x86_64 : 0);
+
+      if (exec_base)
+	{
+	  bfd_size_type auxv_size = 0;
+	  void *auxv = NULL;
+	  if (arch == 9)
+	    {
+	      auxv_size = sizeof (uint64_t) * 4;
+	      uint64_t *auxv64 = bfd_zalloc (abfd, auxv_size);
+	      if (!auxv64)
+		goto fail;
+
+	      auxv64[0] = 9; /* AT_ENTRY */
+	      auxv64[1] = exec_base;
+	      auxv = auxv64;
+	    }
+	  else
+	    {
+	      auxv_size = sizeof (uint32_t) * 4;
+	      uint32_t *auxv32 = bfd_zalloc (abfd, auxv_size);
+	      if (!auxv32)
+		goto fail;
+
+	      auxv32[0] = 9; /* AT_ENTRY */
+	      auxv32[1] = exec_base;
+	      auxv = auxv32;
+	    }
+
+	  sec = make_bfd_asection (abfd, ".auxv",
+				   SEC_HAS_CONTENTS | SEC_IN_MEMORY,
+				   0, auxv_size, 0);
+	  if (!sec)
+	    goto fail;
+
+	  sec->contents = auxv;
+	}
     }
 
   if (miscInfoRva)
