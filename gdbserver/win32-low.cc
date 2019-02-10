@@ -1580,7 +1580,28 @@ const char *
 win32_process_target::thread_name (ptid_t thread)
 {
   windows_thread_info *th = thread_rec (thread, DONT_INVALIDATE_CONTEXT);
-  return th ? th->name.get () : nullptr;
+  if (!th)
+    return nullptr;
+
+  if (GetThreadDescription)
+    {
+      PWSTR desc;
+      if (SUCCEEDED (GetThreadDescription (th->h, &desc)))
+	{
+	  int len = WideCharToMultiByte (CP_ACP, 0, desc, -1,
+					 NULL, 0, NULL, NULL);
+	  if (len > 1)
+	    {
+	      th->name.reset ((char *) xmalloc (len));
+	      WideCharToMultiByte (CP_ACP, 0, desc, -1,
+				   th->name.get (), len, NULL, NULL);
+	    }
+
+	  LocalFree (desc);
+	}
+    }
+
+  return th->name.get ();
 }
 
 CORE_ADDR

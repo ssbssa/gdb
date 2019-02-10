@@ -3344,7 +3344,29 @@ windows_nat_target::get_ada_task_ptid (long lwp, long thread)
 const char *
 windows_nat_target::thread_name (struct thread_info *thr)
 {
-  return thread_rec (thr->ptid, DONT_INVALIDATE_CONTEXT)->name.get ();
+  windows_thread_info *th = thread_rec (thr->ptid, DONT_INVALIDATE_CONTEXT);
+  if (!th)
+    return NULL;
+
+  if (GetThreadDescription)
+    {
+      PWSTR desc;
+      if (SUCCEEDED (GetThreadDescription (th->h, &desc)))
+	{
+	  int len = WideCharToMultiByte (CP_ACP, 0, desc, -1,
+					 NULL, 0, NULL, NULL);
+	  if (len > 1)
+	    {
+	      th->name.reset ((char *) xmalloc (len));
+	      WideCharToMultiByte (CP_ACP, 0, desc, -1,
+				   th->name.get (), len, NULL, NULL);
+	    }
+
+	  LocalFree (desc);
+	}
+    }
+
+  return th->name.get ();
 }
 
 
