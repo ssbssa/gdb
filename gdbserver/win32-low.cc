@@ -111,6 +111,10 @@ winapi_Wow64GetThreadContext win32_Wow64GetThreadContext;
 static winapi_Wow64SetThreadContext win32_Wow64SetThreadContext;
 #endif
 
+#define GetThreadDescription           dyn_GetThreadDescription
+typedef HRESULT (WINAPI *winapi_GetThreadDescription) (HANDLE, PWSTR *);
+static winapi_GetThreadDescription GetThreadDescription;
+
 #ifndef _WIN32_WCE
 static void win32_add_all_dlls (void);
 #endif
@@ -1977,7 +1981,28 @@ const char *
 win32_process_target::thread_name (ptid_t thread)
 {
   windows_thread_info *th = thread_rec (thread, DONT_INVALIDATE_CONTEXT);
-  return th ? th->name.get () : nullptr;
+  if (!th)
+    return nullptr;
+
+  if (GetThreadDescription)
+    {
+      PWSTR desc;
+      if (SUCCEEDED (GetThreadDescription (th->h, &desc)))
+	{
+	  int len = WideCharToMultiByte (CP_ACP, 0, desc, -1,
+					 NULL, 0, NULL, NULL);
+	  if (len > 1)
+	    {
+	      th->name.reset ((char *) xmalloc (len));
+	      WideCharToMultiByte (CP_ACP, 0, desc, -1,
+				   th->name.get (), len, NULL, NULL);
+	    }
+
+	  LocalFree (desc);
+	}
+    }
+
+  return th->name.get ();
 }
 
 CORE_ADDR
@@ -2003,10 +2028,13 @@ initialize_low (void)
   set_target_ops (&the_win32_target);
   the_low_target.arch_setup ();
 
+  HMODULE dll = GetModuleHandle (_T("KERNEL32.DLL"));
+  if (dll)
+    GetThreadDescription = GETPROCADDRESS (dll, GetThreadDescription);
+
 #ifdef __x86_64__
   /* These functions are loaded dynamically, because they are not available
      on Windows XP.  */
-  HMODULE dll = GetModuleHandle (_T("KERNEL32.DLL"));
   win32_Wow64GetThreadContext = GETPROCADDRESS (dll, Wow64GetThreadContext);
   win32_Wow64SetThreadContext = GETPROCADDRESS (dll, Wow64SetThreadContext);
 #endif

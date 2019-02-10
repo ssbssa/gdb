@@ -97,6 +97,7 @@ using namespace windows_nat;
 #define SymInitialize			dyn_SymInitialize
 #define SymCleanup			dyn_SymCleanup
 #define SymFindFileInPath		dyn_SymFindFileInPath
+#define GetThreadDescription		dyn_GetThreadDescription
 
 typedef BOOL WINAPI (AdjustTokenPrivileges_ftype) (HANDLE, BOOL,
 						   PTOKEN_PRIVILEGES,
@@ -166,6 +167,9 @@ typedef BOOL WINAPI (SymFindFileInPath_ftype) (HANDLE, PCSTR, PCSTR, PVOID,
 					       DWORD, DWORD, DWORD, PSTR,
 					       PFINDFILEINPATHCALLBACK, PVOID);
 static SymFindFileInPath_ftype *SymFindFileInPath;
+
+typedef HRESULT WINAPI (GetThreadDescription_ftype) (HANDLE, PWSTR *);
+static GetThreadDescription_ftype *GetThreadDescription;
 
 #undef STARTUPINFO
 #undef CreateProcess
@@ -3517,7 +3521,29 @@ windows_nat_target::get_ada_task_ptid (long lwp, long thread)
 const char *
 windows_nat_target::thread_name (struct thread_info *thr)
 {
-  return thread_rec (thr->ptid, DONT_INVALIDATE_CONTEXT)->name.get ();
+  windows_thread_info *th = thread_rec (thr->ptid, DONT_INVALIDATE_CONTEXT);
+  if (!th)
+    return NULL;
+
+  if (GetThreadDescription)
+    {
+      PWSTR desc;
+      if (SUCCEEDED (GetThreadDescription (th->h, &desc)))
+	{
+	  int len = WideCharToMultiByte (CP_ACP, 0, desc, -1,
+					 NULL, 0, NULL, NULL);
+	  if (len > 1)
+	    {
+	      th->name.reset ((char *) xmalloc (len));
+	      WideCharToMultiByte (CP_ACP, 0, desc, -1,
+				   th->name.get (), len, NULL, NULL);
+	    }
+
+	  LocalFree (desc);
+	}
+    }
+
+  return th->name.get ();
 }
 
 
@@ -3821,6 +3847,7 @@ _initialize_loadable ()
       GPA (hm, Wow64SetThreadContext);
       GPA (hm, Wow64GetThreadSelectorEntry);
 #endif
+      GPA (hm, GetThreadDescription);
     }
 
   /* Set variables to dummy versions of these processes if the function
