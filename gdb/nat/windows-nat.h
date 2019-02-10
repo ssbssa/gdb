@@ -281,6 +281,7 @@ extern BOOL wait_for_debug_event (DEBUG_EVENT *event, DWORD timeout);
 #define Wow64SetThreadContext		dyn_Wow64SetThreadContext
 #define Wow64GetThreadSelectorEntry	dyn_Wow64GetThreadSelectorEntry
 #define GenerateConsoleCtrlEvent	dyn_GenerateConsoleCtrlEvent
+#define GetThreadDescription		dyn_GetThreadDescription
 
 typedef BOOL WINAPI (AdjustTokenPrivileges_ftype) (HANDLE, BOOL,
 						   PTOKEN_PRIVILEGES,
@@ -350,6 +351,9 @@ extern Wow64GetThreadSelectorEntry_ftype *Wow64GetThreadSelectorEntry;
 
 typedef BOOL WINAPI (GenerateConsoleCtrlEvent_ftype) (DWORD, DWORD);
 extern GenerateConsoleCtrlEvent_ftype *GenerateConsoleCtrlEvent;
+
+typedef HRESULT WINAPI (GetThreadDescription_ftype) (HANDLE, PWSTR *);
+extern GetThreadDescription_ftype *GetThreadDescription;
 
 /* Load any functions which may not be available in ancient versions
    of Windows.  */
