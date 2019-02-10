@@ -85,6 +85,7 @@
 #define OpenProcessToken		dyn_OpenProcessToken
 #define GetConsoleFontSize		dyn_GetConsoleFontSize
 #define GetCurrentConsoleFont		dyn_GetCurrentConsoleFont
+#define GetThreadDescription		dyn_GetThreadDescription
 
 typedef BOOL WINAPI (AdjustTokenPrivileges_ftype) (HANDLE, BOOL,
 						   PTOKEN_PRIVILEGES,
@@ -127,6 +128,9 @@ typedef BOOL WINAPI (MiniDumpWriteDump_ftype) (HANDLE, DWORD, HANDLE,
 					       PMINIDUMP_EXCEPTION_INFORMATION,
 					       PMINIDUMP_USER_STREAM_INFORMATION,
 					       PMINIDUMP_CALLBACK_INFORMATION);
+
+typedef HRESULT WINAPI (GetThreadDescription_ftype) (HANDLE, PWSTR *);
+static GetThreadDescription_ftype *GetThreadDescription;
 
 #undef STARTUPINFO
 #undef CreateProcess
@@ -3342,7 +3346,30 @@ windows_nat_target::get_ada_task_ptid (long lwp, long thread)
 const char *
 windows_nat_target::thread_name (struct thread_info *thr)
 {
-  return thread_rec (thr->ptid.tid (), 0)->name;
+  windows_thread_info *th = thread_rec (thr->ptid.tid (), 0);
+  if (!th)
+    return NULL;
+
+  if (GetThreadDescription)
+    {
+      PWSTR desc;
+      if (SUCCEEDED (GetThreadDescription (th->h, &desc)))
+	{
+	  int len = WideCharToMultiByte (CP_ACP, 0, desc, -1,
+					 NULL, 0, NULL, NULL);
+	  if (len > 1)
+	    {
+	      xfree (th->name);
+	      th->name = (char *) xmalloc (len);
+	      WideCharToMultiByte (CP_ACP, 0, desc, -1,
+				   th->name, len, NULL, NULL);
+	    }
+
+	  LocalFree (desc);
+	}
+    }
+
+  return th->name;
 }
 
 
@@ -3638,6 +3665,7 @@ _initialize_loadable (void)
       GPA (hm, GetConsoleFontSize);
       GPA (hm, DebugActiveProcessStop);
       GPA (hm, GetCurrentConsoleFont);
+      GPA (hm, GetThreadDescription);
     }
 
   /* Set variables to dummy versions of these processes if the function
