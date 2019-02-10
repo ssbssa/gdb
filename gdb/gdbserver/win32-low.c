@@ -103,6 +103,10 @@ typedef BOOL (WINAPI *winapi_DebugSetProcessKillOnExit) (BOOL KillOnExit);
 typedef BOOL (WINAPI *winapi_DebugBreakProcess) (HANDLE);
 typedef BOOL (WINAPI *winapi_GenerateConsoleCtrlEvent) (DWORD, DWORD);
 
+#define GetThreadDescription		dyn_GetThreadDescription
+typedef HRESULT (WINAPI *winapi_GetThreadDescription) (HANDLE, PWSTR *);
+static winapi_GetThreadDescription GetThreadDescription;
+
 static ptid_t win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus,
 			  int options);
 static void win32_resume (struct thread_resume *resume_info, size_t n);
@@ -1947,7 +1951,29 @@ static const char *
 win32_thread_name (ptid_t thread)
 {
   win32_thread_info *th = thread_rec (thread, 0);
-  return th ? th->name : NULL;
+  if (!th)
+    return NULL;
+
+  if (GetThreadDescription)
+    {
+      PWSTR desc;
+      if (SUCCEEDED (GetThreadDescription (th->h, &desc)))
+	{
+	  int len = WideCharToMultiByte (CP_ACP, 0, desc, -1,
+					 NULL, 0, NULL, NULL);
+	  if (len > 1)
+	    {
+	      xfree (th->name);
+	      th->name = (char *) xmalloc (len);
+	      WideCharToMultiByte (CP_ACP, 0, desc, -1,
+				   th->name, len, NULL, NULL);
+	    }
+
+	  LocalFree (desc);
+	}
+    }
+
+  return th->name;
 }
 
 static struct target_ops win32_target_ops = {
@@ -2036,4 +2062,8 @@ initialize_low (void)
 {
   set_target_ops (&win32_target_ops);
   the_low_target.arch_setup ();
+
+  HMODULE dll = GetModuleHandle (_T("KERNEL32.DLL"));
+  if (dll)
+    GetThreadDescription = GETPROCADDRESS (dll, GetThreadDescription);
 }
