@@ -3275,6 +3275,7 @@ typedef struct
   int pid;
   int signal;
   char *exe_name;
+  char *fail_cmd;
 }
 pe_core_data;
 
@@ -3571,6 +3572,9 @@ coff_core_file_p (bfd *abfd)
 	  if (bfd_bread (&module, sizeof module, abfd) != sizeof module)
 	    goto fail;
 
+	  uint32_t ms = module.versionInfo.fileVersionMS;
+	  uint32_t ls = module.versionInfo.fileVersionLS;
+
 	  if (bfd_seek (abfd, module.nameRva, SEEK_SET) != 0
 	      || bfd_bread (&size, sizeof size, abfd) != sizeof size)
 	    goto fail;
@@ -3596,6 +3600,21 @@ coff_core_file_p (bfd *abfd)
 			pcd->exe_name[n] =
 			  wide_name[n] < 0x80 ? wide_name[n] : '?';
 #endif
+
+		      if (ms || ls)
+			{
+			  pcd->fail_cmd = bfd_alloc (abfd, len + 40);
+			  if (pcd->fail_cmd)
+			    {
+			      sprintf (pcd->fail_cmd,
+				       "%s [version %u.%u.%u.%u]",
+				       pcd->exe_name,
+				       ms >> 16, ms & 0xffff,
+				       ls >> 16, ls & 0xffff);
+			    }
+			}
+		      if (!pcd->fail_cmd)
+			pcd->fail_cmd = pcd->exe_name;
 		    }
 		}
 
@@ -3835,7 +3854,7 @@ fail:
 char *
 coff_core_file_failing_command (bfd *abfd)
 {
-  return ((pe_core_data *) abfd->tdata.any)->exe_name;
+  return ((pe_core_data *) abfd->tdata.any)->fail_cmd;
 }
 
 int
