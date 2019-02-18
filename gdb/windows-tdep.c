@@ -864,6 +864,8 @@ windows_get_siginfo_type (struct gdbarch *gdbarch)
   return siginfo_type;
 }
 
+static std::unique_ptr<std::string> last_xfer_libraries;
+
 /* Implement the "solib_create_inferior_hook" solib_ops method.  */
 
 static void
@@ -922,6 +924,8 @@ windows_solib_create_inferior_hook (int from_tty)
 	objfile_rebase (current_program_space->symfile_object_file,
 			exec_base - vmaddr);
     }
+
+  last_xfer_libraries.reset ();
 }
 
 static enum gdb_signal
@@ -1339,20 +1343,25 @@ windows_core_xfer_shared_libraries (struct gdbarch *gdbarch,
 				    gdb_byte *readbuf,
 				    ULONGEST offset, ULONGEST len)
 {
-  cpms_data data { gdbarch, "<library-list>\n", 0 };
-  bfd_map_over_sections (current_program_space->core_bfd (),
-			 core_process_module_section,
-			 &data);
-  data.xml += "</library-list>\n";
+  if (!last_xfer_libraries)
+    {
+      cpms_data data { gdbarch, "<library-list>\n", 0 };
+      bfd_map_over_sections (current_program_space->core_bfd (),
+			     core_process_module_section,
+			     &data);
+      data.xml += "</library-list>\n";
 
-  ULONGEST len_avail = data.xml.length ();
+      last_xfer_libraries.reset (new std::string (std::move (data.xml)));
+    }
+
+  ULONGEST len_avail = last_xfer_libraries->length ();
   if (offset >= len_avail)
     return 0;
 
   if (len > len_avail - offset)
     len = len_avail - offset;
 
-  memcpy (readbuf, data.xml.data () + offset, len);
+  memcpy (readbuf, last_xfer_libraries->data () + offset, len);
 
   return len;
 }
