@@ -3677,6 +3677,29 @@ coff_core_file_p (bfd *abfd)
 	  if (!sec)
 	    goto fail;
 
+	  if (module.cvRecord.rva && module.cvRecord.size >= 24)
+	    {
+	      char sig[4];
+	      if (bfd_seek (abfd, module.cvRecord.rva, SEEK_SET) != 0
+		  || bfd_read (sig, sizeof sig, abfd) != sizeof sig)
+		goto fail;
+
+	      if (sig[0] == 'R' && sig[1] == 'S'
+		  && sig[2] == 'D' && sig[3] == 'S')
+		{
+		  sprintf (secname, ".corebuildid/%llx",
+			   (unsigned long long) module.base);
+
+		  sec = make_bfd_asection (abfd, secname,
+					   SEC_HAS_CONTENTS,
+					   module.cvRecord.rva + 4,
+					   20,
+					   0);
+		  if (!sec)
+		    goto fail;
+		}
+	    }
+
 	  if (bfd_seek (abfd, moduleListRva + 4 + (m + 1) * sizeof module,
 			SEEK_SET) != 0)
 	    goto fail;
