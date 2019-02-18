@@ -1285,6 +1285,66 @@ no_shared_libraries (const char *ignored, int from_tty)
   objfile_purge_solibs ();
 }
 
+static void
+find_library_command (const char *args, int from_tty)
+{
+  if (args == NULL)
+    error (_("find-library takes an address"));
+
+  CORE_ADDR addr = parse_and_eval_address (args);
+
+  for (struct so_list *so : current_program_space->solibs ())
+    {
+      if (! so->so_name[0] || so->addr_high == 0)
+	continue;
+
+      if (addr >= so->addr_low && addr <= so->addr_high)
+	{
+	  printf_unfiltered (_("Address %s is part of library %s\n"),
+			     paddress (target_gdbarch (), addr), so->so_name);
+	  return;
+	}
+    }
+
+  const struct target_so_ops *ops = gdbarch_so_ops (target_gdbarch ());
+
+  if (ops->map_addr)
+    {
+      struct so_list *maybe_so = NULL;
+      CORE_ADDR maybe_addr = 0;
+
+      for (struct so_list *so : current_program_space->solibs ())
+	{
+	  if (! so->so_name[0])
+	    continue;
+
+	  if (so->addr_high == 0)
+	    {
+	      CORE_ADDR map_addr = ops->map_addr (so);
+	      if (map_addr > maybe_addr && map_addr <= addr)
+		{
+		  maybe_so = so;
+		  maybe_addr = map_addr;
+		}
+	    }
+	  else if (so->addr_low > maybe_addr && so->addr_low <= addr)
+	    {
+	      maybe_so = NULL;
+	      maybe_addr = 0;
+	    }
+	}
+
+      if (maybe_addr != 0)
+	{
+	  printf_unfiltered (_("Address %s is maybe part of not-loaded library %s\n"),
+			     paddress (target_gdbarch (), addr), maybe_so->so_name);
+	  return;
+	}
+    }
+
+  error (_("Can't find address %s"), paddress (target_gdbarch(), addr));
+}
+
 /* See solib.h.  */
 
 void
@@ -1762,6 +1822,9 @@ _initialize_solib ()
   add_info_alias ("dll", info_sharedlibrary_cmd, 1);
   add_com ("nosharedlibrary", class_files, no_shared_libraries,
 	   _("Unload all shared object library symbols."));
+
+  add_com ("find-library", class_files, find_library_command,
+	   _("Find shared library by address."));
 
   add_setshow_boolean_cmd ("auto-solib-add", class_support,
 			   &auto_solib_add, _("\
