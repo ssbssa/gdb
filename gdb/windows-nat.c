@@ -1229,13 +1229,22 @@ symbol_server_init (void)
 
 const char *
 symbol_server_lib (const char *orig_lib_name,
-		   uint32_t size, uint32_t timestamp)
+		   uint32_t size, uint32_t timestamp, uint32_t *buildid)
 {
   static char lib_name[MAX_PATH];
   BOOL ret;
 
   if (!SymFindFileInPath)
     return NULL;
+
+  if (buildid)
+    {
+      ret = SymFindFileInPath (symbol_server_process, NULL, orig_lib_name,
+			       buildid, buildid[4], 0, SSRVOPT_GUIDPTR,
+			       lib_name, NULL, NULL);
+      if (ret)
+	return lib_name;
+    }
 
   ret = SymFindFileInPath (symbol_server_process, NULL, orig_lib_name,
 			   &timestamp, size, 0, SSRVOPT_DWORDPTR,
