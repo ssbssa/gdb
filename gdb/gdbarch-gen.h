@@ -1022,6 +1022,14 @@ typedef bool (gdbarch_core_read_x86_xsave_layout_ftype) (struct gdbarch *gdbarch
 extern bool gdbarch_core_read_x86_xsave_layout (struct gdbarch *gdbarch, x86_xsave_layout &xsave_layout);
 extern void set_gdbarch_core_read_x86_xsave_layout (struct gdbarch *gdbarch, gdbarch_core_read_x86_xsave_layout_ftype *core_read_x86_xsave_layout);
 
+/* Return the executable path of a core file. */
+
+extern bool gdbarch_core_load_executable_p (struct gdbarch *gdbarch);
+
+typedef char * (gdbarch_core_load_executable_ftype) (struct gdbarch *gdbarch);
+extern char * gdbarch_core_load_executable (struct gdbarch *gdbarch);
+extern void set_gdbarch_core_load_executable (struct gdbarch *gdbarch, gdbarch_core_load_executable_ftype *core_load_executable);
+
 /* BFD target to use when generating a core file. */
 
 extern bool gdbarch_gcore_bfd_target_p (struct gdbarch *gdbarch);
