@@ -172,6 +172,8 @@ struct target_so_ops
        NULL, in which case no specific preprocessing is necessary
        for this target.  */
     void (*handle_event) (void);
+
+    CORE_ADDR (*map_addr) (struct so_list *so);
   };
 
 /* Free the memory associated with a (so_list *).  */
