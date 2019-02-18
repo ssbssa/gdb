@@ -86,6 +86,9 @@
 #define GetConsoleFontSize		dyn_GetConsoleFontSize
 #define GetCurrentConsoleFont		dyn_GetCurrentConsoleFont
 #define GetThreadDescription		dyn_GetThreadDescription
+#define SymInitialize			dyn_SymInitialize
+#define SymCleanup			dyn_SymCleanup
+#define SymFindFileInPath		dyn_SymFindFileInPath
 
 typedef BOOL WINAPI (AdjustTokenPrivileges_ftype) (HANDLE, BOOL,
 						   PTOKEN_PRIVILEGES,
@@ -131,6 +134,17 @@ typedef BOOL WINAPI (MiniDumpWriteDump_ftype) (HANDLE, DWORD, HANDLE,
 
 typedef HRESULT WINAPI (GetThreadDescription_ftype) (HANDLE, PWSTR *);
 static GetThreadDescription_ftype *GetThreadDescription;
+
+typedef BOOL WINAPI (SymInitialize_ftype) (HANDLE, PCSTR, BOOL);
+static SymInitialize_ftype *SymInitialize;
+
+typedef BOOL WINAPI (SymCleanup_ftype) (HANDLE);
+static SymCleanup_ftype *SymCleanup;
+
+typedef BOOL WINAPI (SymFindFileInPath_ftype) (HANDLE, PCSTR, PCSTR, PVOID,
+					       DWORD, DWORD, DWORD, PSTR,
+					       PFINDFILEINPATHCALLBACK, PVOID);
+static SymFindFileInPath_ftype *SymFindFileInPath;
 
 #undef STARTUPINFO
 #undef CreateProcess
@@ -1198,6 +1212,74 @@ static void
 minidump_full_command (const char *args, int from_tty)
 {
   do_minidump (args, true);
+}
+
+static char *minidump_search_path = NULL;
+static HMODULE symbol_server_mod;
+static HANDLE symbol_server_process;
+
+void
+symbol_server_free (void)
+{
+  if (SymCleanup)
+    SymCleanup (symbol_server_process);
+  if (symbol_server_mod)
+    FreeLibrary (symbol_server_mod);
+
+  symbol_server_mod = NULL;
+  SymInitialize = NULL;
+  SymCleanup = NULL;
+  SymFindFileInPath = NULL;
+}
+
+int
+symbol_server_init (void)
+{
+  if (minidump_search_path == NULL)
+    return 0;
+
+  symbol_server_mod = LoadLibrary ("dbghelp.dll");
+  if (!symbol_server_mod)
+    return 0;
+
+  SymInitialize = (SymInitialize_ftype *)
+    GetProcAddress (symbol_server_mod, "SymInitialize");
+  SymCleanup = (SymCleanup_ftype *)
+    GetProcAddress (symbol_server_mod, "SymCleanup");
+  SymFindFileInPath = (SymFindFileInPath_ftype *)
+    GetProcAddress (symbol_server_mod, "SymFindFileInPath");
+  symbol_server_process = (HANDLE) 1;
+
+  if (!SymInitialize || !SymCleanup || !SymFindFileInPath ||
+      !SymInitialize (symbol_server_process,
+		      minidump_search_path,
+		      FALSE))
+    {
+      SymCleanup = NULL;
+      symbol_server_free ();
+      return 0;
+    }
+
+  return 1;
+}
+
+const char *
+symbol_server_lib (const char *orig_lib_name,
+		   uint32_t size, uint32_t timestamp)
+{
+  static char lib_name[MAX_PATH];
+  BOOL ret;
+
+  if (!SymFindFileInPath)
+    return NULL;
+
+  ret = SymFindFileInPath (symbol_server_process, NULL, orig_lib_name,
+			   &timestamp, size, 0, SSRVOPT_DWORDPTR,
+			   lib_name, NULL, NULL);
+  if (ret)
+    return lib_name;
+
+  return NULL;
 }
 
 /* Handle DEBUG_STRING output from child process.
@@ -3406,6 +3488,13 @@ crashed process will be supplied by the Windows JIT debugging mechanism."));
 	   _("Save minidump file of the debugged process."));
   add_com ("minidump-full", class_files, minidump_full_command,
 	   _("Save minidump file with full memory of the debugged process."));
+  add_setshow_optional_filename_cmd ("minidump-search-path", class_support,
+				     &minidump_search_path, _("\
+Set the search path for shared library symbol files of minidumps."), _("\
+Show the search path for shared library symbol files of minidumps."),
+				     _("Can include symbol servers."),
+				     NULL, NULL,
+				     &setlist, &showlist);
 
   add_com ("console", class_obscure, console_resize_command,
 	       _("Resize console."));
