@@ -1064,6 +1064,23 @@ windows_core_thread_name (struct gdbarch *gdbarch, struct thread_info *thr)
   return NULL;
 }
 
+static const char *
+core_get_module_name (struct gdbarch *gdbarch, const char *sect_name,
+		      gdb_byte *wide_name, unsigned int wide_size,
+		      obstack *name)
+{
+  const char *module_name;
+
+  convert_between_encodings (target_wide_charset (gdbarch),
+			     host_charset (),
+			     wide_name, wide_size, 2,
+			     name, translit_char);
+  obstack_grow_str0 (name, "");
+  module_name = (char *) obstack_base (name);
+
+  return module_name;
+}
+
 static struct target_so_ops windows_so_ops;
 
 /* Common parts for gdbarch initialization for the Windows and Cygwin OS
@@ -1256,10 +1273,10 @@ core_process_module_section (bfd *abfd, asection *sect, void *obj)
   enum bfd_endian byte_order = gdbarch_byte_order (data->gdbarch);
 
   unsigned int data_type;
-  char *module_name;
+  const char *module_name;
   size_t module_name_size;
   size_t module_name_offset;
-  CORE_ADDR base_addr;
+  unsigned long long base_addr;
   int is_module, is_coremodule;
 
   is_module = startswith (sect->name, ".module");
@@ -1277,19 +1294,19 @@ core_process_module_section (bfd *abfd, asection *sect, void *obj)
 
   if (is_coremodule)
     {
-      auto_obstack host_name;
-      convert_between_encodings (target_wide_charset (data->gdbarch),
-				 host_charset (),
-				 buf.data (), bfd_section_size (sect), 2,
-				 &host_name, translit_char);
-      obstack_grow_str0 (&host_name, "");
-      module_name = (char *) obstack_base (&host_name);
-
-      sscanf (sect->name + 12, "%llx", &base_addr);
-
       if (data->module_count != 0)
-	windows_xfer_shared_library (module_name, base_addr,
-				     NULL, data->gdbarch, data->obstack);
+	{
+	  auto_obstack host_name;
+
+	  sscanf (sect->name + 12, "%llx", &base_addr);
+
+	  module_name = core_get_module_name (data->gdbarch, sect->name,
+					      buf.data (), bfd_section_size (sect),
+					      &host_name);
+
+	  windows_xfer_shared_library (module_name, base_addr,
+				       NULL, data->gdbarch, data->obstack);
+	}
       data->module_count++;
 
       return;
