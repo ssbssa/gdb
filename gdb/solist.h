@@ -167,6 +167,8 @@ struct solib_ops
      NULL, in which case no specific preprocessing is necessary
      for this target.  */
   void (*handle_event) (void);
+
+  CORE_ADDR (*map_addr) (const solib &so);
 };
 
 /* A unique pointer to a so_list.  */
