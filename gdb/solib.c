@@ -1370,6 +1370,63 @@ no_shared_libraries_command (const char *ignored, int from_tty)
   no_shared_libraries (current_program_space);
 }
 
+static void
+find_library_command (const char *args, int from_tty)
+{
+  if (args == NULL)
+    error (_("find-library takes an address"));
+
+  CORE_ADDR addr = parse_and_eval_address (args);
+  gdbarch *gdbarch = current_inferior ()->arch ();
+
+  for (const solib &so : current_program_space->solibs ())
+    {
+      if (so.name.empty () || so.addr_high == 0)
+	continue;
+
+      if (addr >= so.addr_low && addr <= so.addr_high)
+	{
+	  printf_unfiltered (_("Address %s is part of library %s\n"),
+			     paddress (gdbarch, addr), so.name.c_str ());
+	  return;
+	}
+    }
+
+  solib_ops_up ops = gdbarch_make_solib_ops (gdbarch, current_program_space);
+  const solib *maybe_so = NULL;
+  CORE_ADDR maybe_addr = 0;
+
+  for (const solib &so : current_program_space->solibs ())
+    {
+      if (so.name.empty ())
+	continue;
+
+      if (so.addr_high == 0)
+	{
+	  CORE_ADDR map_addr = ops->map_addr (so);
+	  if (map_addr > maybe_addr && map_addr <= addr)
+	    {
+	      maybe_so = &so;
+	      maybe_addr = map_addr;
+	    }
+	}
+      else if (so.addr_low > maybe_addr && so.addr_low <= addr)
+	{
+	  maybe_so = NULL;
+	  maybe_addr = 0;
+	}
+    }
+
+  if (maybe_addr != 0)
+    {
+      printf_unfiltered (_("Address %s is maybe part of not-loaded library %s\n"),
+			 paddress (gdbarch, addr), maybe_so->name.c_str ());
+      return;
+    }
+
+  error (_("Can't find address %s"), paddress (gdbarch, addr));
+}
+
 /* See solib.h.  */
 
 void
@@ -1906,6 +1963,9 @@ INIT_GDB_FILE (solib)
 
   add_info ("linker-namespaces", info_linker_namespace_command,
       _("Get information about linker namespaces in the inferior."));
+
+  add_com ("find-library", class_files, find_library_command,
+	   _("Find shared library by address."));
 
   add_setshow_boolean_cmd ("auto-solib-add", class_support, &auto_solib_add,
 			   _("\

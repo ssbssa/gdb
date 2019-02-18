@@ -282,6 +282,9 @@ struct solib_ops
     (iterate_over_objfiles_in_search_order_cb_ftype cb,
      objfile *current_objfile) const;
 
+  virtual CORE_ADDR map_addr (const solib &so) const
+  { return 0; }
+
 protected:
   /* The program space for which this solib_ops was created.  */
   program_space *m_pspace;
