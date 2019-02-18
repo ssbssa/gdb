@@ -37,6 +37,9 @@
 #include "libcoff.h"
 #include "solist.h"
 #include "charset.h"
+#ifdef _WIN32
+#include "windows-nat.h"
+#endif
 
 #define CYGWIN_DLL_NAME "cygwin1.dll"
 
@@ -1068,6 +1071,9 @@ windows_core_thread_name (struct gdbarch *gdbarch, struct thread_info *thr)
 static const char *
 core_get_module_name (struct gdbarch *gdbarch, const char *sect_name,
 		      gdb_byte *wide_name, unsigned int wide_size,
+#ifdef _WIN32
+		      int use_symbol_server,
+#endif
 		      obstack *name)
 {
   const char *module_name;
@@ -1079,6 +1085,33 @@ core_get_module_name (struct gdbarch *gdbarch, const char *sect_name,
   obstack_grow_str0 (name, "");
   module_name = (char *) obstack_base (name);
 
+#ifdef _WIN32
+  if (use_symbol_server)
+    {
+      const char *findstr;
+      uint32_t size = 0;
+      uint32_t timestamp = 0;
+      const char *symlib;
+
+      findstr = strstr (sect_name, ";s=");
+      if (findstr)
+	size = strtoul (findstr + 3, NULL, 16);
+      findstr = strstr (sect_name, ";t=");
+      if (findstr)
+	timestamp = strtoul (findstr + 3, NULL, 16);
+
+      findstr = strstr (sect_name, ";v=");
+
+      symlib = symbol_server_lib (module_name, size, timestamp);
+      if (symlib)
+	module_name = symlib;
+      else if (findstr)
+	warning (_("Can't find '%s' version %s."), module_name, findstr + 3);
+      else
+	warning (_("Can't find '%s'."), module_name);
+    }
+#endif
+
   return module_name;
 }
 
@@ -1088,6 +1121,9 @@ struct cpes_data
   struct obstack *obstack;
   int module_count;
   const char *load_executable;
+#ifdef _WIN32
+  int use_symbol_server;
+#endif
 };
 
 static void
@@ -1114,6 +1150,9 @@ core_process_executable_section (bfd *abfd, asection *sect, void *obj)
 
   name = core_get_module_name (data->gdbarch, sect->name,
 			       buf.get (), bfd_section_size (sect),
+#ifdef _WIN32
+			       data->use_symbol_server,
+#endif
 			       data->obstack);
 
   data->load_executable = name;
@@ -1125,9 +1164,17 @@ windows_core_load_executable (struct gdbarch *gdbarch)
   auto_obstack obstack;
   struct cpes_data data = { gdbarch, &obstack, 0, NULL };
 
+#ifdef _WIN32
+  data.use_symbol_server = symbol_server_init ();
+#endif
+
   bfd_map_over_sections (core_bfd,
 			 core_process_executable_section,
 			 &data);
+
+#ifdef _WIN32
+  symbol_server_free ();
+#endif
 
   return data.load_executable ? xstrdup(data.load_executable) : NULL;
 }
@@ -1316,6 +1363,9 @@ struct cpms_data
   struct gdbarch *gdbarch;
   struct obstack *obstack;
   int module_count;
+#ifdef _WIN32
+  int use_symbol_server;
+#endif
 };
 
 static void
@@ -1354,6 +1404,9 @@ core_process_module_section (bfd *abfd, asection *sect, void *obj)
 
 	  module_name = core_get_module_name (data->gdbarch, sect->name,
 					      buf.data (), bfd_section_size (sect),
+#ifdef _WIN32
+					      data->use_symbol_server,
+#endif
 					      &host_name);
 
 	  windows_xfer_shared_library (module_name, base_addr,
@@ -1412,6 +1465,10 @@ windows_core_xfer_shared_libraries (struct gdbarch *gdbarch,
       struct obstack obstack;
       struct cpms_data data = { gdbarch, &obstack, 0 };
 
+#ifdef _WIN32
+      data.use_symbol_server = symbol_server_init ();
+#endif
+
       obstack_init (&obstack);
       obstack_grow_str (&obstack, "<library-list>\n");
       bfd_map_over_sections (core_bfd,
@@ -1422,6 +1479,10 @@ windows_core_xfer_shared_libraries (struct gdbarch *gdbarch,
       last_xfer_libraries = xstrdup ((char *) obstack_finish (&obstack));
 
       obstack_free (&obstack, NULL);
+
+#ifdef _WIN32
+      symbol_server_free ();
+#endif
     }
 
   buf = last_xfer_libraries;
