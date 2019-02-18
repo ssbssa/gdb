@@ -975,6 +975,56 @@ windows_core_thread_name (struct gdbarch *gdbarch, struct thread_info *thr)
   return NULL;
 }
 
+struct cpes_data
+{
+  struct gdbarch *gdbarch;
+  struct obstack *obstack;
+  int module_count;
+  const char *load_executable;
+};
+
+static void
+core_process_executable_section (bfd *abfd, asection *sect, void *obj)
+{
+  struct cpes_data *data = (struct cpes_data *) obj;
+  gdb::unique_xmalloc_ptr<gdb_byte> buf;
+  const char *name;
+
+  if (data->module_count)
+    return;
+
+  if (!startswith (sect->name, ".coremodule/"))
+    return;
+
+  data->module_count++;
+
+  buf.reset ((gdb_byte *) xmalloc (bfd_get_section_size (sect) + 1));
+  if (!buf)
+    return;
+  if (!bfd_get_section_contents (abfd, sect,
+				 buf.get (), 0, bfd_get_section_size (sect)))
+    return;
+
+  name = core_get_module_name (data->gdbarch, sect->name,
+			       buf.get (), bfd_get_section_size (sect),
+			       data->obstack);
+
+  data->load_executable = name;
+}
+
+static char *
+windows_core_load_executable (struct gdbarch *gdbarch)
+{
+  auto_obstack obstack;
+  struct cpes_data data = { gdbarch, &obstack, 0, NULL };
+
+  bfd_map_over_sections (core_bfd,
+			 core_process_executable_section,
+			 &data);
+
+  return data.load_executable ? xstrdup(data.load_executable) : NULL;
+}
+
 /* To be called from the various GDB_OSABI_CYGWIN handlers for the
    various Windows architectures and machine types.  */
 
@@ -1005,6 +1055,7 @@ windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 				      windows_gdb_signal_from_target);
   set_gdbarch_core_xfer_siginfo (gdbarch, windows_core_xfer_siginfo);
   set_gdbarch_core_thread_name (gdbarch, windows_core_thread_name);
+  set_gdbarch_core_load_executable (gdbarch, windows_core_load_executable);
 }
 
 /* Implementation of `tlb' variable.  */
