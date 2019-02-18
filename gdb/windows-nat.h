@@ -36,5 +36,17 @@ int amd64_windows_segment_register_p (int regnum);
 extern const int amd64_mappings[];
 #endif
 
+#ifdef _WIN32
+int
+symbol_server_init (void);
+
+void
+symbol_server_free (void);
+
+const char *
+symbol_server_lib (const char *orig_lib_name,
+		   uint32_t size, uint32_t timestamp);
+#endif
+
 #endif
 
