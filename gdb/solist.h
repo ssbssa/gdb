@@ -180,6 +180,8 @@ struct solib_ops
      name).  */
 
   std::optional<CORE_ADDR> (*find_solib_addr) (solib &so);
+
+  CORE_ADDR (*map_addr) (const solib &so);
 };
 
 /* A unique pointer to a so_list.  */

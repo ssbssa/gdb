@@ -399,6 +399,30 @@ solib_target_in_dynsym_resolve_code (CORE_ADDR pc)
   return in_plt_section (pc);
 }
 
+static CORE_ADDR
+solib_map_addr (const solib &so)
+{
+  auto *li = gdb::checked_static_cast<lm_info_target *> (so.lm_info.get ());
+
+  if (!li->section_bases.empty ())
+    {
+      int i;
+      CORE_ADDR low = ~(CORE_ADDR) 0;
+      for (i = 0; i < li->section_bases.size (); i++)
+	{
+	  if (li->section_bases[i] < low)
+	    low = li->section_bases[i];
+	}
+      return low;
+    }
+  else if (!li->segment_bases.empty ())
+    {
+      return li->segment_bases[0];
+    }
+
+  return 0;
+}
+
 const solib_ops solib_target_so_ops =
 {
   solib_target_relocate_section_addresses,
@@ -414,4 +438,5 @@ const solib_ops solib_target_so_ops =
   nullptr,
   nullptr,
   default_find_solib_addr,
+  solib_map_addr,
 };
