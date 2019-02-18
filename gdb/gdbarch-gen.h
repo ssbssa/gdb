@@ -1050,6 +1050,14 @@ using gdbarch_core_read_x86_xsave_layout_ftype = bool (struct gdbarch *gdbarch, 
 bool gdbarch_core_read_x86_xsave_layout (struct gdbarch *gdbarch, struct bfd &cbfd, x86_xsave_layout &xsave_layout);
 void set_gdbarch_core_read_x86_xsave_layout (struct gdbarch *gdbarch, gdbarch_core_read_x86_xsave_layout_ftype *core_read_x86_xsave_layout);
 
+/* Return the executable path of a core file. */
+
+bool gdbarch_core_load_executable_p (struct gdbarch *gdbarch);
+
+using gdbarch_core_load_executable_ftype = char *(struct gdbarch *gdbarch);
+char *gdbarch_core_load_executable (struct gdbarch *gdbarch);
+void set_gdbarch_core_load_executable (struct gdbarch *gdbarch, gdbarch_core_load_executable_ftype *core_load_executable);
+
 /* BFD target to use when generating a core file. */
 
 bool gdbarch_gcore_bfd_target_p (struct gdbarch *gdbarch);
