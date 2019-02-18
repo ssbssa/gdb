@@ -176,6 +176,7 @@ struct gdbarch
   gdbarch_core_pid_to_str_ftype *core_pid_to_str;
   gdbarch_core_thread_name_ftype *core_thread_name;
   gdbarch_core_xfer_siginfo_ftype *core_xfer_siginfo;
+  gdbarch_core_load_executable_ftype *core_load_executable;
   const char * gcore_bfd_target;
   int vtable_function_descriptors;
   int vbit_in_delta;
@@ -532,6 +533,7 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of core_pid_to_str, has predicate.  */
   /* Skip verify of core_thread_name, has predicate.  */
   /* Skip verify of core_xfer_siginfo, has predicate.  */
+  /* Skip verify of core_load_executable, has predicate.  */
   /* Skip verify of gcore_bfd_target, has predicate.  */
   /* Skip verify of vtable_function_descriptors, invalid_p == 0 */
   /* Skip verify of vbit_in_delta, invalid_p == 0 */
@@ -1126,6 +1128,12 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   fprintf_filtered (file,
                       "gdbarch_dump: core_xfer_siginfo = <%s>\n",
                       host_address_to_string (gdbarch->core_xfer_siginfo));
+  fprintf_filtered (file,
+                      "gdbarch_dump: gdbarch_core_load_executable_p() = %d\n",
+                      gdbarch_core_load_executable_p (gdbarch));
+  fprintf_filtered (file,
+                      "gdbarch_dump: core_load_executable = <%s>\n",
+                      host_address_to_string (gdbarch->core_load_executable));
   fprintf_filtered (file,
                       "gdbarch_dump: gdbarch_gcore_bfd_target_p() = %d\n",
                       gdbarch_gcore_bfd_target_p (gdbarch));
@@ -3862,6 +3870,30 @@ set_gdbarch_core_xfer_siginfo (struct gdbarch *gdbarch,
                                gdbarch_core_xfer_siginfo_ftype core_xfer_siginfo)
 {
   gdbarch->core_xfer_siginfo = core_xfer_siginfo;
+}
+
+bool
+gdbarch_core_load_executable_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->core_load_executable != NULL;
+}
+
+char *
+gdbarch_core_load_executable (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->core_load_executable != NULL);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_core_load_executable called\n");
+  return gdbarch->core_load_executable (gdbarch);
+}
+
+void
+set_gdbarch_core_load_executable (struct gdbarch *gdbarch,
+                                  gdbarch_core_load_executable_ftype core_load_executable)
+{
+  gdbarch->core_load_executable = core_load_executable;
 }
 
 bool
