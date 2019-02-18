@@ -31,6 +31,7 @@ struct target_solib_ops : solib_ops
   void relocate_section_addresses (solib &so, target_section *) const override;
   owning_intrusive_list<solib> current_sos () const override;
   bool in_dynsym_resolve_code (CORE_ADDR pc) const override;
+  CORE_ADDR map_addr (const solib &so) const override;
 };
 
 /* Return a new solib_ops for systems fetching solibs from the target.  */
