@@ -693,7 +693,7 @@ symbol_server_free (void);
 
 const char *
 symbol_server_lib (const char *orig_lib_name,
-		   uint32_t size, uint32_t timestamp);
+		   uint32_t size, uint32_t timestamp, uint32_t *buildid);
 #endif
 
 struct cpms_data
@@ -730,6 +730,10 @@ core_get_module_name (struct gdbarch *gdbarch, const char *sect_name,
       uint32_t size = 0;
       uint32_t timestamp = 0;
       const char *symlib;
+      unsigned long long base_addr;
+      uint32_t buildid[5];
+      char sect_buildid[32];
+      uint32_t *b = NULL;
 
       findstr = strstr (sect_name, ";s=");
       if (findstr)
@@ -740,7 +744,16 @@ core_get_module_name (struct gdbarch *gdbarch, const char *sect_name,
 
       findstr = strstr (sect_name, ";v=");
 
-      symlib = symbol_server_lib (module_name, size, timestamp);
+      sscanf (sect_name + 12, "%llx", &base_addr);
+
+      sprintf (sect_buildid, ".corebuildid/%llx", base_addr);
+      asection *s = bfd_get_section_by_name (core_bfd, sect_buildid);
+
+      if (s && bfd_get_section_size (s) == 20
+	  && bfd_get_section_contents (core_bfd, s, buildid, 0, 20))
+	b = buildid;
+
+      symlib = symbol_server_lib (module_name, size, timestamp, b);
       if (symlib)
 	module_name = symlib;
       else if (findstr)
