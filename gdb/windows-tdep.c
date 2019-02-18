@@ -841,6 +841,8 @@ make_windows_solib_ops (program_space *pspace)
   return std::make_unique<windows_solib_ops> (pspace);
 }
 
+static std::unique_ptr<std::string> last_xfer_libraries;
+
 /* Implement the "solib_create_inferior_hook" solib_ops method.  */
 
 void
@@ -898,6 +900,8 @@ windows_solib_ops::create_inferior_hook (int from_tty) const
 	objfile_rebase (current_program_space->symfile_object_file,
 			exec_base - vmaddr);
     }
+
+  last_xfer_libraries.reset ();
 }
 
 /* Implement the "iterate_over_objfiles_in_search_order" gdbarch
@@ -1423,21 +1427,26 @@ windows_core_xfer_shared_libraries (struct gdbarch *gdbarch,
 				    struct bfd &cbfd, gdb_byte *readbuf,
 				    ULONGEST offset, ULONGEST len)
 {
-  cpms_data data { gdbarch, "<library-list>\n", 0 };
+  if (!last_xfer_libraries)
+    {
+      cpms_data data { gdbarch, "<library-list>\n", 0 };
 
-  for (asection *sect : gdb_bfd_sections (&cbfd))
-    core_process_module_section (&cbfd, sect, data);
+      for (asection *sect : gdb_bfd_sections (&cbfd))
+	core_process_module_section (&cbfd, sect, data);
 
-  data.xml += "</library-list>\n";
+      data.xml += "</library-list>\n";
 
-  ULONGEST len_avail = data.xml.length ();
+      last_xfer_libraries.reset (new std::string (std::move (data.xml)));
+    }
+
+  ULONGEST len_avail = last_xfer_libraries->length ();
   if (offset >= len_avail)
     return 0;
 
   if (len > len_avail - offset)
     len = len_avail - offset;
 
-  memcpy (readbuf, data.xml.data () + offset, len);
+  memcpy (readbuf, last_xfer_libraries->data () + offset, len);
 
   return len;
 }
