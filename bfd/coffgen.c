@@ -3445,7 +3445,7 @@ coff_core_file_p (bfd *abfd)
     {
       uint32_t moduleCount;
       dump_module module;
-      char secname[32];
+      char secname[100];
       uint32_t size;
       uint32_t m;
 
@@ -3521,6 +3521,13 @@ coff_core_file_p (bfd *abfd)
 
 	  sprintf (secname, ".coremodule/%llx",
 		   (unsigned long long) module.base);
+	  if (module.size)
+	    sprintf (secname + strlen (secname), ";s=%x", module.size);
+	  if (module.timestamp)
+	    sprintf (secname + strlen (secname), ";t=%x", module.timestamp);
+	  if (ms || ls)
+	    sprintf (secname + strlen (secname), ";v=%u.%u.%u.%u",
+		     ms >> 16, ms & 0xffff, ls >> 16, ls & 0xffff);
 
 	  sec = make_bfd_asection (abfd, secname,
 				   SEC_HAS_CONTENTS,

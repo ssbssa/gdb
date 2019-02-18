@@ -157,6 +157,22 @@ struct windows_per_inferior : public windows_process_info
 /* The current process.  */
 static windows_per_inferior windows_process;
 
+#define SymInitialize			dyn_SymInitialize
+#define SymCleanup			dyn_SymCleanup
+#define SymFindFileInPath		dyn_SymFindFileInPath
+
+typedef BOOL WINAPI (SymInitialize_ftype) (HANDLE, PCSTR, BOOL);
+static SymInitialize_ftype *SymInitialize;
+
+typedef BOOL WINAPI (SymCleanup_ftype) (HANDLE);
+static SymCleanup_ftype *SymCleanup;
+
+typedef BOOL WINAPI (SymFindFileInPath_ftype) (HANDLE, PCSTR, PCSTR, PVOID,
+					       DWORD, DWORD, DWORD, PSTR,
+					       PFINDFILEINPATHCALLBACK, PVOID);
+static SymFindFileInPath_ftype *SymFindFileInPath;
+
+
 #undef STARTUPINFO
 
 #ifndef __CYGWIN__
@@ -1168,6 +1184,74 @@ jit_uninstall_command (const char *args, int from_tty)
 
   if (ret != ERROR_SUCCESS)
     error (_("Error deleting 'Debugger' registry value."));
+}
+
+static std::string minidump_search_path;
+static HMODULE symbol_server_mod;
+static HANDLE symbol_server_process;
+
+void
+symbol_server_free (void)
+{
+  if (SymCleanup)
+    SymCleanup (symbol_server_process);
+  if (symbol_server_mod)
+    FreeLibrary (symbol_server_mod);
+
+  symbol_server_mod = NULL;
+  SymInitialize = NULL;
+  SymCleanup = NULL;
+  SymFindFileInPath = NULL;
+}
+
+int
+symbol_server_init (void)
+{
+  if (minidump_search_path.empty ())
+    return 0;
+
+  symbol_server_mod = LoadLibrary ("dbghelp.dll");
+  if (!symbol_server_mod)
+    return 0;
+
+  SymInitialize = (SymInitialize_ftype *)
+    GetProcAddress (symbol_server_mod, "SymInitialize");
+  SymCleanup = (SymCleanup_ftype *)
+    GetProcAddress (symbol_server_mod, "SymCleanup");
+  SymFindFileInPath = (SymFindFileInPath_ftype *)
+    GetProcAddress (symbol_server_mod, "SymFindFileInPath");
+  symbol_server_process = (HANDLE) 1;
+
+  if (!SymInitialize || !SymCleanup || !SymFindFileInPath ||
+      !SymInitialize (symbol_server_process,
+		      minidump_search_path.c_str (),
+		      FALSE))
+    {
+      SymCleanup = NULL;
+      symbol_server_free ();
+      return 0;
+    }
+
+  return 1;
+}
+
+const char *
+symbol_server_lib (const char *orig_lib_name,
+		   uint32_t size, uint32_t timestamp)
+{
+  static char lib_name[MAX_PATH];
+  BOOL ret;
+
+  if (!SymFindFileInPath)
+    return NULL;
+
+  ret = SymFindFileInPath (symbol_server_process, NULL, orig_lib_name,
+			   &timestamp, size, 0, SSRVOPT_DWORDPTR,
+			   lib_name, NULL, NULL);
+  if (ret)
+    return lib_name;
+
+  return NULL;
 }
 
 /* See nat/windows-nat.h.  */
@@ -3255,6 +3339,13 @@ crashed process will be supplied by the Windows JIT debugging mechanism."));
 	   _("Install as JIT debugger."));
   add_com ("jit-uninstall", class_obscure, jit_uninstall_command,
 	   _("Uninstall JIT debugger."));
+  add_setshow_optional_filename_cmd ("minidump-search-path", class_support,
+				     &minidump_search_path, _("\
+Set the search path for shared library symbol files of minidumps."), _("\
+Show the search path for shared library symbol files of minidumps."),
+				     _("Can include symbol servers."),
+				     NULL, NULL,
+				     &setlist, &showlist);
 
   add_com ("console", class_obscure, console_resize_command,
 	       _("Resize console."));
