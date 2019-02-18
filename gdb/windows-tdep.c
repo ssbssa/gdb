@@ -549,6 +549,8 @@ init_w32_command_list (void)
     }
 }
 
+static char *last_xfer_librararies = NULL;
+
 static void
 windows_solib_create_inferior_hook (int from_tty)
 {
@@ -561,6 +563,9 @@ windows_solib_create_inferior_hook (int from_tty)
       if (vmaddr != exec_base)
 	objfile_rebase (symfile_objfile, exec_base - vmaddr);
     }
+
+  xfree (last_xfer_librararies);
+  last_xfer_librararies = NULL;
 }
 
 struct enum_value_name
@@ -766,19 +771,27 @@ windows_core_xfer_shared_libraries (struct gdbarch *gdbarch,
 				  gdb_byte *readbuf,
 				  ULONGEST offset, ULONGEST len)
 {
-  struct obstack obstack;
   const char *buf;
   ULONGEST len_avail;
-  struct cpms_data data = { gdbarch, &obstack, 0 };
 
-  obstack_init (&obstack);
-  obstack_grow_str (&obstack, "<library-list>\n");
-  bfd_map_over_sections (core_bfd,
-			 core_process_module_section,
-			 &data);
-  obstack_grow_str0 (&obstack, "</library-list>\n");
+  if (!last_xfer_librararies)
+    {
+      struct obstack obstack;
+      struct cpms_data data = { gdbarch, &obstack, 0 };
 
-  buf = (const char *) obstack_finish (&obstack);
+      obstack_init (&obstack);
+      obstack_grow_str (&obstack, "<library-list>\n");
+      bfd_map_over_sections (core_bfd,
+			     core_process_module_section,
+			     &data);
+      obstack_grow_str0 (&obstack, "</library-list>\n");
+
+      last_xfer_librararies = xstrdup ((char *) obstack_finish (&obstack));
+
+      obstack_free (&obstack, NULL);
+    }
+
+  buf = last_xfer_librararies;
   len_avail = strlen (buf);
   if (offset >= len_avail)
     return 0;
@@ -787,7 +800,6 @@ windows_core_xfer_shared_libraries (struct gdbarch *gdbarch,
     len = len_avail - offset;
   memcpy (readbuf, buf + offset, len);
 
-  obstack_free (&obstack, NULL);
   return len;
 }
 
