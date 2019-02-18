@@ -1720,6 +1720,17 @@ Returns true if the layout was read successfully.
     predicate=True,
 )
 
+Method(
+    comment="""
+Return the executable path of a core file.
+""",
+    type="char *",
+    name="core_load_executable",
+    params=[],
+    predicate=True,
+    invalid=True,
+)
+
 Value(
     comment="""
 BFD target to use when generating a core file.
