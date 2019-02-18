@@ -45,7 +45,7 @@ symbol_server_free (void);
 
 const char *
 symbol_server_lib (const char *orig_lib_name,
-		   uint32_t size, uint32_t timestamp);
+		   uint32_t size, uint32_t timestamp, uint32_t *buildid);
 #endif
 
 #endif
