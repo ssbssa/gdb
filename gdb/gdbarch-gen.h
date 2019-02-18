@@ -976,6 +976,14 @@ typedef LONGEST (gdbarch_core_xfer_siginfo_ftype) (struct gdbarch *gdbarch, gdb_
 extern LONGEST gdbarch_core_xfer_siginfo (struct gdbarch *gdbarch, gdb_byte *readbuf, ULONGEST offset, ULONGEST len);
 extern void set_gdbarch_core_xfer_siginfo (struct gdbarch *gdbarch, gdbarch_core_xfer_siginfo_ftype *core_xfer_siginfo);
 
+/* Return the executable path of a core file. */
+
+extern bool gdbarch_core_load_executable_p (struct gdbarch *gdbarch);
+
+typedef char * (gdbarch_core_load_executable_ftype) (struct gdbarch *gdbarch);
+extern char * gdbarch_core_load_executable (struct gdbarch *gdbarch);
+extern void set_gdbarch_core_load_executable (struct gdbarch *gdbarch, gdbarch_core_load_executable_ftype *core_load_executable);
+
 /* BFD target to use when generating a core file. */
 
 extern bool gdbarch_gcore_bfd_target_p (struct gdbarch *gdbarch);

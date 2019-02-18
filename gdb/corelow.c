@@ -522,6 +522,22 @@ core_target_open (const char *arg, int from_tty)
   /* Own the target until it is successfully pushed.  */
   target_ops_up target_holder (target);
 
+  if (!current_program_space->exec_bfd ())
+    {
+      gdbarch *core_gdbarch = target->core_gdbarch ();
+
+      if (core_gdbarch != NULL
+	  && gdbarch_core_load_executable_p (core_gdbarch))
+	{
+	  char *executable_path = gdbarch_core_load_executable (core_gdbarch);
+
+	  if (executable_path != NULL)
+	    try_open_exec_file (executable_path, NULL, 0);
+
+	  xfree (executable_path);
+	}
+    }
+
   validate_files ();
 
   /* If we have no exec file, try to set the architecture from the
