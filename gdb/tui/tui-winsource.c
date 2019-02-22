@@ -103,9 +103,9 @@ tui_update_source_window_as_is (struct tui_win_info *win_info,
     }
   else
     {
-      tui_update_breakpoint_info (win_info, 0);
+      tui_update_breakpoint_info (win_info, 0, NULL);
       tui_show_source_content (win_info);
-      tui_update_exec_info (win_info);
+      tui_update_exec_info (win_info, NULL);
       if (win_info->generic.type == SRC_WIN)
 	{
 	  symtab_and_line sal;
@@ -403,7 +403,7 @@ tui_set_is_exec_point_at (struct tui_line_or_address l,
    This is called whenever a breakpoint is inserted, removed or
    has its state changed.  */
 void
-tui_update_all_breakpoint_info (void)
+tui_update_all_breakpoint_info (struct breakpoint *bp_del)
 {
   struct tui_list *list = tui_source_windows ();
   int i;
@@ -412,9 +412,9 @@ tui_update_all_breakpoint_info (void)
     {
       struct tui_win_info *win = list->list[i];
 
-      if (tui_update_breakpoint_info (win, FALSE))
+      if (tui_update_breakpoint_info (win, FALSE, bp_del))
         {
-          tui_update_exec_info (win);
+          tui_update_exec_info (win, bp_del);
         }
     }
 }
@@ -428,7 +428,8 @@ tui_update_all_breakpoint_info (void)
 
 int
 tui_update_breakpoint_info (struct tui_win_info *win, 
-			    int current_only)
+			    int current_only,
+			    struct breakpoint *bp_del)
 {
   int i;
   int need_refresh = 0;
@@ -454,6 +455,9 @@ tui_update_breakpoint_info (struct tui_win_info *win,
            bp = bp->next)
         {
 	  struct bp_location *loc;
+
+	  if (bp == bp_del)
+	    continue;
 
 	  gdb_assert (line->line_or_addr.loa == LOA_LINE
 		      || line->line_or_addr.loa == LOA_ADDRESS);
@@ -497,7 +501,8 @@ tui_update_breakpoint_info (struct tui_win_info *win,
    based upon the input window which is either the source or
    disassembly window.  */
 enum tui_status
-tui_set_exec_info_content (struct tui_win_info *win_info)
+tui_set_exec_info_content (struct tui_win_info *win_info,
+			   struct breakpoint *bp_del)
 {
   enum tui_status ret = TUI_SUCCESS;
 
@@ -514,7 +519,7 @@ tui_set_exec_info_content (struct tui_win_info *win_info)
 	{
 	  int i;
 
-          tui_update_breakpoint_info (win_info, 1);
+          tui_update_breakpoint_info (win_info, 1, bp_del);
 	  for (i = 0; i < win_info->generic.content_size; i++)
 	    {
 	      struct tui_win_element *element;
@@ -597,9 +602,10 @@ tui_clear_exec_info_content (struct tui_win_info *win_info)
 
 /* Function to update the execution info window.  */
 void
-tui_update_exec_info (struct tui_win_info *win_info)
+tui_update_exec_info (struct tui_win_info *win_info,
+		      struct breakpoint *bp_del)
 {
-  tui_set_exec_info_content (win_info);
+  tui_set_exec_info_content (win_info, bp_del);
   tui_show_exec_info_content (win_info);
 }
 

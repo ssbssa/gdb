@@ -29,13 +29,14 @@ struct tui_win_info;
 /* Update the execution windows to show the active breakpoints.  This
    is called whenever a breakpoint is inserted, removed or has its
    state changed.  */
-extern void tui_update_all_breakpoint_info (void);
+extern void tui_update_all_breakpoint_info (struct breakpoint *bp_del);
 
 /* Scan the source window and the breakpoints to update the hasBreak
    information for each line.  Returns 1 if something changed and the
    execution window must be refreshed.  */
 extern int tui_update_breakpoint_info (struct tui_win_info *win,
-				       int current_only);
+				       int current_only,
+				       struct breakpoint *bp_del);
 
 /* Function to display the "main" routine.  */
 extern void tui_display_main (void);
@@ -55,11 +56,13 @@ extern void tui_horizontal_source_scroll (struct tui_win_info *,
 					  enum tui_scroll_direction, 
 					  int);
 extern void tui_refill_source_window (struct tui_win_info *);
-extern enum tui_status tui_set_exec_info_content (struct tui_win_info *);
+extern enum tui_status tui_set_exec_info_content (struct tui_win_info *,
+						  struct breakpoint *bp_del);
 extern void tui_show_exec_info_content (struct tui_win_info *);
 extern void tui_erase_exec_info_content (struct tui_win_info *);
 extern void tui_clear_exec_info_content (struct tui_win_info *);
-extern void tui_update_exec_info (struct tui_win_info *);
+extern void tui_update_exec_info (struct tui_win_info *,
+				  struct breakpoint *bp_del);
 
 extern void tui_set_is_exec_point_at (struct tui_line_or_address,
 				      struct tui_win_info *);

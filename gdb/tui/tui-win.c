@@ -611,7 +611,7 @@ tui_refresh_all_win (void)
 	      tui_show_source_content (tui_win_list[type]);
 	      tui_check_and_display_highlight_if_needed (tui_win_list[type]);
 	      tui_erase_exec_info_content (tui_win_list[type]);
-	      tui_update_exec_info (tui_win_list[type]);
+	      tui_update_exec_info (tui_win_list[type], NULL);
 	      break;
 	    case DATA_WIN:
 	      tui_refresh_data_win ();
