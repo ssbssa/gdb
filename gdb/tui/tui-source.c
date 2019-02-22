@@ -29,6 +29,8 @@
 #include "objfiles.h"
 #include "filenames.h"
 #include "source-cache.h"
+#include "linespec.h"
+#include "language.h"
 
 #include "tui/tui.h"
 #include "tui/tui-data.h"
@@ -254,4 +256,79 @@ tui_source_window::show_line_number (int offset) const
 		 lineno, space);
     }
   waddstr (handle.get (), text);
+}
+
+void
+tui_source_window::click (int mouse_x, int mouse_y, int mouse_button)
+{
+  if (mouse_button == 1 || mouse_button == 2)
+    {
+      if (mouse_x <= 2)
+	{
+	  int line = m_start_line_or_addr.u.line_no + mouse_y;
+	  gdb::unique_xmalloc_ptr<char> bp_str;
+	  bp_str = xstrprintf ("%s:%d", m_fullname.get (), line);
+
+	  struct linespec_sals lsal;
+	  lsal.canonical = NULL;
+	  try
+	    {
+	      lsal.sals = decode_line_with_current_source (bp_str.get (), 0);
+	    }
+	  catch (const gdb_exception_error &e)
+	    {
+	    }
+
+	  if (lsal.sals.size () == 1)
+	    {
+	      symtab_and_line &sal = lsal.sals[0];
+
+	      breakpoint *bp = NULL;
+	      for (breakpoint &b : all_breakpoints ())
+		{
+		  for (bp_location &loc : b.locations ())
+		    {
+		      if (loc.symtab != NULL
+			  && loc.line_number == sal.line
+			  && filename_cmp (m_fullname.get (),
+					   symtab_to_fullname (loc.symtab)) == 0)
+			{
+			  bp = &b;
+			  break;
+			}
+		    }
+
+		  if (bp)
+		    break;
+		}
+
+	      if (mouse_button == 2)
+		{
+		  if (bp)
+		    delete_breakpoint (bp);
+		}
+	      else if (mouse_button == 1 && bp)
+		{
+		  if (bp->enable_state == bp_disabled)
+		    enable_breakpoint (bp);
+		  else
+		    disable_breakpoint (bp);
+		}
+	      else if (mouse_button == 1)
+		{
+		  const char *loc_str = bp_str.get ();
+		  location_spec_up location = string_to_location_spec
+		    (&loc_str, current_language,
+		     symbol_name_match_type::WILD);
+
+		  reinitialize_more_filter ();
+
+		  create_breakpoint (m_gdbarch, location.get (), NULL, -1, -1,
+				     NULL, false, 0, 0, bp_breakpoint, 0,
+				     AUTO_BOOLEAN_FALSE,
+				     &code_breakpoint_ops, 0, 1, 0, 0);
+		}
+	    }
+	}
+    }
 }

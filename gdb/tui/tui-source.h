@@ -56,6 +56,8 @@ struct tui_source_window : public tui_source_window_base
   void display_start_addr (struct gdbarch **gdbarch_p,
 			   CORE_ADDR *addr_p) override;
 
+  void click (int mouse_x, int mouse_y, int mouse_button) override;
+
 protected:
 
   void do_scroll_vertical (int num_to_scroll) override;
