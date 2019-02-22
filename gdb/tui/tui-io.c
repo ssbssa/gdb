@@ -33,6 +33,7 @@
 #include "tui/tui-wingeneral.h"
 #include "tui/tui-file.h"
 #include "tui/tui-out.h"
+#include "tui/tui-source.h"
 #include "ui-out.h"
 #include "cli-out.h"
 #include <fcntl.h>
@@ -588,7 +589,7 @@ tui_redisplay_readline (void)
 static void
 tui_prep_terminal (int notused1)
 {
-  mouse_set (MOUSE_WHEEL_SCROLL);
+  mouse_set (ALL_MOUSE_EVENTS);
 }
 
 /* Readline callback to restore the terminal.  It is called once each
@@ -936,6 +937,17 @@ tui_dispatch_ctrl_char (unsigned int ch)
 	win_info->backward_scroll (3);
       else if (MOUSE_WHEEL_DOWN)
 	win_info->forward_scroll (3);
+      else if ((BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_CLICKED)
+	       || (BUTTON_CHANGED(2) && BUTTON_STATUS(2) == BUTTON_CLICKED)
+	       || (BUTTON_CHANGED(3) && BUTTON_STATUS(3) == BUTTON_CLICKED))
+	{
+	  int button
+	    = (BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_CLICKED) ? 1
+	    : (BUTTON_CHANGED(2) && BUTTON_STATUS(2) == BUTTON_CLICKED) ? 2
+	    : 3;
+	  if (TUI_SRC_WIN != nullptr)
+	    TUI_SRC_WIN->mouse_click (MOUSE_X_POS, MOUSE_Y_POS, button);
+	}
       break;
     case '\f':
       break;

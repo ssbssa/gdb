@@ -29,6 +29,7 @@
 #include "objfiles.h"
 #include "filenames.h"
 #include "source-cache.h"
+#include "linespec.h"
 
 #include "tui/tui.h"
 #include "tui/tui-data.h"
@@ -224,4 +225,81 @@ tui_source_window::display_start_addr (struct gdbarch **gdbarch_p,
 
   *gdbarch_p = m_gdbarch;
   find_line_pc (cursal.symtab, m_start_line_or_addr.u.line_no, addr_p);
+}
+
+void
+tui_source_window::mouse_click (int mouse_x, int mouse_y, int mouse_button)
+{
+  if ((mouse_button == 1 || mouse_button == 2)
+      && mouse_x > x && mouse_x < x + width - 1
+      && mouse_y > y && mouse_y < y + height - 1)
+    {
+      if (mouse_x <= x + 3)
+	{
+	  int line = m_start_line_or_addr.u.line_no + mouse_y - 1 - y;
+	  gdb::unique_xmalloc_ptr<char> bp_str;
+	  bp_str.reset (xstrprintf ("%s:%d", m_fullname.get (), line));
+
+	  struct linespec_sals lsal;
+	  lsal.canonical = NULL;
+	  try
+	    {
+	      lsal.sals = decode_line_with_current_source (bp_str.get (), 0);
+	    }
+	  catch (const gdb_exception_error &e)
+	    {
+	    }
+
+	  if (lsal.sals.size () == 1)
+	    {
+	      symtab_and_line &sal = lsal.sals[0];
+
+	      breakpoint *bp;
+	      bp = iterate_over_breakpoints ([&] (breakpoint *b) -> bool
+		{
+		  struct bp_location *loc;
+
+		  for (loc = b->loc; loc != NULL; loc = loc->next)
+		    {
+		      if (loc->symtab != NULL
+			  && loc->line_number == sal.line
+			  && filename_cmp (m_fullname.get (),
+					   symtab_to_fullname (loc->symtab)) == 0)
+			return true;
+		    }
+
+		    return false;
+		});
+
+	      if (mouse_button == 2)
+		{
+		  if (bp)
+		    delete_breakpoint (bp);
+		}
+	      else if (mouse_button == 1 && bp)
+		{
+		  if (bp->enable_state == bp_disabled)
+		    enable_breakpoint (bp);
+		  else
+		    disable_breakpoint (bp);
+		}
+	      else if (mouse_button == 1)
+		{
+		  struct linespec_result canonical;
+		  canonical.lsals.push_back (std::move (lsal));
+
+		  bkpt_breakpoint_ops.
+		    create_breakpoints_sal (m_gdbarch,
+					    &canonical,
+					    NULL,
+					    NULL,
+					    bp_breakpoint,
+					    disp_donttouch,
+					    -1, 0, 0,
+					    &bkpt_breakpoint_ops,
+					    0, 1, 0, 0);
+		}
+	    }
+	}
+    }
 }
