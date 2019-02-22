@@ -58,8 +58,6 @@
 static void make_visible_with_new_height (struct tui_win_info *);
 static void make_invisible_and_set_new_height (struct tui_win_info *, 
 					       int);
-static enum tui_status tui_adjust_win_heights (struct tui_win_info *, 
-					       int);
 static int new_height_ok (struct tui_win_info *, int);
 static void tui_set_tab_width_command (const char *, int);
 static void tui_refresh_all_command (const char *, int);
@@ -1177,7 +1175,7 @@ tui_set_win_height_command (const char *arg, int from_tty)
 }
 
 /* Function to adjust all window heights around the primary.   */
-static enum tui_status
+enum tui_status
 tui_adjust_win_heights (struct tui_win_info *primary_win_info,
 			int new_height)
 {

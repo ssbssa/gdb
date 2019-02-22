@@ -43,6 +43,8 @@
 ** PUBLIC FUNCTIONS                        **
 ******************************************/
 
+static int tui_resizer = -1;
+
 /* Dispatch the correct tui function based upon the control
    character.  */
 unsigned int
@@ -176,6 +178,39 @@ tui_dispatch_ctrl_char (unsigned int ch)
 		  xfree (fn);
 		}
 	    }
+	}
+      else if (BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_PRESSED)
+	{
+	  int w;
+	  for (w = 0; w < MAX_MAJOR_WINDOWS; w++)
+	    {
+	      if (!tui_win_list[w] || !tui_win_list[w]->generic.handle)
+		continue;
+
+	      struct tui_gen_win_info *gwi = &tui_win_list[w]->generic;
+
+	      if (MOUSE_Y_POS == gwi->origin.y + gwi->height - 1
+		  && MOUSE_X_POS > gwi->origin.x
+		  && MOUSE_X_POS < gwi->origin.x + gwi->width - 1)
+		{
+		  tui_resizer = w;
+		  break;
+		}
+	    }
+	}
+      else if (BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_MOVED
+	       && tui_resizer >= 0)
+	{
+	  struct tui_gen_win_info *gwi = &tui_win_list[tui_resizer]->generic;
+	  int new_height = MOUSE_Y_POS + 1 - gwi->origin.y;
+	  if (new_height != gwi->height
+	      && tui_adjust_win_heights (tui_win_list[tui_resizer],
+					 new_height) == TUI_SUCCESS)
+	    tui_update_gdb_sizes ();
+	}
+      else if (BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_RELEASED)
+	{
+	  tui_resizer = -1;
 	}
       break;
     case '\f':
