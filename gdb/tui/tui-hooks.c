@@ -90,7 +90,7 @@ tui_register_changed (struct frame_info *frame, int regno)
 static void
 tui_event_create_breakpoint (struct breakpoint *b)
 {
-  tui_update_all_breakpoint_info ();
+  tui_update_all_breakpoint_info (NULL);
 }
 
 /* Breakpoint deletion hook.
@@ -98,13 +98,13 @@ tui_event_create_breakpoint (struct breakpoint *b)
 static void
 tui_event_delete_breakpoint (struct breakpoint *b)
 {
-  tui_update_all_breakpoint_info ();
+  tui_update_all_breakpoint_info (b);
 }
 
 static void
 tui_event_modify_breakpoint (struct breakpoint *b)
 {
-  tui_update_all_breakpoint_info ();
+  tui_update_all_breakpoint_info (NULL);
 }
 
 /* Refresh TUI's frame and register information.  This is a hook intended to be
