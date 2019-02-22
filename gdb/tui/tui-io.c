@@ -333,7 +333,7 @@ tui_prep_terminal (int notused1)
   xfree (tui_rl_saved_prompt);
   tui_rl_saved_prompt = rl_prompt != NULL ? xstrdup (rl_prompt) : NULL;
 
-  mouse_set (MOUSE_WHEEL_SCROLL);
+  mouse_set (ALL_MOUSE_EVENTS);
 }
 
 /* Readline callback to restore the terminal.  It is called once each
