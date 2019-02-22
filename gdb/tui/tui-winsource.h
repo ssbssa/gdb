@@ -29,13 +29,14 @@ struct tui_win_info;
 /* Update the execution windows to show the active breakpoints.  This
    is called whenever a breakpoint is inserted, removed or has its
    state changed.  */
-extern void tui_update_all_breakpoint_info (void);
+extern void tui_update_all_breakpoint_info (struct breakpoint *bp_del);
 
 /* Scan the source window and the breakpoints to update the hasBreak
    information for each line.  Returns 1 if something changed and the
    execution window must be refreshed.  */
 extern int tui_update_breakpoint_info (struct tui_win_info *win,
-				       int current_only);
+				       int current_only,
+				       struct breakpoint *bp_del);
 
 /* Function to display the "main" routine.  */
 extern void tui_display_main (void);
