@@ -185,7 +185,7 @@ static void *wow64_dbgbreak;
 #endif
 
 /* User options.  */
-static bool new_console = false;
+static bool new_console = true;
 #ifdef __CYGWIN__
 static bool cygwin_exceptions = false;
 #endif
