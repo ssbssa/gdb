@@ -310,7 +310,7 @@ bool debug_memory = false;	/* show target memory accesses */
 bool debug_exceptions = false;	/* show target exceptions */
 
 /* User options.  */
-static bool new_console = false;
+static bool new_console = true;
 #ifdef __CYGWIN__
 static bool cygwin_exceptions = false;
 #endif
