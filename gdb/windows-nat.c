@@ -287,7 +287,7 @@ static int saw_create;
 static int open_process_used = 0;
 
 /* User options.  */
-static int new_console = 0;
+static int new_console = 1;
 #ifdef __CYGWIN__
 static int cygwin_exceptions = 0;
 #endif
