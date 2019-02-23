@@ -277,6 +277,9 @@ if ![info exists INTERNAL_GDBFLAGS] {
 	append INTERNAL_GDBFLAGS { --binary-output}
     }
 }
+if [ishost "*-*-mingw*"] {
+    append INTERNAL_GDBFLAGS " -iex {set new-console off}"
+}
 
 # The variable gdb_prompt is a regexp which matches the gdb prompt.
 # Set it if it is not already set.  This is also set by default_gdb_init
