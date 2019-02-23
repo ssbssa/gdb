@@ -231,7 +231,7 @@ static unsigned long cygwin_get_dr6 (void);
 static unsigned long cygwin_get_dr7 (void);
 
 /* User options.  */
-static bool new_console = false;
+static bool new_console = true;
 #ifdef __CYGWIN__
 static bool cygwin_exceptions = false;
 #endif
