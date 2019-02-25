@@ -69,6 +69,7 @@
 #include "inf-child.h"
 #include "gdb_tilde_expand.h"
 #include "readline/tilde.h"
+#include "coff-pe-read.h"
 
 #include "readline/readline.h"
 #ifdef TUI
@@ -689,6 +690,7 @@ struct safe_symbol_file_add_args
 struct lm_info_windows : public lm_info_base
 {
   LPVOID load_addr = 0;
+  CORE_ADDR text_offset = 0;
 };
 
 static struct so_list solib_start, *solib_end;
@@ -794,6 +796,9 @@ windows_make_so (const char *name, LPVOID load_addr)
 							      text);
     }
 #endif
+
+  gdb_bfd_ref_ptr dll (gdb_bfd_open (so->so_name, gnutarget, -1));
+  li->text_offset = pe_text_section_offset (dll.get ());
 
   return so;
 }
@@ -3302,6 +3307,7 @@ windows_xfer_shared_libraries (struct target_ops *ops,
 
       windows_xfer_shared_library (so->so_name, (CORE_ADDR)
 				   (uintptr_t) li->load_addr,
+				   li->text_offset,
 				   target_gdbarch (), &obstack);
     }
   obstack_grow_str0 (&obstack, "</library-list>\n");
