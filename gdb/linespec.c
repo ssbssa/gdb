@@ -3960,6 +3960,23 @@ find_function_symbols (struct linespec_state *state,
     *minsyms = info.result.minimal_symbols;
 }
 
+static bool
+is_simple_name (const char *name)
+{
+  do
+    {
+      if (name[0] == ':' && name[1] == ':')
+	name += 2;
+      if (*name == ':')
+	break;
+      while ((*name >= 'A' && *name <= 'Z') || (*name >= 'a' && *name <= 'z')
+	     || (*name >= '0' && *name <= '9') || *name == '_')
+	name++;
+    }
+  while (name[0] == ':' && name[1] == ':');
+  return *name == '\0';
+}
+
 /* Find all symbols named NAME in FILE_SYMTABS, returning debug symbols
    in SYMBOLS and minimal symbols in MINSYMS.  */
 
@@ -3971,7 +3988,9 @@ find_linespec_symbols (struct linespec_state *state,
 		       VEC (symbolp) **symbols,
 		       VEC (bound_minimal_symbol_d) **minsyms)
 {
-  std::string canon = cp_canonicalize_string_no_typedefs (lookup_name);
+  std::string canon;
+  if (!is_simple_name (lookup_name))
+    canon = cp_canonicalize_string_no_typedefs (lookup_name);
   if (!canon.empty ())
     lookup_name = canon.c_str ();
 
