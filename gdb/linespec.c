@@ -1143,7 +1143,8 @@ iterate_over_all_matching_symtabs
 
     for (objfile *objfile : current_program_space->objfiles ())
       {
-	if (objfile->sf)
+	if (objfile->sf
+	    && lookup_name.name ().find ('.') == std::string::npos)
 	  objfile->sf->qf->expand_symtabs_matching (objfile,
 						    NULL,
 						    lookup_name,
