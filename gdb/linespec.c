@@ -1168,10 +1168,11 @@ iterate_over_all_matching_symtabs
 
       for (objfile *objfile : current_program_space->objfiles ())
 	{
-	  objfile->expand_symtabs_matching (NULL, &lookup_name, NULL, NULL,
-					    (SEARCH_GLOBAL_BLOCK
-					     | SEARCH_STATIC_BLOCK),
-					    domain);
+	  if (lookup_name.name ().find ('.') == std::string::npos)
+	    objfile->expand_symtabs_matching (NULL, &lookup_name, NULL, NULL,
+					      (SEARCH_GLOBAL_BLOCK
+					       | SEARCH_STATIC_BLOCK),
+					      domain);
 
 	  for (compunit_symtab *cu : objfile->compunits ())
 	    {
