@@ -61,62 +61,60 @@ static const char * const cli_intensities[] = {
 
 /* See cli-style.h.  */
 
-cli_style_option file_name_style ("filename", ui_file_style::GREEN);
+cli_style_option file_name_style ("filename", ui_file_style::GREEN,
+				  ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option function_name_style ("function", ui_file_style::YELLOW);
+cli_style_option function_name_style ("function", ui_file_style::YELLOW,
+				      ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option variable_name_style ("variable", ui_file_style::CYAN);
+cli_style_option variable_name_style ("variable", ui_file_style::CYAN,
+				      ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option address_style ("address", ui_file_style::BLUE);
+cli_style_option address_style ("address", ui_file_style::BLUE,
+				ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option highlight_style ("highlight", ui_file_style::RED);
+cli_style_option highlight_style ("highlight", ui_file_style::RED,
+				  ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option title_style ("title", ui_file_style::BOLD);
+cli_style_option title_style ("title", ui_file_style::BLACK,
+			      ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option tui_border_style ("tui-border", ui_file_style::CYAN);
+cli_style_option tui_border_style ("tui-border", ui_file_style::CYAN,
+				   ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
 cli_style_option tui_active_border_style ("tui-active-border",
-					  ui_file_style::CYAN);
+					  ui_file_style::CYAN,
+					  ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option metadata_style ("metadata", ui_file_style::DIM);
+cli_style_option metadata_style ("metadata", ui_file_style::BLACK,
+				 ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
 cli_style_option::cli_style_option (const char *name,
-				    ui_file_style::basic_color fg)
+				    ui_file_style::basic_color fg,
+				    ui_file_style::intensity inten)
   : changed (name),
     m_name (name),
     m_foreground (cli_colors[fg - ui_file_style::NONE]),
     m_background (cli_colors[0]),
-    m_intensity (cli_intensities[ui_file_style::NORMAL])
-{
-}
-
-/* See cli-style.h.  */
-
-cli_style_option::cli_style_option (const char *name,
-				    ui_file_style::intensity i)
-  : changed (name),
-    m_name (name),
-    m_foreground (cli_colors[0]),
-    m_background (cli_colors[0]),
-    m_intensity (cli_intensities[i])
+    m_intensity (cli_intensities[inten])
 {
 }
 
