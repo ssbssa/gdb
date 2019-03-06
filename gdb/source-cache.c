@@ -189,6 +189,8 @@ source_cache::get_source_lines (struct symtab *s, int first_line,
 	{
 	  if (item.fullname == fullname)
 	    {
+	      if (!s->nlines)
+		s->nlines = item.nlines;
 	      *lines = extract_lines (item, first_line, last_line);
 	      return true;
 	    }
@@ -200,6 +202,7 @@ source_cache::get_source_lines (struct symtab *s, int first_line,
 	  std::ifstream input (fullname);
 	  if (input.is_open ())
 	    {
+#if 0
 	      if (s->line_charpos == 0)
 		{
 		  scoped_fd desc = open_source_file (s);
@@ -213,6 +216,7 @@ source_cache::get_source_lines (struct symtab *s, int first_line,
 		     use-after-free.  */
 		  fullname = symtab_to_fullname (s);
 		}
+#endif
 	      srchilite::SourceHighlight highlighter ("esc.outlang");
 	      highlighter.setStyleFile("esc.style");
 
@@ -223,7 +227,27 @@ source_cache::get_source_lines (struct symtab *s, int first_line,
 	      std::ostringstream output;
 	      highlighter.highlight (input, output, lang_name, fullname);
 
-	      source_text result = { fullname, output.str () };
+	      if (!s->nlines)
+		{
+		  std::string text = output.str ();
+		  int lineno = 0;
+		  std::string::size_type pos = 0;
+		  while (1)
+		    {
+		      std::string::size_type new_pos = text.find ('\n', pos);
+		      if (new_pos == std::string::npos)
+			{
+			  if (pos + 1 < text.size ())
+			    lineno++;
+			  break;
+			}
+		      pos = new_pos + 1;
+		      lineno++;
+		    }
+		  s->nlines = lineno;
+		}
+
+	      source_text result = { fullname, output.str (), s->nlines };
 	      m_source_map.push_back (std::move (result));
 
 	      if (m_source_map.size () > MAX_ENTRIES)

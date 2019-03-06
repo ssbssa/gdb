@@ -56,6 +56,7 @@ private:
     std::string fullname;
     /* The contents of the file.  */
     std::string contents;
+    int nlines;
   };
 
   /* A helper function for get_source_lines that is used when the
