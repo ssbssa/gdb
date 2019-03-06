@@ -231,6 +231,10 @@ get_standard_cache_dir ()
 #endif
 
   const char *home = getenv ("HOME");
+#ifdef _WIN32
+  if (home == NULL)
+    home = getenv ("USERPROFILE");
+#endif
   if (home != NULL)
     {
       /* Make sure the path is absolute and tilde-expanded.  */
