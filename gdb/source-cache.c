@@ -247,6 +247,12 @@ source_cache::ensure (struct symtab *s)
 		{
 		  highlighter = new srchilite::SourceHighlight ("esc.outlang");
 		  highlighter->setStyleFile ("esc.style");
+
+#ifdef USE_RELATIVE_SRC_HIGHLIGHT
+		  std::string data_dir = gdb_datadir;
+		  data_dir += "/../source-highlight";
+		  highlighter->setDataDir (data_dir);
+#endif
 		}
 
 	      std::istringstream input (contents);
