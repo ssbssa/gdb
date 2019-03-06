@@ -216,6 +216,10 @@ source_cache::get_source_lines (struct symtab *s, int first_line,
 	      srchilite::SourceHighlight highlighter ("esc.outlang");
 	      highlighter.setStyleFile("esc.style");
 
+	      std::string data_dir = gdb_datadir;
+	      data_dir += "/../source-highlight";
+	      highlighter.setDataDir (data_dir);
+
 	      std::ostringstream output;
 	      highlighter.highlight (input, output, lang_name, fullname);
 
