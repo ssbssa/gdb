@@ -226,7 +226,14 @@ try_source_highlight (std::string &contents ATTRIBUTE_UNUSED,
 	  highlighter = new srchilite::SourceHighlight ("esc.outlang");
 	  highlighter->setStyleFile ("esc.style");
 
+#ifdef USE_RELATIVE_SRC_HIGHLIGHT
+	  std::string datadir = gdb_datadir;
+	  datadir += "/../source-highlight";
+	  highlighter->setDataDir (datadir);
+#else
 	  const std::string &datadir = srchilite::Settings::retrieveDataDir ();
+#endif
+
 	  langmap = new srchilite::LangMap (datadir, "lang.map");
 	}
 
