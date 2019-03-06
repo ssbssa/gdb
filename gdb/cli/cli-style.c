@@ -61,26 +61,31 @@ static const char * const cli_intensities[] = {
 
 /* See cli-style.h.  */
 
-cli_style_option file_name_style (ui_file_style::GREEN);
+cli_style_option file_name_style (ui_file_style::GREEN,
+				  ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option function_name_style (ui_file_style::YELLOW);
+cli_style_option function_name_style (ui_file_style::BLACK,
+				      ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option variable_name_style (ui_file_style::CYAN);
+cli_style_option variable_name_style (ui_file_style::CYAN,
+				      ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option address_style (ui_file_style::BLUE);
+cli_style_option address_style (ui_file_style::MAGENTA,
+				ui_file_style::BOLD);
 
 /* See cli-style.h.  */
 
-cli_style_option::cli_style_option (ui_file_style::basic_color fg)
+cli_style_option::cli_style_option (ui_file_style::basic_color fg,
+				    ui_file_style::intensity inten)
   : m_foreground (cli_colors[fg - ui_file_style::NONE]),
     m_background (cli_colors[0]),
-    m_intensity (cli_intensities[ui_file_style::NORMAL])
+    m_intensity (cli_intensities[inten])
 {
 }
 
