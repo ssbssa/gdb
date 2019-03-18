@@ -269,7 +269,12 @@ If enabled, output to the terminal is styled."),
 			   set_style_enabled, show_style_enabled,
 			   &style_set_list, &style_show_list);
 
-  add_setshow_boolean_cmd ("sources", no_class, &source_styling, _("\
+  std::string esc_style = gdb_datadir;
+  esc_style += "/../source-highlight/esc.style";
+  struct stat st;
+  if (stat (esc_style.c_str (), &st) == 0)
+    {
+      add_setshow_boolean_cmd ("sources", no_class, &source_styling, _("\
 Set whether source code styling is enabled."), _("\
 Show whether source code styling is enabled."), _("\
 If enabled, source code is styled.\n"
@@ -280,8 +285,11 @@ see \"show style enabled\"."
 "Source highlighting is disabled in this installation of gdb, because\n\
 it was not linked against GNU Source Highlight."
 #endif
-			   ), set_style_enabled, show_style_sources,
-			   &style_set_list, &style_show_list);
+			       ), set_style_enabled, show_style_sources,
+			       &style_set_list, &style_show_list);
+    }
+  else
+    source_styling = 0;
 
 #define STYLE_ADD_SETSHOW_COMMANDS(STYLE, NAME, PREFIX_DOC)	  \
   STYLE.add_setshow_commands (NAME, no_class, PREFIX_DOC,		\
