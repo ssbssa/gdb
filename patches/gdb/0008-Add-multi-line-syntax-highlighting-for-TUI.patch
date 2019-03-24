@@ -1,0 +1,221 @@
+From 43f2fb7ca030c120790ae726289b600dfe7768e1 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 9 Mar 2014 19:47:12 +0100
+Subject: [PATCH 08/23] Add multi-line syntax highlighting for TUI
+
+---
+ gdb/source.c         | 113 +++++++++++++++++++++++++++++++++++++++++++++++++--
+ gdb/tui/tui-source.c |  47 +++++++++++++++++++--
+ 2 files changed, 153 insertions(+), 7 deletions(-)
+
+diff --git a/gdb/source.c b/gdb/source.c
+index 1f136f4cfb..f994b7e8bf 100644
+--- a/gdb/source.c
++++ b/gdb/source.c
+@@ -1177,6 +1177,98 @@ symtab_to_filename_for_display (struct symtab *symtab)
+     internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
+ }
+ 
++#ifdef TUI_SYNTAX_HIGHLIGHT
++const char *
++find_end_comment (const char *line, const char *line_end);
++const char *
++find_end_comment (const char *line, const char *line_end)
++{
++  line = (const char *) memmem (line, line_end - line, "*/", 2);
++  if (!line) return NULL;
++  return line + 2;
++}
++
++static const char *
++find_end_string_char (const char *line,const char *line_end,char endchar)
++{
++  while (line < line_end)
++    {
++      char c = line[0];
++
++      if (c == '\\' && line + 1 < line_end)
++	{
++	  line += 2;
++	  continue;
++	}
++
++      if (c == endchar)
++	return line + 1;
++
++      line++;
++    }
++
++  return NULL;
++}
++
++const char *
++find_end_string (const char *line, const char *line_end);
++const char *
++find_end_string (const char *line, const char *line_end)
++{
++  return find_end_string_char (line, line_end, '"');
++}
++
++static int
++find_syntax_status (const char *line, const char *line_end, int prev_status)
++{
++  switch (prev_status)
++    {
++    case 1:
++      line = find_end_comment (line, line_end);
++      if (!line) return 1;
++      break;
++
++    case 2:
++      line = find_end_string (line, line_end);
++      if (!line) return 2;
++      break;
++    }
++
++  while (line < line_end)
++    {
++      char c = line[0];
++
++      if (c == '"')
++	{
++	  line = find_end_string (line + 1, line_end);
++	  if (!line) return 2;
++	  continue;
++	}
++      else if (c == '\'')
++	{
++	  line = find_end_string_char (line + 1, line_end, '\'');
++	  if (!line) break;
++	  continue;
++	}
++      else if (c == '/' && line + 1 < line_end)
++	{
++	  if (line[1] == '*')
++	    {
++	      line = find_end_comment (line + 2, line_end);
++	      if (!line) return 1;
++	      continue;
++	    }
++	  else if (line[1] == '/')
++	    break;
++	}
++
++      line++;
++    }
++
++  return 0;
++}
++#endif
++
+ /* Create and initialize the table S->line_charpos that records
+    the positions of the lines in the source file, which is assumed
+    to be open on descriptor DESC.
+@@ -1242,13 +1334,28 @@ find_source_lines (struct symtab *s, int desc)
+ 	    line_charpos[nlines++] = p - data;
+ 	  }
+       }
++
++#ifndef TUI_SYNTAX_HIGHLIGHT
++    line_charpos =
++      (int *) xrealloc ((char *) line_charpos, nlines * sizeof (int));
++#else
++    line_charpos =
++      (int *) xrealloc ((char *) line_charpos, 2 * nlines * sizeof (int));
++    line_charpos[nlines] = 0;
++    for (size = 1; size < nlines; size++)
++      {
++	line_charpos[nlines + size] =
++	  find_syntax_status (data + line_charpos[size - 1],
++			      data + line_charpos[size],
++			      line_charpos[nlines + size - 1]);
++      }
++#endif
++
+     do_cleanups (old_cleanups);
+   }
+ 
+   s->nlines = nlines;
+-  s->line_charpos =
+-    (int *) xrealloc ((char *) line_charpos, nlines * sizeof (int));
+-
++  s->line_charpos = line_charpos;
+ }
+ 
+ 
+diff --git a/gdb/tui/tui-source.c b/gdb/tui/tui-source.c
+index 8fc52e59e5..bade77cf80 100644
+--- a/gdb/tui/tui-source.c
++++ b/gdb/tui/tui-source.c
+@@ -379,15 +379,51 @@ enum
+   COL_COMMENT,
+ };
+ 
++const char *
++find_end_comment (const char *line, const char *line_end);
++const char *
++find_end_string (const char *line, const char *line_end);
++
+ static void
+ tui_syntax_highlight (enum language lang,
+ 		      const char *src_line,
+-		      char *col_line)
++		      char *col_line,
++		      int syntax_status)
+ {
+   int preproc = 0;
+ 
+   if( lang != language_c && lang != language_cplus ) return;
+ 
++  if (syntax_status)
++    {
++      const char *(*find_end_func) (const char *, const char *);
++      char color;
++      int count;
++      const char *line_start = src_line;
++      const char *line_end = line_start + strlen (line_start);
++
++      if (syntax_status == 1)
++	{
++	  find_end_func = &find_end_comment;
++	  color = COL_COMMENT;
++	}
++      else
++	{
++	  find_end_func = &find_end_string;
++	  color = COL_LITERAL;
++	}
++
++      src_line = find_end_func (line_start, line_end);
++      if (!src_line)
++	src_line = line_end;
++
++      count = src_line - line_start;
++      memset (col_line, color, count);
++      col_line += count;
++
++      preproc = 1;
++    }
++
+   while (src_line[0])
+     {
+       char c = src_line[0];
+@@ -759,9 +795,12 @@ tui_set_source_content (struct symtab *s,
+ #ifdef TUI_SYNTAX_HIGHLIGHT
+ 			  if (tui_can_syntax_highlight)
+ 			    {
+-			      tui_syntax_highlight (lang,
+-						    src_line + cur_len,
+-						    col_line + cur_len);
++			      if (cur_line_no <= s->nlines)
++				tui_syntax_highlight (lang,
++						      src_line + cur_len,
++						      col_line + cur_len,
++						      s->line_charpos[s->nlines
++						      + cur_line_no - 1]);
+ 
+ 			      src_line[threshold-SYNTAX_HIGHLIGHT_EXTRA] = 0;
+ 
+-- 
+2.15.1.windows.2
+

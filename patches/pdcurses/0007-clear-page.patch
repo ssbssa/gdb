@@ -1,0 +1,135 @@
+--- a/pdcurses/terminfo.c	2015-01-02 01:08:29.052867700 +0100
++++ b/pdcurses/terminfo.c	2015-01-04 16:35:55.002144800 +0100
+@@ -48,6 +48,11 @@
+ 
+ #include <term.h>
+ 
++#ifdef _WIN32
++#include <string.h>
++#include <windows.h>
++#endif
++
+ TERMINAL *cur_term = NULL;
+ 
+ int mvcur(int oldrow, int oldcol, int newrow, int newcol)
+@@ -147,6 +152,11 @@
+ {
+     PDC_LOG(("tgetent() - called: name %s\n", name));
+ 
++#ifdef _WIN32
++    if (!strcmp(name, "dumb"))
++        return 1;
++#endif
++
+     return ERR;
+ }
+ 
+@@ -154,7 +164,11 @@
+ {
+     PDC_LOG(("tgetflag() - called: id %s\n", id));
+ 
++#ifdef _WIN32
++    return 0;
++#else
+     return ERR;
++#endif
+ }
+ 
+ int tgetnum(const char *id)
+@@ -168,6 +182,23 @@
+ {
+     PDC_LOG(("tgetstr() - called: id %s\n", id));
+ 
++#ifdef _WIN32
++    if (id[0] == 'c' && id[1] == 'l')
++    {
++        char *val = *area;
++        strcpy(val, "\014");
++        *area += 2;
++        return val;
++    }
++    else if (id[0] == 'l' && id[1] == 'e')
++    {
++        char *val = *area;
++        strcpy(val, "\b");
++        *area += 2;
++        return val;
++    }
++#endif
++
+     return (char *)NULL;
+ }
+ 
+@@ -207,12 +238,71 @@
+     return (char *)NULL;
+ }
+ 
++#ifdef _WIN32
++void PDC_clear_page(void)
++{
++    if (SP && SP->alive)
++        return;
++
++    CONSOLE_SCREEN_BUFFER_INFO csbi;
++    HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
++    GetConsoleScreenBufferInfo(hout, &csbi);
++
++    int h = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
++    SMALL_RECT sr = {
++        0,
++        csbi.dwCursorPosition.Y + 1,
++        csbi.srWindow.Right - csbi.srWindow.Left,
++        csbi.dwCursorPosition.Y + h
++    };
++    COORD coord = {
++        0,
++        csbi.dwCursorPosition.Y + 1
++    };
++    if (coord.Y < csbi.dwSize.Y)
++    {
++        DWORD len = csbi.dwSize.X * ( csbi.dwSize.Y - coord.Y );
++        DWORD w;
++        FillConsoleOutputCharacter(hout, ' ', len, coord, &w);
++        FillConsoleOutputAttribute(hout, csbi.wAttributes, len, coord, &w);
++    }
++    if (sr.Bottom >= csbi.dwSize.Y)
++    {
++        int scroll = sr.Bottom - csbi.dwSize.Y + 1;
++        sr.Top -= scroll;
++        sr.Bottom -= scroll;
++        coord.Y -= scroll;
++
++        SMALL_RECT srScroll = { 0, 0, csbi.dwSize.X - 1, csbi.dwSize.Y - 1 };
++        COORD cDest = { 0, -scroll };
++        CHAR_INFO ci = {
++            .Char.UnicodeChar = ' ',
++            .Attributes = csbi.wAttributes
++        };
++        ScrollConsoleScreenBuffer(hout, &srScroll, NULL, cDest, &ci);
++    }
++    SetConsoleWindowInfo(hout, TRUE, &sr);
++    SetConsoleCursorPosition(hout, coord);
++}
++#endif
++
+ int tputs(const char *str, int affcnt, int (*putfunc)(int))
+ {
+     PDC_LOG(("tputs() - called\n"));
+ 
+     while (*str)
+-        putfunc(*str++);
++    {
++        char c = *str;
++        str++;
++#ifdef _WIN32
++        if (c == '\014')
++        {
++            PDC_clear_page();
++            continue;
++        }
++#endif
++        putfunc(c);
++    }
+ 
+     return 0;
+ }

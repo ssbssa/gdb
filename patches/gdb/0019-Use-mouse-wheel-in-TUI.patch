@@ -1,0 +1,84 @@
+From 58e1bda0663175911c38ad742bd6439e5aea85c8 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Wed, 9 Mar 2016 17:38:34 +0200
+Subject: [PATCH 19/23] Use mouse wheel in TUI
+
+---
+ gdb/ser-mingw.c       | 6 ++++++
+ gdb/tui/tui-command.c | 7 +++++++
+ gdb/tui/tui-io.c      | 3 +++
+ gdb/tui/tui.c         | 2 ++
+ 4 files changed, 18 insertions(+)
+
+diff --git a/gdb/ser-mingw.c b/gdb/ser-mingw.c
+index d5e5aabb18..50537dd206 100644
+--- a/gdb/ser-mingw.c
++++ b/gdb/ser-mingw.c
+@@ -601,6 +601,12 @@ console_select_thread (void *arg)
+ 		  break;
+ 		}
+ 	    }
++	  else if (record.EventType == MOUSE_EVENT &&
++		   record.Event.MouseEvent.dwEventFlags == MOUSE_WHEELED)
++	    {
++	      SetEvent (state->read_event);
++	      break;
++	    }
+ 
+ 	  /* Otherwise discard it and wait again.  */
+ 	  ReadConsoleInput (h, &record, 1, &n_records);
+diff --git a/gdb/tui/tui-command.c b/gdb/tui/tui-command.c
+index 6dde0fcd4a..fac9072bd5 100644
+--- a/gdb/tui/tui-command.c
++++ b/gdb/tui/tui-command.c
+@@ -76,6 +76,13 @@ tui_dispatch_ctrl_char (unsigned int ch)
+     case KEY_LEFT:
+       tui_scroll_right (win_info, 1);
+       break;
++    case KEY_MOUSE:
++      request_mouse_pos ();
++      if (MOUSE_WHEEL_UP)
++	tui_scroll_backward (win_info, 3);
++      else if (MOUSE_WHEEL_DOWN)
++	tui_scroll_forward (win_info, 3);
++      break;
+     case '\f':
+       break;
+     default:
+diff --git a/gdb/tui/tui-io.c b/gdb/tui/tui-io.c
+index c7df50a4f2..75109bddad 100644
+--- a/gdb/tui/tui-io.c
++++ b/gdb/tui/tui-io.c
+@@ -332,6 +332,8 @@ tui_prep_terminal (int notused1)
+      rl_prompt because it points to an alloca buffer).  */
+   xfree (tui_rl_saved_prompt);
+   tui_rl_saved_prompt = rl_prompt != NULL ? xstrdup (rl_prompt) : NULL;
++
++  mouse_set (MOUSE_WHEEL_SCROLL);
+ }
+ 
+ /* Readline callback to restore the terminal.  It is called once each
+@@ -339,6 +341,7 @@ tui_prep_terminal (int notused1)
+ static void
+ tui_deprep_terminal (void)
+ {
++  mouse_set (0);
+ }
+ 
+ #ifdef TUI_USE_PIPE_FOR_READLINE
+diff --git a/gdb/tui/tui.c b/gdb/tui/tui.c
+index fc9e87192a..0300409f19 100644
+--- a/gdb/tui/tui.c
++++ b/gdb/tui/tui.c
+@@ -624,6 +624,8 @@ tui_disable (void)
+   rl_startup_hook = 0;
+   rl_already_prompted = 0;
+ 
++  mouse_set (0);
++
+   /* Leave curses and restore previous gdb terminal setting.  */
+   endwin ();
+ 
+-- 
+2.15.1.windows.2
+

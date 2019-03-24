@@ -1,0 +1,45 @@
+--- a/win32/pdcwin.h	2008-07-13 08:36:32.000000000 +0200
++++ b/win32/pdcwin.h	2019-02-23 14:00:27.372018900 +0100
+@@ -13,5 +13,6 @@
+ extern unsigned char *pdc_atrtab;
+ extern HANDLE pdc_con_out, pdc_con_in;
+ extern DWORD pdc_quick_edit;
++extern DWORD pdc_processed_input;
+ 
+ extern int PDC_get_buffer_rows(void);
+--- a/win32/pdckbd.c	2018-07-28 13:52:42.688717700 +0200
++++ b/win32/pdckbd.c	2019-02-23 14:00:58.568803200 +0100
+@@ -642,8 +642,10 @@
+        If turning off the mouse: Set QuickEdit Mode to the status it 
+        had on startup, and clear all other flags */
+ 
+-    SetConsoleMode(pdc_con_in, SP->_trap_mbe ?
+-                   (ENABLE_MOUSE_INPUT|0x0080) : (pdc_quick_edit|0x0080));
++    DWORD mode = SP->_trap_mbe ?
++      (ENABLE_MOUSE_INPUT|0x0080) : (pdc_quick_edit|0x0080);
++
++    SetConsoleMode(pdc_con_in, pdc_processed_input | mode);
+ 
+     memset(&old_mouse_status, 0, sizeof(old_mouse_status));
+ 
+--- a/win32/pdcscrn.c	2018-07-28 13:52:42.376717200 +0200
++++ b/win32/pdcscrn.c	2019-02-23 14:01:04.016114800 +0100
+@@ -18,6 +18,7 @@
+ HANDLE pdc_con_in = INVALID_HANDLE_VALUE;
+ 
+ DWORD pdc_quick_edit;
++DWORD pdc_processed_input;
+ 
+ static short curstoreal[16], realtocurs[16] =
+ {
+@@ -315,6 +316,10 @@
+ 
+     pdc_quick_edit = old_console_mode & 0x0040;
+ 
++    /* preserve processed input setting (ctrl-c handling) */
++
++    pdc_processed_input = old_console_mode & ENABLE_PROCESSED_INPUT;
++
+     SP->lines = PDC_get_rows();
+     SP->cols = PDC_get_columns();
+ 

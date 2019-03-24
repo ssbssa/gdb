@@ -1,0 +1,50 @@
+--- a/pdcurses/terminfo.c	2015-01-04 16:35:55.002144800 +0100
++++ b/pdcurses/terminfo.c	2015-01-04 17:23:26.706334400 +0100
+@@ -197,6 +197,13 @@
+         *area += 2;
+         return val;
+     }
++    else if (id[0] == 'u' && id[1] == 'p')
++    {
++        char *val = *area;
++        strcpy(val, "\013");
++        *area += 2;
++        return val;
++    }
+ #endif
+ 
+     return (char *)NULL;
+@@ -284,6 +291,21 @@
+     SetConsoleWindowInfo(hout, TRUE, &sr);
+     SetConsoleCursorPosition(hout, coord);
+ }
++
++void PDC_line_up(void)
++{
++    CONSOLE_SCREEN_BUFFER_INFO csbi;
++    HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
++    GetConsoleScreenBufferInfo(hout, &csbi);
++    if (csbi.dwCursorPosition.Y <= 0)
++        return;
++
++    COORD coord = {
++        csbi.dwCursorPosition.X,
++        csbi.dwCursorPosition.Y - 1
++    };
++    SetConsoleCursorPosition(hout, coord);
++}
+ #endif
+ 
+ int tputs(const char *str, int affcnt, int (*putfunc)(int))
+@@ -300,6 +322,11 @@
+             PDC_clear_page();
+             continue;
+         }
++	else if (c == '\013')
++        {
++            PDC_line_up();
++            continue;
++        }
+ #endif
+         putfunc(c);
+     }

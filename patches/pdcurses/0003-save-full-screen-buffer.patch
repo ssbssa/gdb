@@ -1,0 +1,58 @@
+From 3549dc990e0a5a04a53f31f890a47abb9cc01a04 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 9 Mar 2014 14:41:49 +0100
+Subject: [PATCH 3/4] save full screen buffer
+
+---
+ win32/pdcscrn.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/win32/pdcscrn.c b/win32/pdcscrn.c
+index fed8716..6dd8f9d 100644
+--- a/win32/pdcscrn.c
++++ b/win32/pdcscrn.c
+@@ -471,6 +471,32 @@ void PDC_restore_screen_mode(int i)
+ {
+ }
+ 
++static int read_console_output(CHAR_INFO *buf, COORD buf_size,
++                               COORD buf_coord, SMALL_RECT *read_region)
++{
++    if (ReadConsoleOutput(pdc_con_out, buf, buf_size, buf_coord, read_region))
++	return 1;
++
++    int h = read_region->Bottom - read_region->Top + 1;
++    int h2 = h / 2;
++    if (!h2) return 0;
++
++    COORD sub_coord1 = buf_coord;
++    SMALL_RECT sub_region1 = *read_region;
++    sub_region1.Bottom = sub_region1.Top + h2 - 1;
++    if (!read_console_output(buf, buf_size, sub_coord1, &sub_region1))
++	return 0;
++
++    COORD sub_coord2 = buf_coord;
++    sub_coord2.Y += h2;
++    SMALL_RECT sub_region2 = *read_region;
++    sub_region2.Top = sub_region1.Bottom + 1;
++    if (!read_console_output(buf, buf_size, sub_coord2, &sub_region2))
++	return 0;
++
++    return 1;
++}
++
+ void PDC_save_screen_mode(int i)
+ {
+     COORD bufsize, origin;
+@@ -501,7 +527,7 @@ void PDC_save_screen_mode(int i)
+     rect.Bottom = orig_scr.dwSize.Y  - 1;
+     rect.Right = orig_scr.dwSize.X - 1;
+ 
+-    if (!ReadConsoleOutput(pdc_con_out, ci_save, bufsize, origin, &rect))
++    if (!read_console_output(ci_save, bufsize, origin, &rect))
+     {
+         /* We can't save the complete buffer, so try and save just
+            the displayed window */
+-- 
+1.8.4.msysgit.0
+

@@ -1,0 +1,25 @@
+From 7988343ed94b2b381c01ef43c9d86efe9f2ef9a2 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 9 Mar 2014 14:45:02 +0100
+Subject: [PATCH 4/4] add debug information in release build
+
+---
+ win32/gccwin32.mak | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/win32/gccwin32.mak b/win32/gccwin32.mak
+index 7504bb3..77a017b 100644
+--- a/win32/gccwin32.mak
++++ b/win32/gccwin32.mak
+@@ -24,7 +24,7 @@ ifeq ($(DEBUG),Y)
+ 	CFLAGS  = -g -Wall -DPDCDEBUG
+ 	LDFLAGS = -g
+ else
+-	CFLAGS  = -O2 -Wall
++	CFLAGS  = -O2 -Wall -g
+ 	LDFLAGS =
+ endif
+ 
+-- 
+1.8.4.msysgit.0
+

@@ -1,0 +1,244 @@
+From e3e0109e2484243cb5753934b7eb02966f269f9c Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 9 Mar 2014 14:40:19 +0100
+Subject: [PATCH 2/4] always save screen when entering curses mode
+
+---
+ win32/pdcscrn.c | 171 +++++++++++++++++++++++++++++---------------------------
+ 1 file changed, 89 insertions(+), 82 deletions(-)
+
+diff --git a/win32/pdcscrn.c b/win32/pdcscrn.c
+index b48ddaa..fed8716 100644
+--- a/win32/pdcscrn.c
++++ b/win32/pdcscrn.c
+@@ -229,7 +229,7 @@ void PDC_scr_close(void)
+ 
+     PDC_reset_shell_mode();
+ 
+-    if (SP->_restore != PDC_RESTORE_NONE)
++    if (SP->_restore != PDC_RESTORE_NONE && ci_save)
+     {
+         if (SP->_restore == PDC_RESTORE_WINDOW)
+         {
+@@ -250,6 +250,9 @@ void PDC_scr_close(void)
+         if (!WriteConsoleOutput(pdc_con_out, ci_save, orig_scr.dwSize, 
+                                 origin, &rect))
+             return;
++
++        free(ci_save);
++        ci_save = NULL;
+     }
+ 
+     if (SP->visibility != 1)
+@@ -257,7 +260,10 @@ void PDC_scr_close(void)
+ 
+     /* Position cursor to the bottom left of the screen. */
+ 
+-    PDC_gotoyx(PDC_get_buffer_rows() - 2, 0);
++    if (SP->_restore != PDC_RESTORE_NONE)
++        PDC_gotoyx(orig_scr.dwCursorPosition.Y, orig_scr.dwCursorPosition.X);
++    else
++        PDC_gotoyx(PDC_get_buffer_rows() - 2, 0);
+ }
+ 
+ void PDC_scr_free(void)
+@@ -275,9 +281,6 @@ void PDC_scr_free(void)
+ 
+ int PDC_scr_open(int argc, char **argv)
+ {
+-    COORD bufsize, origin;
+-    SMALL_RECT rect;
+-    const char *str;
+     CONSOLE_SCREEN_BUFFER_INFO csbi;
+     int i;
+ 
+@@ -304,7 +307,6 @@ int PDC_scr_open(int argc, char **argv)
+     is_nt = !(GetVersion() & 0x80000000);
+ 
+     GetConsoleScreenBufferInfo(pdc_con_out, &csbi);
+-    GetConsoleScreenBufferInfo(pdc_con_out, &orig_scr);
+     GetConsoleMode(pdc_con_in, &old_console_mode);
+ 
+     /* preserve QuickEdit Mode setting for use in PDC_mouse_set() when
+@@ -313,8 +315,8 @@ int PDC_scr_open(int argc, char **argv)
+ 
+     pdc_quick_edit = old_console_mode & 0x0040;
+ 
+-    SP->lines = (str = getenv("LINES")) ? atoi(str) : PDC_get_rows();
+-    SP->cols = (str = getenv("COLS")) ? atoi(str) : PDC_get_columns();
++    SP->lines = PDC_get_rows();
++    SP->cols = PDC_get_columns();
+ 
+     SP->mouse_wait = PDC_CLICK_PERIOD;
+     SP->audible = TRUE;
+@@ -342,81 +344,9 @@ int PDC_scr_open(int argc, char **argv)
+ 
+     SP->_restore = PDC_RESTORE_NONE;
+ 
+-    if (getenv("PDC_RESTORE_SCREEN"))
+-    {
+-        /* Attempt to save the complete console buffer */
+-
+-        ci_save = malloc(orig_scr.dwSize.X * orig_scr.dwSize.Y *
+-                         sizeof(CHAR_INFO));
+-
+-        if (!ci_save)
+-        {
+-            PDC_LOG(("PDC_scr_open() - malloc failure (1)\n"));
+-
+-            return ERR;
+-        }
+-
+-        bufsize.X = orig_scr.dwSize.X;
+-        bufsize.Y = orig_scr.dwSize.Y;
++    PDC_save_screen_mode(0);
+ 
+-        origin.X = origin.Y = 0;
+-
+-        rect.Top = rect.Left = 0;
+-        rect.Bottom = orig_scr.dwSize.Y  - 1;
+-        rect.Right = orig_scr.dwSize.X - 1;
+-
+-        if (!ReadConsoleOutput(pdc_con_out, ci_save, bufsize, origin, &rect))
+-        {
+-            /* We can't save the complete buffer, so try and save just 
+-               the displayed window */
+-
+-            free(ci_save);
+-            ci_save = NULL;
+-
+-            bufsize.X = orig_scr.srWindow.Right - orig_scr.srWindow.Left + 1;
+-            bufsize.Y = orig_scr.srWindow.Bottom - orig_scr.srWindow.Top + 1;
+-
+-            ci_save = malloc(bufsize.X * bufsize.Y * sizeof(CHAR_INFO));
+-
+-            if (!ci_save)
+-            {
+-                PDC_LOG(("PDC_scr_open() - malloc failure (2)\n"));
+-
+-                return ERR;
+-            }
+-
+-            origin.X = origin.Y = 0;
+-
+-            rect.Top = orig_scr.srWindow.Top;
+-            rect.Left = orig_scr.srWindow.Left;
+-            rect.Bottom = orig_scr.srWindow.Bottom;
+-            rect.Right = orig_scr.srWindow.Right;
+-
+-            if (!ReadConsoleOutput(pdc_con_out, ci_save, bufsize, 
+-                                   origin, &rect))
+-            {
+-#ifdef PDCDEBUG
+-                CHAR LastError[256];
+-
+-                FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, 
+-                              GetLastError(), MAKELANGID(LANG_NEUTRAL, 
+-                              SUBLANG_DEFAULT), LastError, 256, NULL);
+-
+-                PDC_LOG(("PDC_scr_open() - %s\n", LastError));
+-#endif
+-                free(ci_save);
+-                ci_save = NULL;
+-
+-                return ERR;
+-            }
+-
+-            SP->_restore = PDC_RESTORE_WINDOW;
+-        }
+-        else
+-            SP->_restore = PDC_RESTORE_BUFFER;
+-    }
+-
+-    SP->_preserve = (getenv("PDC_PRESERVE_SCREEN") != NULL);
++    SP->_preserve = 0;
+ 
+     PDC_reset_prog_mode();
+ 
+@@ -543,6 +473,83 @@ void PDC_restore_screen_mode(int i)
+ 
+ void PDC_save_screen_mode(int i)
+ {
++    COORD bufsize, origin;
++    SMALL_RECT rect;
++
++    if (i != 0 || ci_save) return;
++
++    GetConsoleScreenBufferInfo(pdc_con_out, &orig_scr);
++
++    /* Attempt to save the complete console buffer */
++
++    ci_save = malloc(orig_scr.dwSize.X * orig_scr.dwSize.Y *
++                     sizeof(CHAR_INFO));
++
++    if (!ci_save)
++    {
++        PDC_LOG(("PDC_scr_open() - malloc failure (1)\n"));
++
++        return;
++    }
++
++    bufsize.X = orig_scr.dwSize.X;
++    bufsize.Y = orig_scr.dwSize.Y;
++
++    origin.X = origin.Y = 0;
++
++    rect.Top = rect.Left = 0;
++    rect.Bottom = orig_scr.dwSize.Y  - 1;
++    rect.Right = orig_scr.dwSize.X - 1;
++
++    if (!ReadConsoleOutput(pdc_con_out, ci_save, bufsize, origin, &rect))
++    {
++        /* We can't save the complete buffer, so try and save just
++           the displayed window */
++
++        free(ci_save);
++        ci_save = NULL;
++
++        bufsize.X = orig_scr.srWindow.Right - orig_scr.srWindow.Left + 1;
++        bufsize.Y = orig_scr.srWindow.Bottom - orig_scr.srWindow.Top + 1;
++
++        ci_save = malloc(bufsize.X * bufsize.Y * sizeof(CHAR_INFO));
++
++        if (!ci_save)
++        {
++            PDC_LOG(("PDC_scr_open() - malloc failure (2)\n"));
++
++            return;
++        }
++
++        origin.X = origin.Y = 0;
++
++        rect.Top = orig_scr.srWindow.Top;
++        rect.Left = orig_scr.srWindow.Left;
++        rect.Bottom = orig_scr.srWindow.Bottom;
++        rect.Right = orig_scr.srWindow.Right;
++
++        if (!ReadConsoleOutput(pdc_con_out, ci_save, bufsize,
++                               origin, &rect))
++        {
++#ifdef PDCDEBUG
++            CHAR LastError[256];
++
++            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL,
++                          GetLastError(), MAKELANGID(LANG_NEUTRAL,
++                          SUBLANG_DEFAULT), LastError, 256, NULL);
++
++            PDC_LOG(("PDC_scr_open() - %s\n", LastError));
++#endif
++            free(ci_save);
++            ci_save = NULL;
++
++            return;
++        }
++
++        SP->_restore = PDC_RESTORE_WINDOW;
++    }
++    else
++        SP->_restore = PDC_RESTORE_BUFFER;
+ }
+ 
+ void PDC_init_pair(short pair, short fg, short bg)
+-- 
+1.8.4.msysgit.0
+

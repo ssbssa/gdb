@@ -1,0 +1,112 @@
+From 98d16b5e93c4305f9195c53327358a2e9dab0eb8 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 9 Mar 2014 17:27:17 +0100
+Subject: [PATCH 09/23] Use page-up/down to scroll in console buffer
+
+---
+ gdb/tui/tui.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+
+diff --git a/gdb/tui/tui.c b/gdb/tui/tui.c
+index 81ad70c8af..adf10a7f70 100644
+--- a/gdb/tui/tui.c
++++ b/gdb/tui/tui.c
+@@ -47,6 +47,9 @@
+ #include <termio.h>
+ #endif
+ #include <setjmp.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+ 
+ #include "gdb_curses.h"
+ #include "interps.h"
+@@ -327,6 +330,60 @@ tui_set_key_mode (enum tui_key_mode mode)
+   tui_show_locator_content ();
+ }
+ 
++#ifdef _WIN32
++static void
++console_scroll (int scroll)
++{
++  HANDLE hStdout;
++  CONSOLE_SCREEN_BUFFER_INFO csbi;
++  SMALL_RECT sr;
++  int half_page;
++
++  if (!scroll) return;
++
++  hStdout = GetStdHandle (STD_OUTPUT_HANDLE);
++  GetConsoleScreenBufferInfo (hStdout, &csbi);
++
++  sr = csbi.srWindow;
++  half_page = (sr.Bottom - sr.Top) / 2;
++
++  if (scroll > 0)
++    scroll = half_page;
++  else
++    scroll = -half_page;
++
++  sr.Top += scroll;
++  sr.Bottom += scroll;
++  if (sr.Top < 0)
++    {
++      sr.Bottom -= sr.Top;
++      sr.Top = 0;
++    }
++  else if (sr.Bottom >= csbi.dwSize.Y - 1)
++    {
++      sr.Top += csbi.dwSize.Y - 1 - sr.Bottom;
++      sr.Bottom = csbi.dwSize.Y - 1;
++    }
++  SetConsoleWindowInfo (hStdout, TRUE, &sr);
++}
++
++static int
++console_paging (int count, int key)
++{
++  switch (key)
++    {
++    case '\x49':
++      console_scroll (-1);
++      break;
++    case '\x51':
++      console_scroll (1);
++      break;
++    }
++
++  return 0;
++}
++#endif
++
+ /* Initialize readline and configure the keymap for the switching
+    key shortcut.  */
+ void
+@@ -334,6 +391,9 @@ tui_initialize_readline (void)
+ {
+   int i;
+   Keymap tui_ctlx_keymap;
++#ifdef _WIN32
++  Keymap page_keymap;
++#endif
+ 
+   rl_initialize ();
+ 
+@@ -345,6 +405,14 @@ tui_initialize_readline (void)
+   tui_ctlx_keymap = rl_make_bare_keymap ();
+   tui_readline_standard_keymap = rl_get_keymap ();
+ 
++#ifdef _WIN32
++  page_keymap = rl_make_bare_keymap ();
++  rl_generic_bind (ISKMAP, "\xe0", (char*)page_keymap,
++		   tui_readline_standard_keymap);
++  rl_bind_key_in_map ('\x49', console_paging, page_keymap);
++  rl_bind_key_in_map ('\x51', console_paging, page_keymap);
++#endif
++
+   for (i = 0; tui_commands[i].cmd; i++)
+     rl_bind_key_in_map (tui_commands[i].key, tui_rl_command_key, tui_keymap);
+ 
+-- 
+2.15.1.windows.2
+

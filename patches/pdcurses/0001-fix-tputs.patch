@@ -1,0 +1,26 @@
+From 46fef94efe6437829b51a096a107f30f8f2a3de8 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 9 Mar 2014 14:22:07 +0100
+Subject: [PATCH 1/4] fix tputs()
+
+---
+ pdcurses/terminfo.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/pdcurses/terminfo.c b/pdcurses/terminfo.c
+index c099ada..2c503a8 100644
+--- a/pdcurses/terminfo.c
++++ b/pdcurses/terminfo.c
+@@ -211,5 +211,8 @@ int tputs(const char *str, int affcnt, int (*putfunc)(int))
+ {
+     PDC_LOG(("tputs() - called\n"));
+ 
+-    return ERR;
++    while (*str)
++        putfunc(*str++);
++
++    return 0;
+ }
+-- 
+1.8.4.msysgit.0
+

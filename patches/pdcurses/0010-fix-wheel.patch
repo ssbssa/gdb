@@ -1,0 +1,11 @@
+--- a/win32/pdckbd.c	2008-07-20 22:12:04.000000000 +0200
++++ b/win32/pdckbd.c	2016-03-08 19:00:37.900892400 +0100
+@@ -475,7 +475,7 @@
+ 
+     if (MEV.dwEventFlags == 4)
+     {
+-        pdc_mouse_status.changes = (MEV.dwButtonState & 0xFF000000) ?
++        pdc_mouse_status.changes = (MEV.dwButtonState & 0x80000000) ?
+             PDC_MOUSE_WHEEL_DOWN : PDC_MOUSE_WHEEL_UP;
+ 
+         pdc_mouse_status.x = -1;

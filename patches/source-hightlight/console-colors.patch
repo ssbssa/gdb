@@ -1,0 +1,54 @@
+--- src/esc.style	2015-03-30 13:33:07.000000000 +0200
++++ src/esc.style	2019-03-18 17:54:03.976097500 +0100
+@@ -1,14 +1,14 @@
+-keyword blue b ;
+-type, classname darkgreen ;
+-string red ;
++keyword yellow b ;
++type, classname green b ;
++string pink b ;
+ regexp orange ;
+-specialchar pink ;
+-comment cyan i ;
+-number purple ;
++specialchar orange b ;
++comment cyan b ;
++number purple b ;
+ preproc darkblue b ;
+-symbol darkred ;
+-function black b;
+-cbracket red;
++symbol red b ;
++function black b ;
++cbracket yellow ;
+ variable darkgreen ;
+ 
+ // line numbers
+@@ -22,7 +22,7 @@
+ name darkgreen ;
+ 
+ // Internet related
+-url blue u;
++url blue b;
+ 
+ // for diffs
+ oldfile orange;
+--- src/c.lang	2010-05-06 10:32:55.000000000 +0200
++++ src/c.lang	2019-03-18 18:27:21.699940800 +0100
+@@ -36,7 +36,7 @@
+ 
+ include "symbols.lang"
+ 
+-cbracket = "{|}"
++cbracket = "{|}|(|)|[|]"
+ 
+ include "function.lang"
+ 
+--- src/symbols.lang	2010-05-06 10:32:55.000000000 +0200
++++ src/symbols.lang	2019-03-18 18:27:01.691796400 +0100
+@@ -1,2 +1,2 @@
+-symbol = "~","!","%","^","*","(",")","-","+","=","[",
+-        "]","\\",":",";",",",".","/","?","&","<",">","\|"
+\ No newline at end of file
++symbol = "~","!","%","^","*","-","+","=",
++        "\\",":",";",",",".","/","?","&","<",">","\|"

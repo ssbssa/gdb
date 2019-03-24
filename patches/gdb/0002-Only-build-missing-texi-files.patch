@@ -1,0 +1,57 @@
+From b51884db8e9cf94fafe672d5f35e604046bf2540 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 30 Aug 2015 15:52:48 +0200
+Subject: [PATCH 02/23] Only build missing texi files
+
+---
+ bfd/doc/Makefile.in | 2 +-
+ gdb/doc/Makefile.in | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/bfd/doc/Makefile.in b/bfd/doc/Makefile.in
+index a80dc75fe3..0502f795ad 100644
+--- a/bfd/doc/Makefile.in
++++ b/bfd/doc/Makefile.in
+@@ -468,7 +468,7 @@ mostlyclean-libtool:
+ clean-libtool:
+ 	-rm -rf .libs _libs
+ 
+-bfd.info: bfd.texinfo $(bfd_TEXINFOS)
++bfd.info: bfd.texinfo | $(bfd_TEXINFOS)
+ 	restore=: && backupdir="$(am__leading_dot)am$$$$" && \
+ 	rm -rf $$backupdir && mkdir $$backupdir && \
+ 	if ($(MAKEINFO) --version) >/dev/null 2>&1; then \
+diff --git a/gdb/doc/Makefile.in b/gdb/doc/Makefile.in
+index eafadee899..bed05432a9 100644
+--- a/gdb/doc/Makefile.in
++++ b/gdb/doc/Makefile.in
+@@ -148,7 +148,7 @@ STABS_DOC_BUILD_INCLUDES = \
+ 	GDBvn.texi
+ STABS_DOC_FILES = \
+ 	$(srcdir)/stabs.texinfo \
+-	$(STABS_DOC_SOURCE_INCLUDES) \
++	$(STABS_DOC_SOURCE_INCLUDES) | \
+ 	$(STABS_DOC_BUILD_INCLUDES)
+ 
+ # Annotate migration document
+@@ -159,7 +159,7 @@ ANNOTATE_DOC_BUILD_INCLUDES = \
+ 	GDBvn.texi
+ ANNOTATE_DOC_FILES = \
+ 	$(srcdir)/annotate.texinfo \
+-	$(ANNOTATE_DOC_SOURCE_INCLUDES) \
++	$(ANNOTATE_DOC_SOURCE_INCLUDES) | \
+ 	$(ANNOTATE_DOC_BUILD_INCLUDES)
+ 
+ # Options to extract the man page from gdb.texinfo
+@@ -482,7 +482,7 @@ gdb.pdf: ${GDB_DOC_FILES}
+ 		$(srcdir)/gdb.texinfo
+ 
+ # GDB MANUAL: info file
+-gdb.info: ${GDB_DOC_FILES}
++gdb.info: | ${GDB_DOC_FILES}
+ 	$(MAKEINFO_CMD) $(READLINE_TEXI_INCFLAG) -I ${GDBMI_DIR} -I $(srcdir) \
+ 		-o gdb.info $(srcdir)/gdb.texinfo
+ 
+-- 
+2.15.1.windows.2
+

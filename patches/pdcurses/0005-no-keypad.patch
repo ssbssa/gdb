@@ -1,0 +1,70 @@
+--- a/pdcurses/getch.c	2008-07-13 18:08:18.000000000 +0200
++++ b/pdcurses/getch.c	2014-12-30 16:46:45.604498500 +0100
+@@ -2,6 +2,11 @@
+ 
+ #include <curspriv.h>
+ 
++#ifdef _WIN32
++#include <windows.h>
++extern HANDLE pdc_con_in;
++#endif
++
+ RCSID("$Id: getch.c,v 1.72 2008/07/13 16:08:18 wmcbrine Exp $")
+ 
+ /*man-start**************************************************************
+@@ -238,7 +243,55 @@
+             /* filter special keys if not in keypad mode */
+ 
+             if (!win->_use_keypad)
++            {
++#ifdef _WIN32
++                char backhalf = 0;
++                switch (key)
++                {
++                case KEY_UP:
++                    backhalf = 'H';
++                    break;
++                case KEY_DOWN:
++                    backhalf = 'P';
++                    break;
++                case KEY_LEFT:
++                    backhalf = 'K';
++                    break;
++                case KEY_RIGHT:
++                    backhalf = 'M';
++                    break;
++                case KEY_HOME:
++                    backhalf = 'G';
++                    break;
++                case KEY_END:
++                    backhalf = 'O';
++                    break;
++                case KEY_DC:
++                    backhalf = 'S';
++                    break;
++                case KEY_IC:
++                    backhalf = 'R';
++                    break;
++                }
++                if (backhalf)
++                {
++                    INPUT_RECORD ir;
++                    ir.EventType = KEY_EVENT;
++                    ir.Event.KeyEvent.bKeyDown = TRUE;
++                    ir.Event.KeyEvent.dwControlKeyState = 0;
++                    ir.Event.KeyEvent.uChar.UnicodeChar = backhalf;
++                    ir.Event.KeyEvent.wRepeatCount = 1;
++                    ir.Event.KeyEvent.wVirtualKeyCode = backhalf;
++                    ir.Event.KeyEvent.wVirtualScanCode =
++                        MapVirtualKey(backhalf, MAPVK_VK_TO_VSC);
++                    DWORD written;
++                    WriteConsoleInput(pdc_con_in, &ir, 1, &written);
++                    return 0xe0;
++                }
++#endif
++
+                 key = -1;
++            }
+ 
+             /* filter mouse events; translate mouse clicks in the slk 
+                area to function keys */
