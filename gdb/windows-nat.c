@@ -561,6 +561,91 @@ windows_per_inferior::thread_rec
   return NULL;
 }
 
+template<typename Getter, typename Context>
+static void
+save_debug_registers (windows_thread_info *th, Context &context,
+		      Getter fGetThreadContext)
+{
+  context.ContextFlags = CONTEXT_DEBUGGER_DR;
+  CHECK (fGetThreadContext (th->h, &context));
+  /* Copy dr values from that thread.
+     But only if there were not modified since last stop.
+     PR gdb/2388 */
+  if (!th->debug_registers_changed)
+    {
+      windows_process.dr[0] = context.Dr0;
+      windows_process.dr[1] = context.Dr1;
+      windows_process.dr[2] = context.Dr2;
+      windows_process.dr[3] = context.Dr3;
+      windows_process.dr[6] = context.Dr6;
+      windows_process.dr[7] = context.Dr7;
+    }
+}
+
+template<typename Setter, typename Context>
+static void
+set_continue_debug_registers (windows_thread_info *th, Context &context,
+			      Setter fSetThreadContext, int killed)
+{
+  if (th->debug_registers_changed)
+    {
+      context.ContextFlags |= CONTEXT_DEBUG_REGISTERS;
+      context.Dr0 = windows_process.dr[0];
+      context.Dr1 = windows_process.dr[1];
+      context.Dr2 = windows_process.dr[2];
+      context.Dr3 = windows_process.dr[3];
+      context.Dr6 = DR6_CLEAR_VALUE;
+      context.Dr7 = windows_process.dr[7];
+      th->debug_registers_changed = false;
+    }
+  if (context.ContextFlags)
+    {
+      DWORD ec = 0;
+
+      if (GetExitCodeThread (th->h, &ec)
+	  && ec == STILL_ACTIVE)
+	{
+	  BOOL status = fSetThreadContext (th->h, &context);
+
+	  if (!killed)
+	    CHECK (status);
+	}
+      context.ContextFlags = 0;
+    }
+}
+
+template<typename Setter, typename Context>
+static void
+set_resume_debug_registers (windows_nat_target *target,
+			    windows_thread_info *th, Context &context,
+			    Setter fSetThreadContext, int step)
+{
+  if (step)
+    {
+      /* Single step by setting t bit.  */
+      struct regcache *regcache = get_current_regcache ();
+      struct gdbarch *gdbarch = regcache->arch ();
+      target->fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
+      context.EFlags |= FLAG_TRACE_BIT;
+    }
+
+  if (context.ContextFlags)
+    {
+      if (th->debug_registers_changed)
+	{
+	  context.Dr0 = windows_process.dr[0];
+	  context.Dr1 = windows_process.dr[1];
+	  context.Dr2 = windows_process.dr[2];
+	  context.Dr3 = windows_process.dr[3];
+	  context.Dr6 = DR6_CLEAR_VALUE;
+	  context.Dr7 = windows_process.dr[7];
+	  th->debug_registers_changed = false;
+	}
+      CHECK (fSetThreadContext (th->h, &context));
+      context.ContextFlags = 0;
+    }
+}
+
 /* Add a thread to the thread list.
 
    PTID is the ptid of the thread to be added.
@@ -758,40 +843,10 @@ windows_nat_target::fetch_registers (struct regcache *regcache, int r)
 #endif
 #ifdef __x86_64__
       if (windows_process.wow64_process)
-	{
-	  th->wow64_context.ContextFlags = CONTEXT_DEBUGGER_DR;
-	  CHECK (Wow64GetThreadContext (th->h, &th->wow64_context));
-	  /* Copy dr values from that thread.
-	     But only if there were not modified since last stop.
-	     PR gdb/2388 */
-	  if (!th->debug_registers_changed)
-	    {
-	      windows_process.dr[0] = th->wow64_context.Dr0;
-	      windows_process.dr[1] = th->wow64_context.Dr1;
-	      windows_process.dr[2] = th->wow64_context.Dr2;
-	      windows_process.dr[3] = th->wow64_context.Dr3;
-	      windows_process.dr[6] = th->wow64_context.Dr6;
-	      windows_process.dr[7] = th->wow64_context.Dr7;
-	    }
-	}
+	save_debug_registers (th, th->wow64_context, Wow64GetThreadContext);
       else
 #endif
-	{
-	  th->context.ContextFlags = CONTEXT_DEBUGGER_DR;
-	  CHECK (GetThreadContext (th->h, &th->context));
-	  /* Copy dr values from that thread.
-	     But only if there were not modified since last stop.
-	     PR gdb/2388 */
-	  if (!th->debug_registers_changed)
-	    {
-	      windows_process.dr[0] = th->context.Dr0;
-	      windows_process.dr[1] = th->context.Dr1;
-	      windows_process.dr[2] = th->context.Dr2;
-	      windows_process.dr[3] = th->context.Dr3;
-	      windows_process.dr[6] = th->context.Dr6;
-	      windows_process.dr[7] = th->context.Dr7;
-	    }
-	}
+	save_debug_registers (th, th->context, GetThreadContext);
       th->reload_context = false;
     }
 
@@ -1403,6 +1458,24 @@ display_selector (HANDLE thread, DWORD sel)
     }
 }
 
+template<typename Context>
+static void
+display_context_selectors (HANDLE thread, Context &context)
+{
+  gdb_puts ("Selector $cs\n");
+  display_selector (thread, context.SegCs);
+  gdb_puts ("Selector $ds\n");
+  display_selector (thread, context.SegDs);
+  gdb_puts ("Selector $es\n");
+  display_selector (thread, context.SegEs);
+  gdb_puts ("Selector $ss\n");
+  display_selector (thread, context.SegSs);
+  gdb_puts ("Selector $fs\n");
+  display_selector (thread, context.SegFs);
+  gdb_puts ("Selector $gs\n");
+  display_selector (thread, context.SegGs);
+}
+
 static void
 display_selectors (const char * args, int from_tty)
 {
@@ -1419,48 +1492,12 @@ display_selectors (const char * args, int from_tty)
     {
 #ifdef __x86_64__
       if (windows_process.wow64_process)
-	{
-	  gdb_puts ("Selector $cs\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->wow64_context.SegCs);
-	  gdb_puts ("Selector $ds\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->wow64_context.SegDs);
-	  gdb_puts ("Selector $es\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->wow64_context.SegEs);
-	  gdb_puts ("Selector $ss\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->wow64_context.SegSs);
-	  gdb_puts ("Selector $fs\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->wow64_context.SegFs);
-	  gdb_puts ("Selector $gs\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->wow64_context.SegGs);
-	}
+	display_context_selectors (current_windows_thread->h,
+				   current_windows_thread->wow64_context);
       else
 #endif
-	{
-	  gdb_puts ("Selector $cs\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->context.SegCs);
-	  gdb_puts ("Selector $ds\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->context.SegDs);
-	  gdb_puts ("Selector $es\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->context.SegEs);
-	  gdb_puts ("Selector $ss\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->context.SegSs);
-	  gdb_puts ("Selector $fs\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->context.SegFs);
-	  gdb_puts ("Selector $gs\n");
-	  display_selector (current_windows_thread->h,
-			    current_windows_thread->context.SegGs);
-	}
+	display_context_selectors (current_windows_thread->h,
+				   current_windows_thread->context);
     }
   else
     {
@@ -1523,63 +1560,12 @@ windows_nat_target::windows_continue (DWORD continue_status, int id,
       {
 #ifdef __x86_64__
 	if (windows_process.wow64_process)
-	  {
-	    if (th->debug_registers_changed)
-	      {
-		th->wow64_context.ContextFlags |= CONTEXT_DEBUG_REGISTERS;
-		th->wow64_context.Dr0 = windows_process.dr[0];
-		th->wow64_context.Dr1 = windows_process.dr[1];
-		th->wow64_context.Dr2 = windows_process.dr[2];
-		th->wow64_context.Dr3 = windows_process.dr[3];
-		th->wow64_context.Dr6 = DR6_CLEAR_VALUE;
-		th->wow64_context.Dr7 = windows_process.dr[7];
-		th->debug_registers_changed = false;
-	      }
-	    if (th->wow64_context.ContextFlags)
-	      {
-		DWORD ec = 0;
-
-		if (GetExitCodeThread (th->h, &ec)
-		    && ec == STILL_ACTIVE)
-		  {
-		    BOOL status = Wow64SetThreadContext (th->h,
-							 &th->wow64_context);
-
-		    if (!killed)
-		      CHECK (status);
-		  }
-		th->wow64_context.ContextFlags = 0;
-	      }
-	  }
+	  set_continue_debug_registers (th.get (), th->wow64_context,
+					Wow64SetThreadContext, killed);
 	else
 #endif
-	  {
-	    if (th->debug_registers_changed)
-	      {
-		th->context.ContextFlags |= CONTEXT_DEBUG_REGISTERS;
-		th->context.Dr0 = windows_process.dr[0];
-		th->context.Dr1 = windows_process.dr[1];
-		th->context.Dr2 = windows_process.dr[2];
-		th->context.Dr3 = windows_process.dr[3];
-		th->context.Dr6 = DR6_CLEAR_VALUE;
-		th->context.Dr7 = windows_process.dr[7];
-		th->debug_registers_changed = false;
-	      }
-	    if (th->context.ContextFlags)
-	      {
-		DWORD ec = 0;
-
-		if (GetExitCodeThread (th->h, &ec)
-		    && ec == STILL_ACTIVE)
-		  {
-		    BOOL status = SetThreadContext (th->h, &th->context);
-
-		    if (!killed)
-		      CHECK (status);
-		  }
-		th->context.ContextFlags = 0;
-	      }
-	  }
+	  set_continue_debug_registers (th.get (), th->context,
+					SetThreadContext, killed);
 	th->resume ();
       }
     else
@@ -1691,60 +1677,12 @@ windows_nat_target::resume (ptid_t ptid, int step, enum gdb_signal sig)
     {
 #ifdef __x86_64__
       if (windows_process.wow64_process)
-	{
-	  if (step)
-	    {
-	      /* Single step by setting t bit.  */
-	      struct regcache *regcache = get_current_regcache ();
-	      struct gdbarch *gdbarch = regcache->arch ();
-	      fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
-	      th->wow64_context.EFlags |= FLAG_TRACE_BIT;
-	    }
-
-	  if (th->wow64_context.ContextFlags)
-	    {
-	      if (th->debug_registers_changed)
-		{
-		  th->wow64_context.Dr0 = windows_process.dr[0];
-		  th->wow64_context.Dr1 = windows_process.dr[1];
-		  th->wow64_context.Dr2 = windows_process.dr[2];
-		  th->wow64_context.Dr3 = windows_process.dr[3];
-		  th->wow64_context.Dr6 = DR6_CLEAR_VALUE;
-		  th->wow64_context.Dr7 = windows_process.dr[7];
-		  th->debug_registers_changed = false;
-		}
-	      CHECK (Wow64SetThreadContext (th->h, &th->wow64_context));
-	      th->wow64_context.ContextFlags = 0;
-	    }
-	}
+	set_resume_debug_registers (this, th, th->wow64_context,
+				    Wow64SetThreadContext, step);
       else
 #endif
-	{
-	  if (step)
-	    {
-	      /* Single step by setting t bit.  */
-	      struct regcache *regcache = get_current_regcache ();
-	      struct gdbarch *gdbarch = regcache->arch ();
-	      fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
-	      th->context.EFlags |= FLAG_TRACE_BIT;
-	    }
-
-	  if (th->context.ContextFlags)
-	    {
-	      if (th->debug_registers_changed)
-		{
-		  th->context.Dr0 = windows_process.dr[0];
-		  th->context.Dr1 = windows_process.dr[1];
-		  th->context.Dr2 = windows_process.dr[2];
-		  th->context.Dr3 = windows_process.dr[3];
-		  th->context.Dr6 = DR6_CLEAR_VALUE;
-		  th->context.Dr7 = windows_process.dr[7];
-		  th->debug_registers_changed = false;
-		}
-	      CHECK (SetThreadContext (th->h, &th->context));
-	      th->context.ContextFlags = 0;
-	    }
-	}
+	set_resume_debug_registers (this, th, th->context,
+				    SetThreadContext, step);
     }
 
   /* Allow continuing with the same signal that interrupted us.
