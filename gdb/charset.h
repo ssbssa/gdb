@@ -126,6 +126,19 @@ class wchar_iterator
   int iterate (enum wchar_iterate_result *out_result, gdb_wchar_t **out_chars,
 	       const gdb_byte **ptr, size_t *len);
 
+  const gdb_byte *input () const { return m_input; }
+  size_t bytes () const { return m_bytes; }
+
+  bool eat_bytes (size_t count)
+    {
+      if (count > m_bytes)
+	return false;
+
+      m_bytes -= count;
+      m_input += count;
+      return true;
+    }
+
  private:
 
   /* The underlying iconv descriptor.  */
