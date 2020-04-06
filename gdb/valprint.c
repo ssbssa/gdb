@@ -2317,6 +2317,15 @@ count_next_character (wchar_iterator *iter,
 
       while (1)
 	{
+	  if (current->num_chars > 0
+	      && iter->bytes () >= current->buflen
+	      && memcmp (current->buf, iter->input (), current->buflen) == 0)
+	    {
+	      iter->eat_bytes (current->buflen);
+	      ++current->repeat_count;
+	      continue;
+	    }
+
 	  /* Get the next character.  */
 	  d.num_chars = iter->iterate (&d.result, &chars, &d.buf, &d.buflen);
 
