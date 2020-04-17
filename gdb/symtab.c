@@ -6300,6 +6300,25 @@ find_main_name (void)
   if (symbol_found_p)
     return;
 
+  if (gdbarch_osabi (target_gdbarch ()) == GDB_OSABI_WINDOWS)
+    {
+      struct bound_minimal_symbol msym;
+
+      msym = lookup_minimal_symbol ("wmain", NULL, NULL);
+      if (msym.minsym != NULL)
+	{
+	  set_main_name ("wmain", language_unknown);
+	  return;
+	}
+
+      msym = lookup_minimal_symbol ("mainCRTStartup", NULL, NULL);
+      if (msym.minsym != NULL)
+	{
+	  set_main_name ("mainCRTStartup", language_unknown);
+	  return;
+	}
+    }
+
   set_main_name ("main", language_unknown);
 }
 
