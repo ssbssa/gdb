@@ -6359,6 +6359,23 @@ find_main_name (void)
       return;
     }
 
+  if (gdbarch_osabi (target_gdbarch ()) == GDB_OSABI_WINDOWS)
+    {
+      lang = find_quick_global_symbol_language ("wmain", VAR_DOMAIN);
+      if (lang != language_unknown)
+	{
+	  set_main_name ("wmain", lang);
+	  return;
+	}
+
+      lang = find_quick_global_symbol_language ("mainCRTStartup", VAR_DOMAIN);
+      if (lang != language_unknown)
+	{
+	  set_main_name ("mainCRTStartup", lang);
+	  return;
+	}
+    }
+
   set_main_name ("main", language_unknown);
 }
 
