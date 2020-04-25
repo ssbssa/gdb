@@ -1063,6 +1063,22 @@ proc_with_prefix test_format {} {
   }
 }
 
+proc test_zero_values {} {
+  check_format_string "zero_one_point" \
+    "raw=True" \
+    "\\{x = 0, y = 1\\}"
+  check_format_string "zero_one_point" \
+    "raw=True, zero_values=False" \
+    "\\{y = 1\\}"
+
+  check_format_string "an_array_with_zeroes" \
+    "raw=True" \
+    "\\{1, 2, 0, 3, 4, 0, 5, 0\\}"
+  check_format_string "an_array_with_zeroes" \
+    "raw=True, zero_values=False" \
+    "\\{1, 2, 3, 4, 5\\}"
+}
+
 # Test mixing options.
 proc_with_prefix test_mixed {} {
   global current_lang
@@ -1170,6 +1186,7 @@ proc_with_prefix test_all_common {} {
   test_max_depth
   test_repeat_threshold
   test_format
+  test_zero_values
   # Multiple options mixed together.
   test_mixed
   # Various error conditions.
