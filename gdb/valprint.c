@@ -128,6 +128,7 @@ struct value_print_options user_print_options =
   false,			/* summary */
   true,				/* symbol_print */
   PRINT_MAX_DEPTH_DEFAULT,	/* max_depth */
+  1,				/* zero_value_print */
 };
 
 /* Initialize *OPTS to be a copy of the user print options.  */
@@ -1937,6 +1938,22 @@ maybe_print_array_index (struct type *index_type, LONGEST index,
 
 /* See valprint.h.  */
 
+bool
+value_is_zero (struct value *v)
+{
+  if (!v->entirely_available () || v->optimized_out ())
+    return false;
+  gdb::array_view<const gdb_byte> result = v->contents_writeable ();
+  const gdb_byte *addr = result.data ();
+  unsigned int len = result.size ();
+  for (unsigned int i = 0; i < len; i++)
+    if (addr[i] != 0)
+      return false;
+  return true;
+}
+
+/* See valprint.h.  */
+
 void
 value_print_array_elements (struct value *val, struct ui_file *stream,
 			    int recurse,
@@ -1984,11 +2001,20 @@ value_print_array_elements (struct value *val, struct ui_file *stream,
 
   annotate_array_section_begin (i, elttype);
 
+  bool need_comma = i != 0;
   for (; i < len && things_printed < options->print_max; i++)
     {
       scoped_value_mark free_values;
 
-      if (i != 0)
+      struct value *element = val->from_component_bitsize (elttype,
+							   bit_stride * i,
+							   bit_stride);
+
+      /* If requested, skip printing of zero value fields.  */
+      if (!options->zero_value_print && value_is_zero (element))
+	continue;
+
+      if (need_comma)
 	{
 	  if (options->prettyformat_arrays)
 	    {
@@ -2007,9 +2033,6 @@ value_print_array_elements (struct value *val, struct ui_file *stream,
       maybe_print_array_index (index_type, i + low_bound,
 			       stream, options);
 
-      struct value *element = val->from_component_bitsize (elttype,
-							   bit_stride * i,
-							   bit_stride);
       rep1 = i + 1;
       reps = 1;
       /* Only check for reps if repeat_count_threshold is not set to
@@ -2059,6 +2082,8 @@ value_print_array_elements (struct value *val, struct ui_file *stream,
 	  annotate_elt ();
 	  things_printed++;
 	}
+
+      need_comma = true;
     }
   annotate_array_section_end ();
   if (i < len)
@@ -2909,6 +2934,18 @@ show_static_field_print (struct ui_file *file, int from_tty,
 	      value);
 }
 
+/* Controls printing of zero value members.  */
+
+static void
+show_zero_value_print (struct ui_file *file, int from_tty,
+		       struct cmd_list_element *c,
+		       const char *value)
+{
+  gdb_printf (file,
+	      _("Printing of zero value members is %s.\n"),
+	      value);
+}
+
 
 
 /* A couple typedefs to make writing the options a bit more
@@ -3095,6 +3132,15 @@ pretty-printers for that value.")
     show_vtblprint, /* show_cmd_cb */
     N_("Set printing of C++ virtual function tables."),
     N_("Show printing of C++ virtual function tables."),
+    NULL, /* help_doc */
+  },
+
+  boolean_option_def {
+    "zero-values",
+    [] (value_print_options *opt) { return &opt->zero_value_print; },
+    show_zero_value_print, /* show_cmd_cb */
+    N_("Set printing of zero value members."),
+    N_("Show printing of zero value members."),
     NULL, /* help_doc */
   },
 };
