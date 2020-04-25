@@ -111,6 +111,11 @@ maintenance print core-file-backed-mappings
   Prints file-backed mappings loaded from a core file's note section.
   Output is expected to be similar to that of "info proc mappings".
 
+set print zero-values [on|off]
+show print zero-values
+  This controls whether GDB prints zero value members of structures and
+  arrays.  The default is 'on'.
+
 * Changed commands
 
 alias [-a] [--] ALIAS = COMMAND [DEFAULT-ARGS...]
