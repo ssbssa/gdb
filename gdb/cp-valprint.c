@@ -197,6 +197,18 @@ cp_print_value_fields (struct value *val, struct ui_file *stream,
 	      && type->field (i).is_static ())
 	    continue;
 
+	  /* If requested, skip printing of zero value fields.  */
+	  if (!options->zero_value_print
+	      && !type->field (i).is_static ())
+	    {
+	      if (type->field (i).is_ignored ())
+		continue;
+
+	      struct value *v = val->primitive_field (0, i, type);
+	      if (value_is_zero (v))
+		continue;
+	    }
+
 	  if (fields_seen)
 	    {
 	      gdb_puts (",", stream);
