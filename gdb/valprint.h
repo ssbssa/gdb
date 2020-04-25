@@ -103,6 +103,9 @@ struct value_print_options
 
   /* Maximum print depth when printing nested aggregates.  */
   int max_depth;
+
+  /* If true, print fields with a zero value.  */
+  bool zero_value_print;
 };
 
 /* Create an option_def_group for the value_print options, with OPTS
@@ -131,6 +134,10 @@ extern void maybe_print_array_index (struct type *index_type, LONGEST index,
 				     struct ui_file *stream,
 				     const struct value_print_options *);
 
+
+/* Check if V only contains zero bytes.  */
+
+extern bool value_is_zero (struct value *v);
 
 /* Print elements of an array.  */
 
