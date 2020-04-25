@@ -119,6 +119,9 @@ main ()
 
   int *a_symbol_pointer = &global_symbol;
 
+  point_t zero_one_point = { 0, 1 };
+  int an_array_with_zeroes[] = { 1, 2, 0, 3, 4, 0, 5, 0 };
+
 #ifdef __cplusplus
   Deriv a_deriv (123);
   Base &a_base_ref = a_deriv;

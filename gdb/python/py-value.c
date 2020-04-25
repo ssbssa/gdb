@@ -660,6 +660,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
       "styling",		/* Should we apply styling.  */
       "nibbles",		/* See set print nibbles on|off.  */
       "summary",		/* Summary mode for non-scalars.  */
+      "zero_values",		/* See set print zero-values on|off.  */
       /* C++ options.  */
       "deref_refs",		/* No corresponding setting.  */
       "actual_objects",		/* See set print object on|off.  */
@@ -707,6 +708,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
   PyObject *address_obj = NULL;
   PyObject *styling_obj = Py_False;
   PyObject *nibbles_obj = NULL;
+  PyObject *zero_values_obj = NULL;
   PyObject *deref_refs_obj = NULL;
   PyObject *actual_objects_obj = NULL;
   PyObject *static_members_obj = NULL;
@@ -714,7 +716,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
   char *format = NULL;
   if (!gdb_PyArg_ParseTupleAndKeywords (args,
 					kw,
-					"|O!O!O!O!O!O!O!O!O!O!O!O!O!IIIIs",
+					"|O!O!O!O!O!O!O!O!O!O!O!O!O!O!IIIIs",
 					keywords,
 					&PyBool_Type, &raw_obj,
 					&PyBool_Type, &pretty_arrays_obj,
@@ -726,6 +728,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
 					&PyBool_Type, &styling_obj,
 					&PyBool_Type, &nibbles_obj,
 					&PyBool_Type, &summary_obj,
+					&PyBool_Type, &zero_values_obj,
 					&PyBool_Type, &deref_refs_obj,
 					&PyBool_Type, &actual_objects_obj,
 					&PyBool_Type, &static_members_obj,
@@ -752,6 +755,8 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
   if (!copy_py_bool_obj (&opts.addressprint, address_obj))
     return NULL;
   if (!copy_py_bool_obj (&opts.nibblesprint, nibbles_obj))
+    return NULL;
+  if (!copy_py_bool_obj (&opts.zero_value_print, zero_values_obj))
     return NULL;
   if (!copy_py_bool_obj (&opts.deref_ref, deref_refs_obj))
     return NULL;
