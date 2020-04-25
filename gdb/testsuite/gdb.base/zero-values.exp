@@ -1,0 +1,32 @@
+# Copyright 2020 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Test disabled printing of zero-values in structures and arrays.
+
+standard_testfile
+
+if {[prepare_for_testing $testfile.exp $testfile $srcfile debug]} {
+    untested $testfile.exp
+    return -1
+}
+
+if ![runto_main] {
+    untested $testfile.exp
+    return -1
+}
+
+gdb_test "print t1" " = \\{i1 = 0, i2 = 0, i3 = 1, d1 = 0, d2 = 2\\.5, d3 = 0, p1 = $hex <ix>, p2 = 0x0, p3 = 0x0, t1 = \\{v1 = 0, v2 = 0\\}, t2 = \\{v1 = 3, v2 = 0\\}, t3 = \\{v1 = 4, v2 = 5\\}, ia = \\{0, 1, 2, 0, 0, 3, 4, 5, 0, 6\\}, ea = \\{0, 0, 0\\}, ipa = \\{0x0, $hex <ix>, 0x0, 0x0, $hex <t1>\\}\\}"
+
+gdb_test "print -zero-values off -- t1" " = \\{i3 = 1, d2 = 2\\.5, p1 = $hex <ix>, t2 = \\{v1 = 3\\}, t3 = \\{v1 = 4, v2 = 5\\}, ia = \\{1, 2, 3, 4, 5, 6\\}, ipa = \\{$hex <ix>, $hex <t1>\\}\\}"
