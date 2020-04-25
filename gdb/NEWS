@@ -797,6 +797,11 @@ show python dont-write-bytecode
   When set to 'auto' (the default) Python will check the
   PYTHONDONTWRITEBYTECODE environment variable.
 
+set print zero-values [on|off]
+show print zero-values
+  This controls whether GDB prints zero value members of structures and
+  arrays.  The default is 'on'.
+
 * Changed commands
 
 break [PROBE_MODIFIER] [LOCATION] [thread THREADNUM]

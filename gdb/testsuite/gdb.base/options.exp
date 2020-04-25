@@ -179,6 +179,7 @@ proc_with_prefix test-print {{prefix ""}} {
 	"-symbol"
 	"-union"
 	"-vtbl"
+	"-zero-values"
     }
 
     global binfile
