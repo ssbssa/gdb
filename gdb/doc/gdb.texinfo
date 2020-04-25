@@ -2167,10 +2167,11 @@ on @code{-} after the command name.  For example:
 
 @smallexample
 (@value{GDBP}) print -@key{TAB}@key{TAB}
--address         -max-depth               -object          -static-members
--array           -memory-tag-violations   -pretty          -symbol
--array-indexes   -nibbles                 -raw-values      -union
--elements        -null-stop               -repeats         -vtbl
+-address         -memory-tag-violations   -raw-values      -vtbl
+-array           -nibbles                 -repeats         -zero-values
+-array-indexes   -null-stop               -static-members
+-elements        -object                  -symbol
+-max-depth       -pretty                  -union
 @end smallexample
 
 Completion will in some cases guide you with a suggestion of what kind
@@ -10573,6 +10574,10 @@ Set printing of unions interior to structures.  Related setting:
 @item -vtbl [@code{on}|@code{off}]
 Set printing of C++ virtual function tables.  Related setting:
 @ref{set print vtbl}.
+
+@item -zero-values [@code{on}|@code{off}]
+Set printing of zero value members. Related setting: @ref{set print
+zero-values}.
 @end table
 
 Because the @code{print} command accepts arbitrary expressions which
@@ -12517,6 +12522,18 @@ Do not pretty print C@t{++} virtual function tables.
 
 @item show print vtbl
 Show whether C@t{++} virtual function tables are pretty printed, or not.
+
+@anchor{set print zero-values}
+@item set print zero-values
+@itemx set print zero-values on
+@cindex zero value members
+Print zero value members of structures and arrays.  The default is on.
+
+@item set print zero-values off
+Do not print zero value members of structures and arrays.
+
+@item show print zero-values
+Show whether zero value members are printed or not.
 @end table
 
 @node Pretty Printing
