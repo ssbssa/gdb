@@ -40,6 +40,7 @@
 #if defined (_WIN32) || defined (__CYGWIN__)
 #include "windows-nat.h"
 #endif
+#include "observable.h"
 
 #define CYGWIN_DLL_NAME "cygwin1.dll"
 
@@ -849,6 +850,90 @@ make_windows_solib_ops (program_space *pspace)
   return std::make_unique<windows_solib_ops> (pspace);
 }
 
+/* Windows-specific cached data.  This is used by GDB for caching
+   purposes for each program space.  */
+struct windows_info
+{
+  CORE_ADDR entry_point = 0;
+};
+
+/* Per-program-space data key.  */
+static const registry<program_space>::key<windows_info> windows_inferior_data;
+
+/* Fetch the Windows cache info for current program space.  This function
+   always returns a valid INFO pointer.  */
+
+static windows_info *
+get_windows_program_space_data ()
+{
+  windows_info *info;
+
+  info = windows_inferior_data.get (current_program_space);
+  if (info == NULL)
+    info = windows_inferior_data.emplace (current_program_space);
+
+  return info;
+}
+
+/* Breakpoint on entry point where any active hardware breakpoints will
+   be reset.  This is necessary because the system resets the thread contexts
+   when reaching the entry point, so any hardware breakpoints that were
+   set before are lost.  */
+struct entry_point_breakpoint : public code_breakpoint
+{
+  entry_point_breakpoint (struct gdbarch *gdbarch, location_spec_up &&locspec_)
+    : code_breakpoint (gdbarch, bp_breakpoint)
+    {
+      disposition = disp_donttouch;
+      locspec = std::move (locspec_);
+    }
+
+  void re_set (program_space *pspace) override;
+
+  void check_status (struct bpstat *bs) override;
+};
+
+/* This breakpoint type should never stop, but when reached, reset
+   the active hardware breakpoints and watchpoints.  */
+
+void
+entry_point_breakpoint::check_status (bpstat *bs)
+{
+  /* Never stop.  */
+  bs->stop = 0;
+
+  /* Reset active hardware breakpoints.  */
+  for (breakpoint &b : all_breakpoints ())
+    for (bp_location &loc : b.locations ())
+      if (loc.inserted && loc.pspace == current_program_space
+	  && (loc.loc_type == bp_loc_hardware_breakpoint
+	      || loc.loc_type == bp_loc_hardware_watchpoint)
+	  && b.remove_location (&loc, REMOVE_BREAKPOINT) == 0)
+	b.insert_location (&loc);
+}
+
+/* Update the breakpoint location to the current entry point.  */
+
+void
+entry_point_breakpoint::re_set (program_space *pspace)
+{
+  windows_info *info = get_windows_program_space_data ();
+  CORE_ADDR entry_point = info->entry_point;
+
+  /* Do nothing if the entry point didn't change.  */
+  for (bp_location &loc : locations ())
+    if (loc.pspace == current_program_space && loc.address == entry_point)
+      return;
+
+  location_spec_up location
+    = new_address_location_spec (entry_point, nullptr, 0);
+  std::vector<symtab_and_line> sals
+    = decode_location_spec (location.get (), current_program_space);
+  update_breakpoint_locations (this, current_program_space, sals, {});
+}
+
+static bool entry_point_breakpoint_created = false;
+
 static std::unique_ptr<std::string> last_xfer_libraries;
 
 /* Implement the "solib_create_inferior_hook" solib_ops method.  */
@@ -911,6 +996,25 @@ windows_solib_ops::create_inferior_hook (int from_tty) const
     }
 
   last_xfer_libraries.reset ();
+
+  /* Create the entry point breakpoint if it doesn't exist already.  */
+  if (target_has_execution () && exec_base != 0)
+    {
+      windows_info *info = get_windows_program_space_data ();
+      CORE_ADDR entry_point = exec_base
+	+ pe_data (current_program_space->exec_bfd ())->pe_opthdr.AddressOfEntryPoint;
+      info->entry_point = entry_point;
+
+      if (!entry_point_breakpoint_created)
+	{
+	  location_spec_up location
+	    = new_address_location_spec (entry_point, nullptr, 0);
+	  breakpoint *b = new entry_point_breakpoint (current_inferior ()->arch (),
+						      std::move (location));
+	  install_breakpoint (1, std::unique_ptr<breakpoint> (b), 0);
+	  entry_point_breakpoint_created = true;
+	}
+    }
 }
 
 /* Implement the "iterate_over_objfiles_in_search_order" gdbarch
