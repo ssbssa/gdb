@@ -41,6 +41,7 @@
 #ifdef _WIN32
 #include "windows-nat.h"
 #endif
+#include "observable.h"
 
 #define CYGWIN_DLL_NAME "cygwin1.dll"
 
@@ -878,6 +879,77 @@ windows_get_siginfo_type (struct gdbarch *gdbarch)
   return siginfo_type;
 }
 
+/* Windows-specific cached data.  This is used by GDB for caching
+   purposes for each program space.  */
+struct windows_info
+{
+  CORE_ADDR entry_point = 0;
+};
+
+/* Per-program-space data key.  */
+static const struct program_space_key<windows_info> windows_inferior_data;
+
+/* Fetch the Windows cache info for current program space.  This function
+   always returns a valid INFO pointer.  */
+
+static windows_info *
+get_windows_program_space_data ()
+{
+  windows_info *info;
+
+  info = windows_inferior_data.get (current_program_space);
+  if (info == NULL)
+    info = windows_inferior_data.emplace (current_program_space);
+
+  return info;
+}
+
+/* Breakpoint on entry point where any active hardware breakpoints will
+   be reset.  This is necessary because the system resets the thread contexts
+   when reaching the entry point, so any hardware breakpoints that were
+   set before are lost.  */
+static struct breakpoint_ops entry_point_breakpoint_ops;
+
+/* This breakpoint type should never stop, but when reached, reset
+   the active hardware breakpoints and watchpoints.  */
+
+static void
+startup_breakpoint_check_status (bpstat bs)
+{
+  /* Never stop.  */
+  bs->stop = 0;
+
+  /* Reset active hardware breakpoints.  */
+  for (breakpoint *b : all_breakpoints ())
+    for (bp_location *loc = b->loc; loc; loc = loc->next)
+      if (loc->inserted && loc->pspace == current_program_space
+	  && (loc->loc_type == bp_loc_hardware_breakpoint
+	      || loc->loc_type == bp_loc_hardware_watchpoint)
+	  && b->ops->remove_location (loc, REMOVE_BREAKPOINT) == 0)
+	b->ops->insert_location (loc);
+}
+
+/* Update the breakpoint location to the current entry point.  */
+
+static void
+startup_breakpoint_re_set (struct breakpoint *b)
+{
+  windows_info *info = get_windows_program_space_data ();
+  CORE_ADDR entry_point = info->entry_point;
+
+  /* Do nothing if the entry point didn't change.  */
+  struct bp_location *loc;
+  for (loc = b->loc; loc; loc = loc->next)
+    if (loc->pspace == current_program_space && loc->address == entry_point)
+      return;
+
+  event_location_up location
+    = new_address_location (entry_point, nullptr, 0);
+  std::vector<symtab_and_line> sals
+    = b->ops->decode_location (b, location.get (), current_program_space);
+  update_breakpoint_locations (b, current_program_space, sals, {});
+}
+
 static char *last_xfer_libraries = NULL;
 
 /* Implement the "solib_create_inferior_hook" target_so_ops method.  */
@@ -938,6 +1010,32 @@ windows_solib_create_inferior_hook (int from_tty)
 
   xfree (last_xfer_libraries);
   last_xfer_libraries = NULL;
+
+  /* Create the entry point breakpoint if it doesn't exist already.  */
+  if (target_has_execution () && exec_base != 0)
+    {
+      windows_info *info = get_windows_program_space_data ();
+      CORE_ADDR entry_point = exec_base
+	+ pe_data (current_program_space->exec_bfd ())->pe_opthdr.AddressOfEntryPoint;
+      info->entry_point = entry_point;
+
+      breakpoint *startup_breakpoint = NULL;
+      for (breakpoint *bp : all_breakpoints ())
+	if (bp->ops == &entry_point_breakpoint_ops)
+	  {
+	    startup_breakpoint = bp;
+	    break;
+	  }
+      if (startup_breakpoint == nullptr)
+	{
+	  event_location_up location
+	    = new_address_location (entry_point, nullptr, 0);
+	  create_breakpoint (target_gdbarch (), location.get (), nullptr, -1,
+			     nullptr, false, 0, 1, bp_breakpoint, 0,
+			     AUTO_BOOLEAN_FALSE, &entry_point_breakpoint_ops,
+			     0, 1, 1, 0);
+	}
+    }
 }
 
 static enum gdb_signal
@@ -1541,6 +1639,14 @@ _initialize_windows_tdep ()
 {
   windows_gdbarch_data_handle
     = gdbarch_data_register_post_init (init_windows_gdbarch_data);
+
+  initialize_breakpoint_ops ();
+  /* Entry point breakpoint.  */
+  entry_point_breakpoint_ops = bkpt_breakpoint_ops;
+  entry_point_breakpoint_ops.check_status
+    = startup_breakpoint_check_status;
+  entry_point_breakpoint_ops.re_set
+    = startup_breakpoint_re_set;
 
   init_w32_command_list ();
   cmd_list_element *info_w32_thread_information_block_cmd
