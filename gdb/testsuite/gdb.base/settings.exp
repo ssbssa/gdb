@@ -598,8 +598,15 @@ proc test-string {variant} {
 	    set fullsrcdir [pwd]
 	}
 
-	gdb_test "cd ${fullsrcdir}" \
-	    "Working directory [string_to_regexp ${fullsrcdir}].*" \
+	set fullsrcdir2 $fullsrcdir
+	set fullsrcdir3 $fullsrcdir
+	if { [ishost *-*-mingw*] } {
+	    set fullsrcdir2 [exec sh -c "cd ${fullsrcdir} && pwd -W"]
+	    set fullsrcdir3 [string map {/ \\} $fullsrcdir2]
+	}
+
+	gdb_test "cd ${fullsrcdir2}" \
+	    "Working directory [string_to_regexp ${fullsrcdir3}].*" \
 	    "cd to \${srcdir}"
 
 	set unique_file ../testsuite/gdb.base/comp-dir/subdir/dummy
