@@ -23,14 +23,19 @@ standard_testfile structs.c
 
 gdb_start
 
-gdb_test "source -v ${srcdir}/${subdir}/source-test.gdb" \
+set srcdir2 $srcdir
+if [ishost "*-*-mingw*"] {
+    set srcdir2 [exec sh -c "cd ${srcdir2} && pwd -W"]
+}
+
+gdb_test "source -v ${srcdir2}/${subdir}/source-test.gdb" \
     "echo test source options.*" \
     "source -v"
 
 # There was a bug where -v got stuck in the "on" position.
 # Verify "source script", without the -v, is not verbose.
 set test "source after -v"
-gdb_test_multiple "source ${srcdir}/${subdir}/source-test.gdb" $test {
+gdb_test_multiple "source ${srcdir2}/${subdir}/source-test.gdb" $test {
     -re "echo test source options.*$gdb_prompt $" {
 	fail "$test"
     }
@@ -39,7 +44,7 @@ gdb_test_multiple "source ${srcdir}/${subdir}/source-test.gdb" $test {
     }
 }
 
-gdb_test "dir ${srcdir}/${subdir}" "Source directories searched: .*" \
+gdb_test "dir ${srcdir2}/${subdir}" "Source directories searched: .*" \
     "set search directories"
 gdb_test "source -s ./source-test.gdb" \
     "test source options" \
@@ -68,7 +73,7 @@ gdb_test "source source-nofile.gdb" \
 #
 # This needs to come after the "dir" command tested above for source-error.gdb
 # to find source-error-1.gdb.
-gdb_test "source ${srcdir}/${subdir}/source-error.gdb" \
+gdb_test "source ${srcdir2}/${subdir}/source-error.gdb" \
     [multi_line ".*source-error.gdb:20: Error in sourced command file:" \
 		"source-error-1.gdb:21: Error in sourced command file:" \
 		"Cannot access memory at address 0x0" ] \
