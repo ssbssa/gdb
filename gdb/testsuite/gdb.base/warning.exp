@@ -29,7 +29,7 @@ gdb_spawn_with_cmdline_opts \
     "-iex \"set pagination off\" -data-directory $tname"
 
 # Make sure we see the warning.
-gdb_test "" "warning: $tname is not a directory.*" \
+gdb_test "" "warning: .* is not a directory.*" \
     "got warning"
 
 # Make sure gdb started up.

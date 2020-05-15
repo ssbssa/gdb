@@ -31,7 +31,11 @@ close $fd
 
 # The choice of path name for the source file is important in order to trigger
 # the bug.  Using $new_srcfile here won't trigger the bug.
-set compile_name [relative_filename $objdir $new_srcfile]
+set objdir1 $objdir
+if [ishost *-*-mingw*] {
+    set objdir1 [exec sh -c "cd $objdir && pwd -W"]
+}
+set compile_name [relative_filename $objdir1 $new_srcfile]
 if { [gdb_compile $compile_name "${binfile}" executable {debug}] != "" } {
     untested "failed to compile"
     return -1
