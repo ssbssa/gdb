@@ -265,6 +265,10 @@ if { $ret != 0 } {
 # The ouput of mktemp contains an end of line, remove it.
 set cache_dir [string trimright $cache_dir \r\n]
 
+if [istarget "*-*-mingw*"] then {
+    set cache_dir [exec sh -c "cd ${cache_dir} && pwd -W"]
+}
+
 test_cache_disabled $cache_dir "before populate"
 test_cache_enabled_miss $cache_dir
 test_cache_enabled_hit $cache_dir
