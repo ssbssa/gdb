@@ -39,6 +39,9 @@ if { $result != 0 || $realsrcfile2 == "" } {
     return -1
 }
 
+if { [ishost *-*-mingw*] && [regexp "^/\[a-zA-Z\]/" "$realsrcfile2"] } {
+    regsub "^/(.)(.*)$" $realsrcfile2 "\\1:\\2" realsrcfile2
+}
 clean_restart ${testfile}
 
 gdb_test "rbreak $realsrcfile2:func" "^Breakpoint 1 at 0x\[0-9a-f\]+: file [string_to_regexp ${subdir}/${srcfile2}], line \[0-9\]+\\.\r\nvoid func\\(void\\);" "rbreak XXX/fullpath-expand-func.c:func"
