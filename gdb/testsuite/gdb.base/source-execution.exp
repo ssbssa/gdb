@@ -27,6 +27,11 @@ if {![runto_main]} {
     return 0
 }
 
-gdb_test "source ${srcdir}/${subdir}/source-execution.gdb" \
+set srcdir2 "${srcdir}"
+if { [ishost *-*-mingw*] } {
+    set srcdir2 [exec sh -c "cd ${srcdir} && pwd -W"]
+}
+
+gdb_test "source ${srcdir2}/${subdir}/source-execution.gdb" \
     "func2.*func3.*" \
     "source source-execution.gdb"

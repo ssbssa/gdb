@@ -107,7 +107,11 @@ proc_with_prefix test_cd_into_dir { } {
     gdb_breakpoint [gdb_get_line_number "break-here"]
     gdb_continue_to_breakpoint "break-here" ".* break-here .*"
 
-    gdb_test "print dir" "\\\$$decimal = \"$tmpdir\", .*" \
+    set tmpdir_regexp $tmpdir
+    if [ishost "*-*-mingw*"] {
+	set tmpdir_regexp [string map {/ \\\\\\\\} $tmpdir]
+    }
+    gdb_test "print dir" "\\\$$decimal = \"$tmpdir_regexp\", .*" \
 	"inferior cwd is correctly set"
 
     set gdb_cwd_after_run ""
@@ -164,7 +168,11 @@ proc_with_prefix test_cwd_reset { } {
     gdb_breakpoint [gdb_get_line_number "break-here"]
     gdb_continue_to_breakpoint "break-here" ".* break-here .*"
 
-    gdb_test "print dir" "\\\$$decimal = \"$tmpdir\", .*" \
+    set tmpdir_regexp $tmpdir
+    if [ishost "*-*-mingw*"] {
+	set tmpdir_regexp [string map {/ \\\\\\\\} $tmpdir]
+    }
+    gdb_test "print dir" "\\\$$decimal = \"$tmpdir_regexp\", .*" \
 	"inferior cwd is correctly set"
 
     # Reset the inferior's cwd.
@@ -178,6 +186,9 @@ proc_with_prefix test_cwd_reset { } {
 	gdb_breakpoint [gdb_get_line_number "break-here"]
 	gdb_continue_to_breakpoint "break-here" ".* break-here .*"
 
+	if [ishost "*-*-mingw*"] {
+	    set gdb_cwd [string map {\\ \\\\\\\\} $gdb_cwd]
+	}
 	gdb_test "print dir" "\\\$$decimal = \"$gdb_cwd\", .*" \
 	    "inferior cwd got reset correctly"
     }
