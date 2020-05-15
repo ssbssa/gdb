@@ -25,7 +25,11 @@ standard_testfile
 
 set new_srcfile [standard_output_file $srcfile]
 set fd [open $new_srcfile w]
-set relative [relative_filename $objdir $new_srcfile]
+set objdir1 $objdir
+if [ishost *-*-mingw*] {
+    set objdir1 [exec sh -c "cd $objdir && pwd -W"]
+}
+set relative [relative_filename $objdir1 $new_srcfile]
 puts $fd "#line 2 \"./$relative\""
 puts $fd "int main () { return 0; } /* set breakpoint here */"
 close $fd
