@@ -21,7 +21,15 @@ if [is_remote host] {
 
 set targetdir "${binfile}.dir"
 set sourcescript "${srcdir}/${subdir}/${testfile}-script"
-set targetscriptdir "${targetdir}/[file dirname ${binfile}]"
+set binfilecopy "${binfile}"
+if { [ishost *-*-mingw*] && [regexp "^\[a-zA-Z\]:/" "$binfilecopy"] } {
+    set bindrive [string index "${binfilecopy}" 0]
+    set binpath [string range "${binfilecopy}" 2 end]
+    set binfilecopy "/"
+    append binfilecopy "$bindrive"
+    append binfilecopy "$binpath"
+}
+set targetscriptdir "${targetdir}/[file dirname ${binfilecopy}]"
 set targetscript "${targetscriptdir}/${testfile}-gdb.gdb"
 
 remote_exec host "rm -rf ${targetdir}"

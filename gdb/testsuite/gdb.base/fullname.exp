@@ -70,7 +70,11 @@ if { [gdb_breakpoint [standard_output_file tmp-${srcfile}]:${line} {no-message}]
 }
 
 # Build the test executable using a relative path.
-if  { [gdb_compile [relative_filename [pwd] [standard_output_file tmp-${srcfile}]] \
+set curdir [pwd]
+if [ishost *-*-mingw*] {
+    set curdir [exec sh -c "pwd -W"]
+}
+if  { [gdb_compile [relative_filename $curdir [standard_output_file tmp-${srcfile}]] \
 	   "${binfile}" executable {debug}] != "" } {
     return -1
 }

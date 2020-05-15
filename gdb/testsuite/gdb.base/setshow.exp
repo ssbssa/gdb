@@ -296,11 +296,17 @@ proc_with_prefix test_setshow_history {} {
     gdb_test "show history filename" \
 	"The filename in which to record the command history is \"[string_to_regexp $HOME]/foobar.baz\"..*" \
 	"show history filename (~/foobar.baz)"
+    set homestr $HOME
+    if [ishost "*-*-mingw*"] {
+	set homestr [string map {\\ /} $homestr]
+	set homestr [exec sh -c "cd ${homestr} && pwd -W"]
+	set homestr [string map {/ \\\\} $homestr]
+    }
     gdb_test "p \$_gdb_setting(\"history filename\")" \
-	" = \"[string_to_regexp $HOME]/foobar.baz\"..*" \
+	" = \"[string_to_regexp $homestr]/foobar.baz\"..*" \
 	"_gdb_setting history filename"
     gdb_test "p \$_gdb_setting_str(\"history filename\")" \
-	" = \"[string_to_regexp $HOME]/foobar.baz\"..*" \
+	" = \"[string_to_regexp $homestr]/foobar.baz\"..*" \
 	"_gdb_setting_str history filename"
 
     #get current working directory
