@@ -639,7 +639,15 @@ proc test_different_dir {type test_different_dir xfail} {
 # the "set debug-file-directory" command.
 
 set different_dir [standard_output_file ${testfile}.dir]
-set debugfile "${different_dir}/[standard_output_file ${testfile}${EXEEXT}.debug]"
+set debugfile1 "[standard_output_file ${testfile}${EXEEXT}.debug]"
+if { [ishost *-*-mingw*] && [regexp "^\[a-zA-Z\]:/" "$debugfile1"] } {
+    set dbgdrive [string index "${debugfile1}" 0]
+    set dbgpath [string range "${debugfile1}" 2 end]
+    set debugfile1 "/"
+    append debugfile1 "$dbgdrive"
+    append debugfile1 "$dbgpath"
+}
+set debugfile "${different_dir}/${debugfile1}"
 remote_exec build "rm -rf $different_dir"
 remote_exec build "mkdir -p [file dirname $debugfile]"
 remote_exec build "mv -f [standard_output_file ${testfile}${EXEEXT}.debug] $debugfile"
