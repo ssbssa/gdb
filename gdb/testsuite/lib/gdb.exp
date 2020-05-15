@@ -1796,6 +1796,10 @@ proc gdb_reinitialize_dir { subdir } {
     if [is_remote host] {
 	return ""
     }
+    # If running on MinGW, replace /c/foo with c:/foo
+    if { [ishost *-*-mingw*] } {
+        set subdir [exec sh -c "\[ -d ${subdir} \] && cd ${subdir} && pwd -W || echo ${subdir}"]
+    }
     send_gdb "dir\n"
     gdb_expect 60 {
 	-re "Reinitialize source path to empty.*y or n. " {
@@ -5557,6 +5561,9 @@ proc standard_output_file {basename} {
     file mkdir $dir
     # If running on MinGW, replace /c/foo with c:/foo
     if { [ishost *-*-mingw*] } {
+	if { [regexp "^\[a-zA-Z\]:/" "$basename"] } {
+	    return $basename
+	}
         set dir [exec sh -c "cd ${dir} && pwd -W"]
     }
     return [file join $dir $basename]
@@ -5964,7 +5971,7 @@ proc gdb_get_line_number { text { file "" } } {
     if { "$file" == "" } then {
 	set file "$srcfile"
     }
-    if { ! [regexp "^/" "$file"] } then {
+    if { ! [regexp "^(/|\[a-zA-Z\]:/)" "$file"] } then {
 	set file "$srcdir/$subdir/$file"
     }
 
@@ -6418,6 +6425,9 @@ gdb_caching_proc gdb_has_argv0 {
 proc get_build_id { filename } {
     if { ([istarget "*-*-mingw*"]
 	  || [istarget *-*-cygwin*]) } {
+	if ![string match *.exe $filename] {
+	    set filename $filename.exe
+	}
 	set objdump_program [gdb_find_objdump]
 	set result [catch {set data [exec $objdump_program -p $filename | grep signature | cut "-d " -f4]} output]
 	verbose "result is $result"
@@ -6666,7 +6676,7 @@ proc build_executable_from_specs {testname executable options args} {
     if [string match gdb_compile_shlib* $func] {
 	set sources_path {}
 	foreach {s local_options} $args {
-	    if { [regexp "^/" "$s"] } then {
+	    if { [regexp "^(/|\[a-zA-Z\]:/)" "$s"] } then {
 		lappend sources_path "$s"
 	    } else {
 		lappend sources_path "$srcdir/$subdir/$s"
@@ -6676,7 +6686,7 @@ proc build_executable_from_specs {testname executable options args} {
     } elseif {[lsearch -exact $options rust] != -1} {
 	set sources_path {}
 	foreach {s local_options} $args {
-	    if { [regexp "^/" "$s"] } then {
+	    if { [regexp "^(/|\[a-zA-Z\]:/)" "$s"] } then {
 		lappend sources_path "$s"
 	    } else {
 		lappend sources_path "$srcdir/$subdir/$s"
@@ -6687,7 +6697,7 @@ proc build_executable_from_specs {testname executable options args} {
 	set objects {}
 	set i 0
 	foreach {s local_options} $args {
-	    if { ! [regexp "^/" "$s"] } then {
+	    if { ! [regexp "^(/|\[a-zA-Z\]:/)" "$s"] } then {
 		set s "$srcdir/$subdir/$s"
 	    }
 	    if  { [$func "${s}" "${binfile}${i}.o" object $local_options] != "" } {
