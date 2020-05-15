@@ -146,6 +146,9 @@ proc test_truncated_comp_dir {} {
 			 "4\[ \t\]+return 0;" \
 			 "5\[ \t\]+\\}" ]
 
+    if [ishost "*-*-mingw*"] {
+	set new_srcfile [string map {/ \\\\} $new_srcfile]
+    }
     gdb_test "info source" \
 	[multi_line \
 	     "Current source file is ${srcfile}" \

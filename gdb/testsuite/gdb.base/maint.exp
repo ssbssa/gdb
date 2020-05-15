@@ -265,12 +265,17 @@ if { $have_psyms } {
 }
 maint_pass_if $symtabs  "maint print objfiles: symtabs"
 
+set srcdir2 $srcdir
+if [ishost *-*-mingw*] {
+    set srcdir2 [exec sh -c "cd $srcdir && pwd -W"]
+}
+
 if { $have_psyms } {
     set psymbols_output [standard_output_file psymbols_output]
     set psymbols_output_re [string_to_regexp $psymbols_output]
     set test_list [list \
 		       "maint print psymbols -source" \
-		       "maint print psymbols -source ${srcdir}/${subdir}/${srcfile} $psymbols_output" \
+		       "maint print psymbols -source ${srcdir2}/${subdir}/${srcfile} $psymbols_output" \
 		       "maint print psymbols -pc" \
 		       "maint print psymbols -pc main $psymbols_output"]
     foreach { test_name command } $test_list {
@@ -289,9 +294,14 @@ if { $have_psyms } {
 }
 
 
+set binfile2 $binfile
+if [ishost *-*-mingw*] {
+    set binfile2 $binfile.exe
+}
+
 set msymbols_output [standard_output_file msymbols_output]
 set msymbols_output_re [string_to_regexp $msymbols_output]
-gdb_test_no_output "maint print msymbols -objfile ${binfile} $msymbols_output" \
+gdb_test_no_output "maint print msymbols -objfile ${binfile2} $msymbols_output" \
     "print msymbols to file, with absolute path"
 gdb_test "shell grep factorial $msymbols_output" \
     "\\\[ *$decimal\\\] \[tT\]\[ \t\]+$hex \\.?factorial.*" \
@@ -300,11 +310,19 @@ gdb_test "shell rm -f $msymbols_output" ".*" "remove absolute path msymbols"
 
 # Check that maint print msymbols allows relative pathnames
 set mydir [pwd]
+if [ishost *-*-mingw*] {
+    set mydir [exec sh -c "pwd -W"]
+}
 gdb_test "cd [standard_output_file {}]" \
     "Working directory .*\..*" \
     "cd to objdir"
 
-gdb_test_no_output "maint print msymbols -objfile ${testfile} $msymbols_output"\
+set testfile2 $testfile
+if [ishost *-*-mingw*] {
+    set testfile2 $testfile.exe
+}
+
+gdb_test_no_output "maint print msymbols -objfile ${testfile2} $msymbols_output"\
     "print msymbols to file, with relative path"
 gdb_test "shell grep factorial $msymbols_output" \
     "\\\[ *$decimal\\\] \[tT\]\[ \t\]+$hex \\.?factorial.*" \
@@ -312,7 +330,7 @@ gdb_test "shell grep factorial $msymbols_output" \
 gdb_test "shell rm -f msymbols_output" ".*" "remove relative path msymbols"
 
 gdb_test "cd ${mydir}" \
-    "Working directory [string_to_regexp ${mydir}]\..*" \
+    "Working directory .*" \
     "cd to mydir"
 
 
@@ -324,7 +342,7 @@ set symbols_output [standard_output_file symbols_output]
 set symbols_output_re [string_to_regexp $symbols_output]
 set test_list [list \
 		   "maint print symbols -source" \
-		   "maint print symbols -source ${srcdir}/${subdir}/${srcfile} $symbols_output" \
+		   "maint print symbols -source ${srcdir2}/${subdir}/${srcfile} $symbols_output" \
 		   "maint print symbols -pc" \
 		   "maint print symbols -pc main $symbols_output"]
 foreach { test_name command } $test_list {
