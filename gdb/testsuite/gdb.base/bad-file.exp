@@ -50,6 +50,9 @@ gdb_test_multiple "file $bad_file" "$test" {
 
 set test "neither file nor directory"
 set bad_file "/dev/null"
+if [ishost *-*-mingw*] {
+    set bad_file "NUL"
+}
 gdb_test_multiple "file $bad_file" "$test" {
     -re "Invalid argument.\[\r\n\]+$gdb_prompt $" {
 	pass $test
