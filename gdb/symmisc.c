@@ -992,6 +992,7 @@ maintenance_print_one_line_table (struct symtab *symtab, void *data)
       ui_out_emit_table table_emitter (uiout, 5, -1, "line-table");
       uiout->table_header (6, ui_left, "index", _("INDEX"));
       uiout->table_header (6, ui_left, "line", _("LINE"));
+      uiout->table_header (6, ui_left, "column", _("COLUMN"));
       uiout->table_header (18, ui_left, "address", _("ADDRESS"));
       uiout->table_header (4, ui_left, "stmt", _("STMT"));
       uiout->table_header (4, ui_left, "weak", _("WEAK"));
@@ -1008,6 +1009,10 @@ maintenance_print_one_line_table (struct symtab *symtab, void *data)
 	    uiout->field_signed ("line", item->line);
 	  else
 	    uiout->field_string ("line", _("END"));
+	  if (item->column > 0)
+	    uiout->field_signed ("column", item->column);
+	  else
+	    uiout->field_string ("column", "");
 	  uiout->field_core_addr ("address", objfile->arch (),
 				  item->pc);
 	  uiout->field_string ("stmt", item->is_stmt ? "Y" : "");
