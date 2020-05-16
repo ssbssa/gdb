@@ -2696,8 +2696,9 @@ void iterate_over_symtabs (const char *name,
 			   gdb::function_view<bool (symtab *)> callback);
 
 
-std::vector<CORE_ADDR> find_pcs_for_symtab_line
-    (struct symtab *symtab, int line, struct linetable_entry **best_entry);
+std::vector<std::pair<CORE_ADDR, int>> find_pcs_and_cols_for_symtab_line
+    (struct symtab *symtab, int line, int column,
+     struct linetable_entry **best_entry);
 
 /* Prototype for callbacks for LA_ITERATE_OVER_SYMBOLS.  The callback
    is called once per matching symbol SYM.  The callback should return
