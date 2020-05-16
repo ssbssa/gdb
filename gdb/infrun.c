@@ -4821,7 +4821,7 @@ fetch_inferior_event ()
 
 void
 set_step_info (thread_info *tp, const frame_info_ptr &frame,
-	       struct symtab_and_line sal)
+	       struct symtab_and_line sal, bool step_column)
 {
   /* This can be removed once this function no longer implicitly relies on the
      inferior_ptid value.  */
@@ -4832,11 +4832,13 @@ set_step_info (thread_info *tp, const frame_info_ptr &frame,
 
   tp->current_symtab = sal.symtab;
   tp->current_line = sal.line;
+  tp->current_column = step_column ? sal.column : 0;
 
   infrun_debug_printf
-    ("symtab = %s, line = %d, step_frame_id = %s, step_stack_frame_id = %s",
+    ("symtab = %s, line = %d, column = %d,"
+     " step_frame_id = %s, step_stack_frame_id = %s",
      tp->current_symtab != nullptr ? tp->current_symtab->filename : "<null>",
-     tp->current_line,
+     tp->current_line, tp->current_column,
      tp->control.step_frame_id.to_string ().c_str (),
      tp->control.step_stack_frame_id.to_string ().c_str ());
 }
@@ -8177,7 +8179,9 @@ process_event_stop_test (struct execution_control_state *ecs)
 	     first.  Otherwise stop at the call site.  */
 
 	  if (call_sal.line == ecs->event_thread->current_line
-	      && call_sal.symtab == ecs->event_thread->current_symtab)
+	      && call_sal.symtab == ecs->event_thread->current_symtab
+	      && (ecs->event_thread->current_column == 0
+		  || call_sal.column == ecs->event_thread->current_column))
 	    {
 	      step_into_inline_frame (ecs->event_thread);
 	      if (inline_frame_is_marked_for_skip (false, ecs->event_thread))
@@ -8196,7 +8200,9 @@ process_event_stop_test (struct execution_control_state *ecs)
 	     different source line.  Otherwise continue through the
 	     inlined function.  */
 	  if (call_sal.line == ecs->event_thread->current_line
-	      && call_sal.symtab == ecs->event_thread->current_symtab)
+	      && call_sal.symtab == ecs->event_thread->current_symtab
+	      && (ecs->event_thread->current_column == 0
+		  || call_sal.column == ecs->event_thread->current_column))
 	    keep_going (ecs);
 	  else
 	    end_stepping_range (ecs);
@@ -8228,7 +8234,9 @@ process_event_stop_test (struct execution_control_state *ecs)
   bool refresh_step_info = true;
   if ((ecs->event_thread->stop_pc () == stop_pc_sal.pc)
       && (ecs->event_thread->current_line != stop_pc_sal.line
-	  || ecs->event_thread->current_symtab != stop_pc_sal.symtab))
+	  || ecs->event_thread->current_symtab != stop_pc_sal.symtab
+	  || (ecs->event_thread->current_column != 0
+	      && ecs->event_thread->current_column != stop_pc_sal.column)))
     {
       /* We are at a different line.  */
 
@@ -8251,7 +8259,8 @@ process_event_stop_test (struct execution_control_state *ecs)
 		  ecs->event_thread->control.step_range_start
 		    = start_line_pc;
 		  ecs->event_thread->control.step_range_end = stop_pc;
-		  set_step_info (ecs->event_thread, frame, stop_pc_sal);
+		  set_step_info (ecs->event_thread, frame, stop_pc_sal,
+				 ecs->event_thread->current_column != 0);
 		  keep_going (ecs);
 		  return;
 		}
@@ -8329,7 +8338,8 @@ process_event_stop_test (struct execution_control_state *ecs)
      paddress (gdbarch, ecs->event_thread->control.step_range_end),
      ecs->event_thread->control.may_range_step);
   if (refresh_step_info)
-    set_step_info (ecs->event_thread, frame, stop_pc_sal);
+    set_step_info (ecs->event_thread, frame, stop_pc_sal,
+		   ecs->event_thread->current_column != 0);
 
   infrun_debug_printf ("keep going");
 
