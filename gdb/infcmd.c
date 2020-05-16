@@ -61,7 +61,7 @@
 
 static void until_next_command (int);
 
-static void step_1 (int, int, const char *);
+static void step_1 (int, int, int, const char *);
 
 #define ERROR_NO_INFERIOR \
    if (!target_has_execution ()) error (_("The program is not being run."));
@@ -738,7 +738,7 @@ continue_command (const char *args, int from_tty)
 /* Record in TP the starting point of a "step" or "next" command.  */
 
 static void
-set_step_frame (thread_info *tp)
+set_step_frame (thread_info *tp, bool step_column)
 {
   /* This can be removed once this function no longer implicitly relies on the
      inferior_ptid value.  */
@@ -747,7 +747,7 @@ set_step_frame (thread_info *tp)
   frame_info_ptr frame = get_current_frame ();
 
   symtab_and_line sal = find_frame_sal (frame);
-  set_step_info (tp, frame, sal);
+  set_step_info (tp, frame, sal, step_column);
 
   CORE_ADDR pc = get_frame_pc (frame);
   tp->control.step_start_function = find_pc_function (pc);
@@ -758,7 +758,7 @@ set_step_frame (thread_info *tp)
 static void
 step_command (const char *count_string, int from_tty)
 {
-  step_1 (0, 0, count_string);
+  step_1 (0, 0, 0, count_string);
 }
 
 /* Likewise, but skip over subroutine calls as if single instructions.  */
@@ -766,7 +766,7 @@ step_command (const char *count_string, int from_tty)
 static void
 next_command (const char *count_string, int from_tty)
 {
-  step_1 (1, 0, count_string);
+  step_1 (1, 0, 0, count_string);
 }
 
 /* Likewise, but step only one instruction.  */
@@ -774,13 +774,27 @@ next_command (const char *count_string, int from_tty)
 static void
 stepi_command (const char *count_string, int from_tty)
 {
-  step_1 (0, 1, count_string);
+  step_1 (0, 1, 0, count_string);
 }
 
 static void
 nexti_command (const char *count_string, int from_tty)
 {
-  step_1 (1, 1, count_string);
+  step_1 (1, 1, 0, count_string);
+}
+
+/* Likewise, but step until instruction of another column is reached.  */
+
+static void
+steps_command (const char *count_string, int from_tty)
+{
+  step_1 (0, 0, 1, count_string);
+}
+
+static void
+nexts_command (const char *count_string, int from_tty)
+{
+  step_1 (1, 0, 1, count_string);
 }
 
 /* Data for the FSM that manages the step/next/stepi/nexti
@@ -796,6 +810,9 @@ struct step_command_fsm : public thread_fsm
 
   /* If true, this is a stepi/nexti, otherwise a step/step.  */
   int single_inst;
+
+  /* If true, this is a steps/nexts, otherwise a step/next.  */
+  int step_column;
 
   explicit step_command_fsm (struct interp *cmd_interp)
     : thread_fsm (cmd_interp)
@@ -813,10 +830,12 @@ struct step_command_fsm : public thread_fsm
 static void
 step_command_fsm_prepare (struct step_command_fsm *sm,
 			  int skip_subroutines, int single_inst,
+			  int step_column,
 			  int count, struct thread_info *thread)
 {
   sm->skip_subroutines = skip_subroutines;
   sm->single_inst = single_inst;
+  sm->step_column = step_column;
   sm->count = count;
 
   /* Leave the si command alone.  */
@@ -829,7 +848,8 @@ step_command_fsm_prepare (struct step_command_fsm *sm,
 static int prepare_one_step (thread_info *, struct step_command_fsm *sm);
 
 static void
-step_1 (int skip_subroutines, int single_inst, const char *count_string)
+step_1 (int skip_subroutines, int single_inst, int step_column,
+	const char *count_string)
 {
   int count;
   int async_exec;
@@ -858,7 +878,7 @@ step_1 (int skip_subroutines, int single_inst, const char *count_string)
   thr->set_thread_fsm (std::unique_ptr<thread_fsm> (step_sm));
 
   step_command_fsm_prepare (step_sm, skip_subroutines,
-			    single_inst, count, thr);
+			    single_inst, step_column, count, thr);
 
   /* Do only one step for now, before returning control to the event
      loop.  Let the continuation figure out how many other steps we
@@ -934,7 +954,7 @@ prepare_one_step (thread_info *tp, struct step_command_fsm *sm)
     {
       frame_info_ptr frame = get_current_frame ();
 
-      set_step_frame (tp);
+      set_step_frame (tp, sm->step_column);
 
       if (!sm->single_inst)
 	{
@@ -1334,7 +1354,7 @@ until_next_command (int from_tty)
   struct until_next_fsm *sm;
 
   clear_proceed_status (0);
-  set_step_frame (tp);
+  set_step_frame (tp, false);
 
   frame = get_current_frame ();
 
@@ -1864,7 +1884,7 @@ finish_command (const char *arg, int from_tty)
 	 called by that frame.  We don't use the magic "1" value for
 	 step_range_end, because then infrun will think this is nexti,
 	 and not step over the rest of this inlined function call.  */
-      set_step_info (tp, frame, {});
+      set_step_info (tp, frame, {}, false);
       tp->control.step_range_start = get_frame_pc (frame);
       tp->control.step_range_end = tp->control.step_range_start;
       tp->control.step_over_calls = STEP_OVER_ALL;
@@ -3347,6 +3367,22 @@ Usage: step [N]\n\
 Argument N means step N times (or till program stops for another \
 reason)."));
   add_com_alias ("s", step_cmd, class_run, 1);
+
+  cmd_list_element *nexts_cmd
+    = add_com ("nexts", class_run, nexts_command, _("\
+Step program by statement, proceeding through subroutine calls.\n\
+Usage: next [N]\n\
+Unlike \"steps\", if the current source line calls a subroutine,\n\
+this command does not enter the subroutine, but instead steps over\n\
+the call."));
+  add_com_alias ("ns", nexts_cmd, class_run, 0);
+
+  cmd_list_element *steps_cmd
+    = add_com ("steps", class_run, steps_command, _("\
+Step program until it reaches a different source line or statement.\n\
+Usage: steps [N]\n\
+Argument N means step N times (or till program stops for another reason)."));
+  add_com_alias ("ss", steps_cmd, class_run, 0);
 
   cmd_list_element *until_cmd
     = add_com ("until", class_run, until_command, _("\
