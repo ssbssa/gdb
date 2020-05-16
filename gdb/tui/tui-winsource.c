@@ -67,7 +67,7 @@ tui_display_main ()
 /* See tui-winsource.h.  */
 
 std::string
-tui_copy_source_line (const char **ptr, int *length)
+tui_copy_source_line (const char **ptr, int *length, int *exec_column)
 {
   const char *lineptr = *ptr;
 
@@ -75,6 +75,7 @@ tui_copy_source_line (const char **ptr, int *length)
   std::string result;
 
   int column = 0;
+  int raw_column = 0;
   char c;
   do
     {
@@ -93,6 +94,7 @@ tui_copy_source_line (const char **ptr, int *length)
 
       ++lineptr;
       ++column;
+      ++raw_column;
 
       auto process_tab = [&] ()
 	{
@@ -104,6 +106,12 @@ tui_copy_source_line (const char **ptr, int *length)
 	       column++, j++)
 	    result.push_back (' ');
 	};
+
+      if (exec_column != nullptr && *exec_column == raw_column)
+	{
+	  *exec_column = result.size ();
+	  exec_column = nullptr;
+	}
 
       if (c == '\n' || c == '\r' || c == '\0')
 	{
@@ -134,6 +142,9 @@ tui_copy_source_line (const char **ptr, int *length)
 
   if (length != nullptr)
     *length = column;
+
+  if (exec_column != nullptr)
+    *exec_column = 0;
 
   return result;
 }
@@ -243,7 +254,21 @@ tui_source_window_base::show_source_line (int lineno)
     tui_set_reverse_mode (m_pad.get (), true);
 
   wmove (m_pad.get (), lineno, 0);
-  tui_puts (line->line.c_str (), m_pad.get ());
+  if (line->is_exec_point && line->line_or_addr.loa == LOA_LINE
+      && line->line_or_addr.u.column_no > 0
+      && line->line_or_addr.u.column_no < line->line.size ())
+    {
+      /* Mark the column by disabling the reverse mode for the
+	 corresponding character.  */
+      int column = line->line_or_addr.u.column_no;
+      tui_puts (line->line.substr (0, column).c_str (), m_pad.get ());
+      tui_set_reverse_mode (m_pad.get (), false);
+      tui_puts (line->line.substr (column, 1).c_str (), m_pad.get ());
+      tui_set_reverse_mode (m_pad.get (), true);
+      tui_puts (line->line.substr (column + 1).c_str (), m_pad.get ());
+    }
+  else
+    tui_puts (line->line.c_str (), m_pad.get ());
   if (line->is_exec_point)
     tui_set_reverse_mode (m_pad.get (), false);
 }
@@ -412,6 +437,13 @@ tui_source_window_base::set_is_exec_point_at (struct tui_line_or_address l)
 	{
 	  changed = true;
 	  m_content[i].is_exec_point = new_state;
+          m_content[i].exec_column = l.loa == LOA_LINE ? l.u.column_no : 0;
+	}
+      else if (new_state && m_content[i].is_exec_point && l.loa == LOA_LINE
+	       && m_content[i].exec_column != l.u.column_no)
+	{
+          changed = true;
+          m_content[i].exec_column = l.u.column_no;
 	}
       i++;
     }
