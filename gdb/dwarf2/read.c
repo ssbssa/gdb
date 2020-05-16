@@ -15279,6 +15279,12 @@ new_symbol_file_line (struct die_info *die, struct dwarf2_cu *cu,
   if (attr != nullptr)
     sym->set_line (attr->unsigned_constant ().value_or (0));
 
+  attr = dwarf2_attr (die,
+		      inlined_func ? DW_AT_call_column : DW_AT_decl_column,
+		      cu);
+  if (attr != nullptr)
+    sym->set_column (attr->constant_value (0));
+
   /* Handle DW_AT_call_file / DW_AT_decl_file.  */
   struct dwarf2_cu *file_cu = cu;
   attr = dwarf2_attr (die, inlined_func ? DW_AT_call_file : DW_AT_decl_file,

@@ -147,8 +147,8 @@ struct buildsym_compunit
      existing subfiles).  It can be equal to NAME if NAME follows that rule.  */
   void start_subfile (const char *name, const char *name_for_id);
 
-  void record_line (struct subfile *subfile, int line, unrelocated_addr pc,
-		    linetable_entry_flags flags);
+  void record_line (struct subfile *subfile, int line, int column,
+		    unrelocated_addr pc, linetable_entry_flags flags);
 
   struct compunit_symtab *get_compunit_symtab ()
   {

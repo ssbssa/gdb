@@ -95,6 +95,12 @@ public:
     advance_line (line_delta);
   }
 
+  /* Handle DW_LNS_set_column.  */
+  void handle_set_column (unsigned int column)
+  {
+    m_column = column;
+  }
+
   /* Handle DW_LNS_set_file.  */
   void handle_set_file (file_name_index file);
 
@@ -153,7 +159,8 @@ private:
 
   bool record_line_p ();
   void finish_line ();
-  void record_line_1 (unsigned int line, linetable_entry_flags flags);
+  void record_line_1 (unsigned int line, unsigned int column,
+		      linetable_entry_flags flags);
 
   struct dwarf2_cu *m_cu;
 
@@ -169,6 +176,7 @@ private:
   /* The line table index of the current file.  */
   file_name_index m_file = 1;
   unsigned int m_line = 1;
+  unsigned int m_column = 0;
 
   /* These are initialized in the constructor.  */
 
@@ -193,10 +201,11 @@ private:
   /* When true, record the lines we decode.  */
   bool m_currently_recording_lines = true;
 
-  /* The last line number that was recorded, used to coalesce
-     consecutive entries for the same line.  This can happen, for
+  /* The last line and column numbers that were recorded, used to coalesce
+     consecutive entries for the same line/column.  This can happen, for
      example, when discriminators are present.  PR 17276.  */
   unsigned int m_last_line = 0;
+  unsigned int m_last_column = 0;
   bool m_line_has_non_zero_discriminator = false;
 };
 
@@ -303,6 +312,8 @@ lnp_state_machine::record_line_p ()
     return true;
   if (m_line != m_last_line)
     return true;
+  if (m_column != m_last_column)
+    return true;
   /* Same line for the same file that we've seen already.
      As a last check, for pr 17276, only record the line if the line
      has never had a non-zero discriminator.  */
@@ -311,11 +322,12 @@ lnp_state_machine::record_line_p ()
   return false;
 }
 
-/* Use the CU's builder to record line number LINE with the given
-   flags.  */
+/* Use the CU's builder to record line number LINE and column
+   number COLUMN beginning at address ADDRESS in the line table
+   of subfile SUBFILE.  */
 
 void
-lnp_state_machine::record_line_1 (unsigned int line,
+lnp_state_machine::record_line_1 (unsigned int line, unsigned int column,
 				  linetable_entry_flags flags)
 {
   if (m_currently_recording_lines)
@@ -329,7 +341,7 @@ lnp_state_machine::record_line_1 (unsigned int line,
 		    m_line, lbasename (m_last_subfile->name.c_str ()),
 		    paddress (m_gdbarch, (CORE_ADDR) addr));
 
-      m_builder->record_line (m_last_subfile, line, addr, flags);
+      m_builder->record_line (m_last_subfile, line, column, addr, flags);
     }
 }
 
@@ -350,7 +362,7 @@ lnp_state_machine::finish_line ()
 		  paddress (m_gdbarch, (CORE_ADDR) m_address));
     }
 
-  record_line_1 (0, LEF_IS_STMT);
+  record_line_1 (0, 0, LEF_IS_STMT);
 }
 
 /* Look for an inline block that finishes at ORIGINAL_ADDRESS.  If a block
@@ -494,8 +506,9 @@ lnp_state_machine::record_line (bool end_sequence)
 	  if (record_line_p ())
 	    {
 	      m_last_subfile = m_builder->get_current_subfile ();
-	      record_line_1 (m_line, lte_flags);
+	      record_line_1 (m_line, m_column, lte_flags);
 	      m_last_line = m_line;
+	      m_last_column = m_column;
 	    }
 	}
     }
@@ -727,8 +740,13 @@ dwarf_decode_lines (struct dwarf2_cu *cu, unrelocated_addr lowpc)
 	      }
 	      break;
 	    case DW_LNS_set_column:
-	      (void) read_unsigned_leb128 (abfd, line_ptr, &bytes_read);
-	      line_ptr += bytes_read;
+	      {
+		unsigned int column
+		  = read_unsigned_leb128 (abfd, line_ptr, &bytes_read);
+		line_ptr += bytes_read;
+
+		state_machine.handle_set_column (column);
+	      }
 	      break;
 	    case DW_LNS_negate_stmt:
 	      state_machine.handle_negate_stmt ();
