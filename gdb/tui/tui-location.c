@@ -39,11 +39,13 @@ tui_location_tracker::set_location (struct gdbarch *gdbarch,
   bool location_changed_p = set_fullname (sal.symtab);
   location_changed_p |= procname != m_proc_name;
   location_changed_p |= sal.line != m_line_no;
+  location_changed_p |= sal.column != m_column_no;
   location_changed_p |= sal.pc != m_addr;
   location_changed_p |= gdbarch != m_gdbarch;
 
   m_proc_name = procname;
   m_line_no = sal.line;
+  m_column_no = sal.column;
   m_addr = sal.pc;
   m_gdbarch = gdbarch;
 

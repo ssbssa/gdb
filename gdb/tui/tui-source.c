@@ -116,6 +116,8 @@ tui_source_window::set_contents (struct gdbarch *arch,
 	= (filename_cmp (tui_location.full_name ().c_str (),
 			 symtab_to_fullname (s)) == 0
 	   && cur_line_no == tui_location.line_no ());
+      element->exec_column
+	= element->is_exec_point ? tui_location.column_no () : 0;
 
       m_content[cur_line].line = std::move (text);
 
@@ -221,7 +223,7 @@ tui_source_window::maybe_update (frame_info_ptr fi, symtab_and_line sal)
 
       l.loa = LOA_LINE;
       l.u.line_no = sal.line;
-      set_is_exec_point_at (l);
+      set_is_exec_point_at (l, sal.column);
     }
 }
 

@@ -235,12 +235,13 @@ tui_source_window_base::do_erase_source_content (const char *str)
 /* See tui-winsource.h.  */
 
 void
-tui_source_window_base::puts_to_pad_with_skip (const char *string, int skip)
+tui_source_window_base::puts_to_pad_with_skip (const char *string, int skip, int column)
 {
   gdb_assert (m_pad.get () != nullptr);
   WINDOW *w = m_pad.get ();
+  int c = 1;
 
-  while (skip > 0)
+  while (skip > 0 || column > 0)
     {
       const char *next = strpbrk (string, "\033");
 
@@ -254,20 +255,48 @@ tui_source_window_base::puts_to_pad_with_skip (const char *string, int skip)
 		{
 		  string += skip;
 		  n_chars -= skip;
+		  c += skip;
 		  skip = 0;
 		}
 	      else
 		{
 		  skip -= n_chars;
 		  string += n_chars;
+		  c += n_chars;
 		  n_chars = 0;
 		}
+
+	      if (column > 0 && c > column)
+		column = 0;
+	    }
+
+	  if (column > 0 && c + n_chars > column)
+	    {
+	      if (column > c)
+		{
+		  std::string copy (string, column - c);
+		  tui_puts (copy.c_str (), w);
+		  string += column - c;
+		  n_chars -= column - c;
+		}
+
+	      tui_set_reverse_mode (m_pad.get (), false);
+
+	      tui_puts (std::string (string, 1).c_str (), m_pad.get ());
+	      string++;
+	      n_chars--;
+
+	      tui_set_reverse_mode (m_pad.get (), true);
+
+	      column = 0;
 	    }
 
 	  if (n_chars > 0)
 	    {
 	      std::string copy (string, n_chars);
 	      tui_puts (copy.c_str (), w);
+	      string += n_chars;
+	      c += n_chars;
 	    }
 	}
 
@@ -305,7 +334,8 @@ tui_source_window_base::show_source_line (int lineno)
     tui_set_reverse_mode (m_pad.get (), true);
 
   wmove (m_pad.get (), lineno, 0);
-  puts_to_pad_with_skip (line->line.c_str (), m_pad_offset);
+  puts_to_pad_with_skip (line->line.c_str (), m_pad_offset,
+			 line->is_exec_point ? line->exec_column : 0);
 
   if (line->is_exec_point)
     tui_set_reverse_mode (m_pad.get (), false);
@@ -558,7 +588,8 @@ tui_source_window_base::do_scroll_horizontal (int num_to_scroll)
    line_no.  */
 
 void
-tui_source_window_base::set_is_exec_point_at (struct tui_line_or_address l)
+tui_source_window_base::set_is_exec_point_at (struct tui_line_or_address l,
+					      int column_no)
 {
   bool changed = false;
   int i;
@@ -580,6 +611,13 @@ tui_source_window_base::set_is_exec_point_at (struct tui_line_or_address l)
 	{
 	  changed = true;
 	  m_content[i].is_exec_point = new_state;
+          m_content[i].exec_column = l.loa == LOA_LINE ? column_no : 0;
+	}
+      else if (new_state && m_content[i].is_exec_point && l.loa == LOA_LINE
+	       && m_content[i].exec_column != column_no)
+	{
+          changed = true;
+          m_content[i].exec_column = column_no;
 	}
       i++;
     }
