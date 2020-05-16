@@ -75,6 +75,7 @@ struct tui_source_element
     : line (std::move (other.line)),
       line_or_addr (other.line_or_addr),
       is_exec_point (other.is_exec_point),
+      exec_column (other.exec_column),
       break_mode (other.break_mode)
   {
   }
@@ -82,6 +83,7 @@ struct tui_source_element
   std::string line;
   struct tui_line_or_address line_or_addr;
   bool is_exec_point = false;
+  int exec_column = 0;
   tui_bp_flags break_mode = 0;
 };
 
@@ -142,7 +144,7 @@ public:
   void refill ();
 
   /* Set the location of the execution point.  */
-  void set_is_exec_point_at (struct tui_line_or_address l);
+  void set_is_exec_point_at (struct tui_line_or_address l, int column_no);
 
   void update_tab_width () override;
 
@@ -227,8 +229,10 @@ private:
 
      "\033[31mDEFGHIJKLM\033[0m"
 
-     the initial escape that sets the color will still be applied.  */
-  void puts_to_pad_with_skip (const char *string, int skip);
+     the initial escape that sets the color will still be applied.
+
+     If COLUMN is set, mark the printable character on this position.  */
+  void puts_to_pad_with_skip (const char *string, int skip, int column);
 
   /* Called when the user "set style enabled" setting is changed.  */
   void style_changed ();
