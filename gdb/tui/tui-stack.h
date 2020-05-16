@@ -73,6 +73,7 @@ struct tui_locator_window : public tui_win_info
   std::string full_name;
   std::string proc_name;
   int line_no = 0;
+  int column_no = 0;
   CORE_ADDR addr = 0;
   /* Architecture associated with code at this location.  */
   struct gdbarch *gdbarch = nullptr;

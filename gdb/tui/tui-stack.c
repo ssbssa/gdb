@@ -274,12 +274,14 @@ tui_locator_window::set_locator_info (struct gdbarch *gdbarch_in,
 
   locator_changed_p |= proc_name != procname;
   locator_changed_p |= sal.line != line_no;
+  locator_changed_p |= sal.column != column_no;
   locator_changed_p |= sal.pc != addr;
   locator_changed_p |= gdbarch_in != gdbarch;
   locator_changed_p |= full_name != fullname;
 
   proc_name = procname;
   line_no = sal.line;
+  column_no = sal.column;
   addr = sal.pc;
   gdbarch = gdbarch_in;
   set_locator_fullname (fullname);
