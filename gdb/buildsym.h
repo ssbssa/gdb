@@ -239,8 +239,8 @@ struct buildsym_compunit
 
   const char *pop_subfile ();
 
-  void record_line (struct subfile *subfile, int line, CORE_ADDR pc,
-		    linetable_entry_flags flags);
+  void record_line (struct subfile *subfile, int line, int column,
+		    CORE_ADDR pc, linetable_entry_flags flags);
 
   struct compunit_symtab *get_compunit_symtab ()
   {
