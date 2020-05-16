@@ -19988,6 +19988,12 @@ public:
     advance_line (line_delta);
   }
 
+  /* Handle DW_LNS_set_column.  */
+  void handle_set_column (unsigned int column)
+  {
+    m_column = column;
+  }
+
   /* Handle DW_LNS_set_file.  */
   void handle_set_file (file_name_index file);
 
@@ -20051,6 +20057,7 @@ private:
   /* The line table index of the current file.  */
   file_name_index m_file = 1;
   unsigned int m_line = 1;
+  unsigned int m_column = 0;
 
   /* These are initialized in the constructor.  */
 
@@ -20078,10 +20085,11 @@ private:
   /* When true, record the lines we decode.  */
   bool m_currently_recording_lines = false;
 
-  /* The last line number that was recorded, used to coalesce
-     consecutive entries for the same line.  This can happen, for
+  /* The last line and column numbers that were recorded, used to coalesce
+     consecutive entries for the same line/column.  This can happen, for
      example, when discriminators are present.  PR 17276.  */
   unsigned int m_last_line = 0;
+  unsigned int m_last_column = 0;
   bool m_line_has_non_zero_discriminator = false;
 };
 
@@ -20181,12 +20189,15 @@ lnp_state_machine::handle_const_add_pc ()
 static int
 dwarf_record_line_p (struct dwarf2_cu *cu,
 		     unsigned int line, unsigned int last_line,
+		     unsigned int column, unsigned int last_column,
 		     int line_has_non_zero_discriminator,
 		     struct subfile *last_subfile)
 {
   if (cu->get_builder ()->get_current_subfile () != last_subfile)
     return 1;
   if (line != last_line)
+    return 1;
+  if (column != last_column)
     return 1;
   /* Same line for the same file that we've seen already.
      As a last check, for pr 17276, only record the line if the line
@@ -20196,12 +20207,13 @@ dwarf_record_line_p (struct dwarf2_cu *cu,
   return 0;
 }
 
-/* Use the CU's builder to record line number LINE beginning at
-   address ADDRESS in the line table of subfile SUBFILE.  */
+/* Use the CU's builder to record line number LINE and column
+   number COLUMN beginning at address ADDRESS in the line table
+   of subfile SUBFILE.  */
 
 static void
 dwarf_record_line_1 (struct gdbarch *gdbarch, struct subfile *subfile,
-		     unsigned int line, CORE_ADDR address,
+		     unsigned int line, unsigned int column, CORE_ADDR address,
 		     linetable_entry_flags flags,
 		     struct dwarf2_cu *cu)
 {
@@ -20216,7 +20228,7 @@ dwarf_record_line_1 (struct gdbarch *gdbarch, struct subfile *subfile,
     }
 
   if (cu != nullptr)
-    cu->get_builder ()->record_line (subfile, line, addr, flags);
+    cu->get_builder ()->record_line (subfile, line, column, addr, flags);
 }
 
 /* Subroutine of dwarf_decode_lines_1 to simplify it.
@@ -20239,7 +20251,7 @@ dwarf_finish_line (struct gdbarch *gdbarch, struct subfile *subfile,
 		  paddress (gdbarch, address));
     }
 
-  dwarf_record_line_1 (gdbarch, subfile, 0, address, LEF_IS_STMT, cu);
+  dwarf_record_line_1 (gdbarch, subfile, 0, 0, address, LEF_IS_STMT, cu);
 }
 
 void
@@ -20303,17 +20315,19 @@ lnp_state_machine::record_line (bool end_sequence)
 	    lte_flags |= LEF_IS_STMT;
 
 	  if (dwarf_record_line_p (m_cu, m_line, m_last_line,
+				   m_column, m_last_column,
 				   m_line_has_non_zero_discriminator,
 				   m_last_subfile))
 	    {
 	      buildsym_compunit *builder = m_cu->get_builder ();
 	      dwarf_record_line_1 (m_gdbarch,
 				   builder->get_current_subfile (),
-				   m_line, m_address, lte_flags,
+				   m_line, m_column, m_address, lte_flags,
 				   m_currently_recording_lines ? m_cu : nullptr);
 	    }
 	  m_last_subfile = m_cu->get_builder ()->get_current_subfile ();
 	  m_last_line = m_line;
+	  m_last_column = m_column;
 	}
     }
 
@@ -20538,8 +20552,13 @@ dwarf_decode_lines_1 (struct line_header *lh, struct dwarf2_cu *cu,
 	      }
 	      break;
 	    case DW_LNS_set_column:
-	      (void) read_unsigned_leb128 (abfd, line_ptr, &bytes_read);
-	      line_ptr += bytes_read;
+	      {
+		unsigned int column
+		  = read_unsigned_leb128 (abfd, line_ptr, &bytes_read);
+		line_ptr += bytes_read;
+
+		state_machine.handle_set_column (column);
+	      }
 	      break;
 	    case DW_LNS_negate_stmt:
 	      state_machine.handle_negate_stmt ();
@@ -20832,6 +20851,12 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 			  cu);
       if (attr != nullptr)
 	sym->set_line (attr->constant_value (0));
+
+      attr = dwarf2_attr (die,
+			  inlined_func ? DW_AT_call_column : DW_AT_decl_column,
+			  cu);
+      if (attr != nullptr)
+	sym->set_column (attr->constant_value (0));
 
       attr = dwarf2_attr (die,
 			  inlined_func ? DW_AT_call_file : DW_AT_decl_file,
