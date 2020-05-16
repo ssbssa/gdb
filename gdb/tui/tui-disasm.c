@@ -517,7 +517,7 @@ tui_disasm_window::maybe_update (frame_info_ptr fi, symtab_and_line sal)
   else
     {
       a.u.addr = sal.pc;
-      set_is_exec_point_at (a);
+      set_is_exec_point_at (a, 0);
     }
 }
 
