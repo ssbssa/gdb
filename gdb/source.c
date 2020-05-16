@@ -1311,11 +1311,16 @@ symtab_to_filename_for_display (struct symtab *symtab)
 
 static void
 print_source_lines_base (struct symtab *s, int line, int stopline,
-			 print_source_lines_flags flags)
+			 print_source_lines_flags flags,
+			 int *column_pos = nullptr)
 {
   bool noprint = false;
   int nlines = stopline - line;
   struct ui_out *uiout = current_uiout;
+
+  int column_in = column_pos != nullptr ? *column_pos : 0;
+  if (column_pos != nullptr)
+    *column_pos = 0;
 
   /* Regardless of whether we can open the file, set current_source_symtab.  */
   current_source_location *loc
@@ -1424,8 +1429,11 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	  uiout->text (":");
 	}
       xsnprintf (buf, sizeof (buf), "%d\t", new_lineno++);
+      int printed = strlen (buf);
+      printed = ((printed >> 3) + 1) << 3;
       uiout->text (buf);
 
+      int column = 0;
       while (*iter != '\0')
 	{
 	  /* Find a run of characters that can be emitted at once.
@@ -1437,6 +1445,24 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	      int skip_bytes;
 
 	      char c = *iter;
+	      if (c != '\033')
+		{
+		  column++;
+		  if (column_pos != nullptr && column_in == column)
+		    {
+		      *column_pos = printed;
+		      column_pos = nullptr;
+		    }
+
+		  if (c == '\t')
+		    printed = ((printed >> 3) + 1) << 3;
+		  else if (c >= 0 && c < 040)
+		    printed += 2;
+		  else if (c == 0177)
+		    printed += 2;
+		  else
+		    printed++;
+		}
 	      if (c == '\033' && skip_ansi_escape (iter, &skip_bytes))
 		iter += skip_bytes;
 	      else if (c >= 0 && c < 040 && c != '\t')
@@ -1500,6 +1526,14 @@ print_source_lines (struct symtab *s, source_lines_range line_range,
 {
   print_source_lines_base (s, line_range.startline (),
 			   line_range.stopline (), flags);
+}
+
+/* See source.h.  */
+
+void
+print_source_line_column (struct symtab *s, int line, int &column)
+{
+  print_source_lines_base (s, line, line + 1, 0, &column);
 }
 
 
