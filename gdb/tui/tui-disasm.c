@@ -514,7 +514,7 @@ tui_disasm_window::maybe_update (struct gdbarch *gdbarch, symtab_and_line sal)
   else
     {
       a.u.addr = sal.pc;
-      set_is_exec_point_at (a);
+      set_is_exec_point_at (a, 0);
     }
 }
 

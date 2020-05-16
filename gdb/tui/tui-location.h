@@ -58,6 +58,10 @@ struct tui_location_tracker
   int line_no () const
   { return m_line_no; }
 
+  /* Return the column number for the current location.  */
+  int column_no () const
+  { return m_column_no; }
+
 private:
 
   /* Update M_FULL_NAME from SYMTAB.   Return true if M_FULL_NAME actually
@@ -72,6 +76,9 @@ private:
 
   /* The line number for the current location.  */
   int m_line_no = 0;
+
+  /* The column number for the current location.  */
+  int m_column_no = 0;
 
   /* The address of the current location.  */
   CORE_ADDR m_addr = 0;
