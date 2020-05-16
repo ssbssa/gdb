@@ -977,6 +977,7 @@ maintenance_print_one_line_table (struct symtab *symtab, void *data)
       ui_out_emit_table table_emitter (uiout, 8, -1, "line-table");
       uiout->table_header (6, ui_left, "index", _("INDEX"));
       uiout->table_header (6, ui_left, "line", _("LINE"));
+      uiout->table_header (6, ui_left, "column", _("COLUMN"));
       uiout->table_header (18, ui_left, "rel-address", _("REL-ADDRESS"));
       uiout->table_header (18, ui_left, "unrel-address", _("UNREL-ADDRESS"));
       uiout->table_header (7, ui_left, "is-stmt", _("IS-STMT"));
@@ -996,6 +997,10 @@ maintenance_print_one_line_table (struct symtab *symtab, void *data)
 	    uiout->field_signed ("line", item->line);
 	  else
 	    uiout->field_string ("line", _("END"));
+	  if (item->column > 0)
+	    uiout->field_signed ("column", item->column);
+	  else
+	    uiout->field_string ("column", "");
 	  uiout->field_core_addr ("rel-address", objfile->arch (),
 				  item->pc (objfile));
 	  uiout->field_core_addr ("unrel-address", objfile->arch (),
