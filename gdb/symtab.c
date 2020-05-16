@@ -78,7 +78,7 @@
 
 static void rbreak_command (const char *, int);
 
-static int find_line_common (const linetable *, int, int *, int);
+static int find_line_common (const linetable *, int, int, int *, int);
 
 static struct block_symbol
   lookup_symbol_aux (const char *name,
@@ -3351,7 +3351,7 @@ find_line_symtab (struct symtab *sym_tab, int line,
   /* First try looking it up in the given symtab.  */
   best_linetable = sym_tab->linetable ();
   best_symtab = sym_tab;
-  best_index = find_line_common (best_linetable, line, &exact, 0);
+  best_index = find_line_common (best_linetable, line, 0, &exact, 0);
   if (best_index < 0 || !exact)
     {
       /* Didn't find an exact match.  So we better keep looking for
@@ -3389,7 +3389,7 @@ find_line_symtab (struct symtab *sym_tab, int line,
 				    symtab_to_fullname (s)) != 0)
 		    continue;	
 		  l = s->linetable ();
-		  ind = find_line_common (l, line, &exact, 0);
+		  ind = find_line_common (l, line, 0, &exact, 0);
 		  if (ind >= 0)
 		    {
 		      if (exact)
@@ -3423,16 +3423,16 @@ done:
   return best_symtab;
 }
 
-/* Given SYMTAB, returns all the PCs function in the symtab that
-   exactly match LINE.  Returns an empty vector if there are no exact
-   matches, but updates BEST_ITEM in this case.  */
+/* Given SYMTAB, returns all the PCs and columns in the symtab that
+   exactly match LINE (and COLUMN, if specified).  Returns an empty vector
+   if there are no exact matches, but updates BEST_ITEM in this case.  */
 
-std::vector<CORE_ADDR>
-find_pcs_for_symtab_line (struct symtab *symtab, int line,
-			  const linetable_entry **best_item)
+std::vector<std::pair<CORE_ADDR, int>>
+find_pcs_and_cols_for_symtab_line (struct symtab *symtab, int line, int column,
+				   const linetable_entry **best_item)
 {
   int start = 0;
-  std::vector<CORE_ADDR> result;
+  std::vector<std::pair<CORE_ADDR, int>> result;
   struct objfile *objfile = symtab->compunit ()->objfile ();
 
   /* First, collect all the PCs that are at this line.  */
@@ -3441,8 +3441,8 @@ find_pcs_for_symtab_line (struct symtab *symtab, int line,
       int was_exact;
       int idx;
 
-      idx = find_line_common (symtab->linetable (), line, &was_exact,
-			      start);
+      idx = find_line_common (symtab->linetable (), line, column,
+			      &was_exact, start);
       if (idx < 0)
 	break;
 
@@ -3457,7 +3457,8 @@ find_pcs_for_symtab_line (struct symtab *symtab, int line,
 	  break;
 	}
 
-      result.push_back (symtab->linetable ()->item[idx].pc (objfile));
+      result.push_back ({symtab->linetable ()->item[idx].pc (objfile),
+			symtab->linetable ()->item[idx].column});
       start = idx + 1;
     }
 
@@ -3531,13 +3532,15 @@ find_line_pc_range (struct symtab_and_line sal, CORE_ADDR *startptr,
 
 /* Given a line table and a line number, return the index into the line
    table for the pc of the nearest line whose number is >= the specified one.
+   If a column number is also given, return the index of the exact line and
+   nearest column whose number is >= the specified one.
    Return -1 if none is found.  The value is >= 0 if it is an index.
    START is the index at which to start searching the line table.
 
    Set *EXACT_MATCH nonzero if the value returned is an exact match.  */
 
 static int
-find_line_common (const linetable *l, int lineno,
+find_line_common (const linetable *l, int lineno, int columnno,
 		  int *exact_match, int start)
 {
   int i;
@@ -3549,6 +3552,7 @@ find_line_common (const linetable *l, int lineno,
 
   int best_index = -1;
   int best = 0;
+  int bestcol = 0;
 
   *exact_match = 0;
 
@@ -3566,7 +3570,8 @@ find_line_common (const linetable *l, int lineno,
       if (!item->is_stmt)
 	continue;
 
-      if (item->line == lineno)
+      if (item->line == lineno
+	  && (columnno == 0 || item->column == columnno))
 	{
 	  /* Return the first (lowest address) entry which matches.  */
 	  *exact_match = 1;
@@ -3576,6 +3581,14 @@ find_line_common (const linetable *l, int lineno,
       if (item->line > lineno && (best == 0 || item->line < best))
 	{
 	  best = item->line;
+	  best_index = i;
+	}
+      else if (columnno != 0 && item->line == lineno
+	       && item->column > columnno
+	       && (best == 0 || item->line < best || item->column < bestcol))
+	{
+	  best = item->line;
+	  bestcol = item->column;
 	  best_index = i;
 	}
     }
