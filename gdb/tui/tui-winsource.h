@@ -37,7 +37,11 @@ struct tui_line_or_address
   enum tui_line_or_address_kind loa;
   union
     {
-      int line_no;
+      struct
+	{
+	  int line_no;
+	  int column_no;
+	};
       CORE_ADDR addr;
     } u;
 };
@@ -75,6 +79,7 @@ struct tui_source_element
     : line (std::move (other.line)),
       line_or_addr (other.line_or_addr),
       is_exec_point (other.is_exec_point),
+      exec_column (other.exec_column),
       break_mode (other.break_mode)
   {
   }
@@ -82,6 +87,7 @@ struct tui_source_element
   std::string line;
   struct tui_line_or_address line_or_addr;
   bool is_exec_point = false;
+  int exec_column = 0;
   tui_bp_flags break_mode = 0;
 };
 
@@ -291,10 +297,13 @@ extern void tui_update_source_windows_with_line (struct symtab_and_line sal);
    line.  If LENGTH is non-NULL, then the length of the line is stored
    there.  Escape sequences are not counted against the length.
    Actually an approximation is used -- each byte of a multi-byte
-   sequence counts as a character here.  */
+   sequence counts as a character here.
+   If EXEC_COLUMN is supplied, it is updated to the position of the
+   specified colum in the returned string.  */
 
 extern std::string tui_copy_source_line (const char **ptr,
-					 int *length = nullptr);
+					 int *length = nullptr,
+					 int *exec_column = nullptr);
 
 /* Constant definitions. */
 #define SCROLL_THRESHOLD 2	/* Threshold for lazy scroll.  */
