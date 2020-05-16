@@ -315,6 +315,7 @@ public:
   thread_suspend_state suspend;
 
   int current_line = 0;
+  int current_column = 0;
   struct symtab *current_symtab = NULL;
 
   /* Internal stepping state.  */
