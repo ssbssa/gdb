@@ -1223,6 +1223,16 @@ struct symbol : public general_symbol_info, public allocate_on_obstack
     m_line = line;
   }
 
+  unsigned short column () const
+  {
+    return m_column;
+  }
+
+  void set_column (unsigned short column)
+  {
+    m_column = column;
+  }
+
   /* Data type of value */
 
   struct type *m_type = nullptr;
@@ -1291,6 +1301,10 @@ struct symbol : public general_symbol_info, public allocate_on_obstack
      generated programs?  */
 
   unsigned short m_line = 0;
+
+  /* Column number of this symbol's definition.  */
+
+  unsigned short m_column = 0;
 
   /* An arbitrary data pointer, allowing symbol readers to record
      additional information on a per-symbol basis.  Note that this data
@@ -1394,6 +1408,9 @@ struct linetable_entry
 {
   /* The line number for this entry.  */
   int line;
+
+  /* The column number for this entry.  */
+  int column;
 
   /* True if this PC is a good location to place a breakpoint for LINE.  */
   unsigned is_stmt : 1;
@@ -2122,6 +2139,9 @@ struct symtab_and_line
      0 is never a valid line number; it is used to indicate that line number
      information is not available.  */
   int line = 0;
+  /* Column number.  0 is never a valid column number; it is used to
+     indicate that column number information is not available.  */
+  int column = 0;
 
   CORE_ADDR pc = 0;
   CORE_ADDR end = 0;

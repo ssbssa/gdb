@@ -2703,6 +2703,7 @@ find_frame_sal (frame_info *frame)
 	{
 	  sal.symtab = symbol_symtab (sym);
 	  sal.line = sym->line ();
+	  sal.column = sym->column ();
 	}
       else
 	/* If the symbol does not have a location, we don't know where
