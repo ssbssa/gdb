@@ -4052,7 +4052,7 @@ decode_digits_ordinary (struct linespec_state *self,
   std::vector<symtab_and_line> sals;
   for (const auto &elt : ls->file_symtabs)
     {
-      std::vector<CORE_ADDR> pcs;
+      std::vector<std::pair<CORE_ADDR, int>> pcs_and_cols;
 
       /* The logic above should ensure this.  */
       gdb_assert (elt != NULL);
@@ -4060,15 +4060,16 @@ decode_digits_ordinary (struct linespec_state *self,
       program_space *pspace = elt->compunit ()->objfile ()->pspace;
       set_current_program_space (pspace);
 
-      pcs = find_pcs_for_symtab_line (elt, line, best_entry);
-      for (CORE_ADDR pc : pcs)
+      pcs_and_cols
+	= find_pcs_and_cols_for_symtab_line (elt, line, 0, best_entry);
+      for (const auto &pc_and_col : pcs_and_cols)
 	{
 	  symtab_and_line sal;
 	  sal.pspace = pspace;
 	  sal.symtab = elt;
 	  sal.line = line;
 	  sal.explicit_line = true;
-	  sal.pc = pc;
+	  sal.pc = pc_and_col.first;
 	  sals.push_back (std::move (sal));
 	}
     }

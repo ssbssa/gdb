@@ -24,6 +24,8 @@ struct linetable_entry_object {
   PyObject_HEAD
   /* The line table source line.  */
   int line;
+  /* The line table source column.  */
+  int column;
   /* The pc associated with the source line.  */
   CORE_ADDR pc;
 };
@@ -99,7 +101,7 @@ symtab_to_linetable_object (PyObject *symtab)
    and an address.  */
 
 static PyObject *
-build_linetable_entry (int line, CORE_ADDR address)
+build_linetable_entry (int line, int column, CORE_ADDR address)
 {
   linetable_entry_object *obj;
 
@@ -108,6 +110,7 @@ build_linetable_entry (int line, CORE_ADDR address)
   if (obj != NULL)
     {
       obj->line = line;
+      obj->column = column;
       obj->pc = address;
     }
 
@@ -121,22 +124,24 @@ build_linetable_entry (int line, CORE_ADDR address)
    address.  */
 
 static PyObject *
-build_line_table_tuple_from_pcs (int line, const std::vector<CORE_ADDR> &pcs)
+build_line_table_tuple_from_pcs (int line,
+				 const std::vector<std::pair<CORE_ADDR, int>> &pcs_and_cols)
 {
   int i;
 
-  if (pcs.size () < 1)
+  if (pcs_and_cols.size () < 1)
     Py_RETURN_NONE;
 
-  gdbpy_ref<> tuple (PyTuple_New (pcs.size ()));
+  gdbpy_ref<> tuple (PyTuple_New (pcs_and_cols.size ()));
 
   if (tuple == NULL)
     return NULL;
 
-  for (i = 0; i < pcs.size (); ++i)
+  for (i = 0; i < pcs_and_cols.size (); ++i)
     {
-      CORE_ADDR pc = pcs[i];
-      gdbpy_ref<> obj (build_linetable_entry (line, pc));
+      CORE_ADDR pc = pcs_and_cols[i].first;
+      gdbpy_ref<> obj (build_linetable_entry (line, pcs_and_cols[i].second,
+					      pc));
 
       if (obj == NULL)
 	return NULL;
@@ -157,7 +162,7 @@ ltpy_get_pcs_for_line (PyObject *self, PyObject *args)
   struct symtab *symtab;
   gdb_py_longest py_line;
   struct linetable_entry *best_entry = NULL;
-  std::vector<CORE_ADDR> pcs;
+  std::vector<std::pair<CORE_ADDR, int>> pcs_and_cols;
 
   LTPY_REQUIRE_VALID (self, symtab);
 
@@ -166,14 +171,15 @@ ltpy_get_pcs_for_line (PyObject *self, PyObject *args)
 
   try
     {
-      pcs = find_pcs_for_symtab_line (symtab, py_line, &best_entry);
+      pcs_and_cols
+	= find_pcs_and_cols_for_symtab_line (symtab, py_line, 0, &best_entry);
     }
   catch (const gdb_exception &except)
     {
       GDB_PY_HANDLE_EXCEPTION (except);
     }
 
-  return build_line_table_tuple_from_pcs (py_line, pcs);
+  return build_line_table_tuple_from_pcs (py_line, pcs_and_cols);
 }
 
 /* Implementation of gdb.LineTable.has_line (self, line) -> Boolean.
@@ -339,6 +345,17 @@ ltpy_entry_get_pc (PyObject *self, void *closure)
   return gdb_py_object_from_ulongest (obj->pc).release ();
 }
 
+/* Implementation of gdb.LineTableEntry.column (self) -> Long.  Returns
+   a long integer associated with the line table entry.  */
+
+static PyObject *
+ltpy_entry_get_column (PyObject *self, void *closure)
+{
+  linetable_entry_object *obj = (linetable_entry_object *) self;
+
+  return gdb_py_object_from_longest (obj->column).release ();
+}
+
 /* LineTable iterator functions.  */
 
 /* Return a new line table iterator.  */
@@ -422,7 +439,7 @@ ltpy_iternext (PyObject *self)
       item = &(symtab->linetable ()->item[iter_obj->current_index]);
     }
 
-  obj = build_linetable_entry (item->line, item->pc);
+  obj = build_linetable_entry (item->line, item->column, item->pc);
   iter_obj->current_index++;
 
   return obj;
@@ -548,6 +565,8 @@ static gdb_PyGetSetDef linetable_entry_object_getset[] = {
     "The line number in the source file.", NULL },
   { "pc", ltpy_entry_get_pc, NULL,
     "The memory address for this line number.", NULL },
+  { "column", ltpy_entry_get_column, NULL,
+    "The column number in the source file.", NULL },
   { NULL }  /* Sentinel */
 };
 
