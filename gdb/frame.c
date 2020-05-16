@@ -2894,6 +2894,7 @@ find_frame_sal (const frame_info_ptr &frame)
 	{
 	  sal.symtab = sym->symtab ();
 	  sal.line = sym->line ();
+	  sal.column = sym->column ();
 	}
       else
 	/* If the symbol does not have a location, we don't know where
