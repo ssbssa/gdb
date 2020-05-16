@@ -205,7 +205,8 @@ extern int stepping_past_nonsteppable_watchpoint (void);
 /* Record in TP the frame and location we're currently stepping through.  */
 extern void set_step_info (thread_info *tp,
 			   frame_info_ptr frame,
-			   struct symtab_and_line sal);
+			   struct symtab_and_line sal,
+			   bool step_column);
 
 /* Several print_*_reason helper functions to print why the inferior
    has stopped to the passed in UIOUT.  */
