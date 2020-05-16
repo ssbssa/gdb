@@ -23,6 +23,8 @@ struct linetable_entry_object : public PyObject
 {
   /* The line table source line.  */
   int line;
+  /* The line table source column.  */
+  int column;
   /* The pc associated with the source line.  */
   CORE_ADDR pc;
 };
@@ -101,7 +103,7 @@ symtab_to_linetable_object (PyObject *symtab)
    and an address.  */
 
 static PyObject *
-build_linetable_entry (int line, CORE_ADDR address)
+build_linetable_entry (int line, int column, CORE_ADDR address)
 {
   linetable_entry_object *obj;
 
@@ -110,6 +112,7 @@ build_linetable_entry (int line, CORE_ADDR address)
   if (obj != NULL)
     {
       obj->line = line;
+      obj->column = column;
       obj->pc = address;
     }
 
@@ -141,7 +144,7 @@ build_line_table_tuple_from_entries
     {
       auto entry = entries[i];
       gdbpy_ref<> obj (build_linetable_entry
-			(entry->line, entry->pc (objfile)));
+			(entry->line, entry->column, entry->pc (objfile)));
 
       if (obj == NULL)
 	return NULL;
@@ -171,7 +174,7 @@ ltpy_get_pcs_for_line (PyObject *self, PyObject *args)
 
   try
     {
-      entries = find_linetable_entries_for_symtab_line (symtab, py_line,
+      entries = find_linetable_entries_for_symtab_line (symtab, py_line, 0,
 							&best_entry);
     }
   catch (const gdb_exception &except)
@@ -329,6 +332,17 @@ ltpy_entry_get_pc (PyObject *self, void *closure)
   return gdb_py_object_from_ulongest (obj->pc).release ();
 }
 
+/* Implementation of gdb.LineTableEntry.column (self) -> Long.  Returns
+   a long integer associated with the line table entry.  */
+
+static PyObject *
+ltpy_entry_get_column (PyObject *self, void *closure)
+{
+  linetable_entry_object *obj = (linetable_entry_object *) self;
+
+  return gdb_py_object_from_longest (obj->column).release ();
+}
+
 /* LineTable iterator functions.  */
 
 /* Return a new line table iterator.  */
@@ -414,7 +428,7 @@ ltpy_iternext (PyObject *self)
     }
 
   struct objfile *objfile = symtab->compunit ().objfile ();
-  obj = build_linetable_entry (item->line, item->pc (objfile));
+  obj = build_linetable_entry (item->line, item->column, item->pc (objfile));
   iter_obj->current_index++;
 
   return obj;
@@ -542,6 +556,8 @@ static gdb_PyGetSetDef linetable_entry_object_getset[] = {
     "The line number in the source file.", NULL },
   { "pc", ltpy_entry_get_pc, NULL,
     "The memory address for this line number.", NULL },
+  { "column", ltpy_entry_get_column, NULL,
+    "The column number in the source file.", NULL },
   { NULL }  /* Sentinel */
 };
 

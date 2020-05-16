@@ -3977,7 +3977,7 @@ decode_digits_ordinary (struct linespec_state *self,
       program_space *pspace = objfile->pspace ();
       set_current_program_space (pspace);
 
-      pcs = find_linetable_entries_for_symtab_line (elt, line, best_entry);
+      pcs = find_linetable_entries_for_symtab_line (elt, line, 0, best_entry);
       for (auto linetable_entry : pcs)
 	{
 	  symtab_and_line sal;

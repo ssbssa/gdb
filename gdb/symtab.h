@@ -2821,7 +2821,8 @@ void for_each_symtab (program_space *pspace, const char *name,
 using find_symtab_callback_ftype = std::function<bool (symtab *)>;
 
 std::vector<const linetable_entry *> find_linetable_entries_for_symtab_line
-    (struct symtab *symtab, int line, const linetable_entry **best_entry);
+    (struct symtab *symtab, int line, int column,
+     const linetable_entry **best_entry);
 
 /* Callback type for function for_each_symbol.  */
 
