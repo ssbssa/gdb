@@ -91,22 +91,28 @@ tui_source_window::set_contents (struct gdbarch *arch,
     {
       struct tui_source_element *element = &m_content[cur_line];
 
-      std::string text;
-      if (*iter != '\0')
-	{
-	  int line_len;
-	  text = tui_copy_source_line (&iter, &line_len);
-	  m_max_length = std::max (m_max_length, line_len);
-	}
-
       /* Set whether element is the execution point
 	 and whether there is a break point on it.  */
       element->line_or_addr.loa = LOA_LINE;
       element->line_or_addr.u.line_no = cur_line_no;
+      element->line_or_addr.u.column_no = 0;
       element->is_exec_point
 	= (filename_cmp (tui_location.full_name ().c_str (),
 			 symtab_to_fullname (s)) == 0
 	   && cur_line_no == tui_location.line_no ());
+      element->exec_column
+	= element->is_exec_point ? tui_location.column_no () : 0;
+
+      std::string text;
+      int column = element->exec_column;
+      if (*iter != '\0')
+	{
+	  int line_len;
+	  text = tui_copy_source_line (&iter, &line_len, &column);
+	  m_max_length = std::max (m_max_length, line_len);
+	}
+      if (element->is_exec_point)
+	element->line_or_addr.u.column_no = column;
 
       m_content[cur_line].line = std::move (text);
 
@@ -212,6 +218,7 @@ tui_source_window::maybe_update (frame_info_ptr fi, symtab_and_line sal)
 
       l.loa = LOA_LINE;
       l.u.line_no = sal.line;
+      l.u.column_no = sal.column;
       set_is_exec_point_at (l);
     }
 }
