@@ -1260,12 +1260,17 @@ symtab_to_filename_for_display (struct symtab *symtab)
 
 static void
 print_source_lines_base (struct symtab *s, int line, int stopline,
-			 print_source_lines_flags flags)
+			 print_source_lines_flags flags,
+			 int *column_pos = nullptr)
 {
   bool noprint = false;
   int errcode = ENOENT;
   int nlines = stopline - line;
   struct ui_out *uiout = current_uiout;
+
+  int column_in = column_pos != nullptr ? *column_pos : 0;
+  if (column_pos != nullptr)
+    *column_pos = 0;
 
   /* Regardless of whether we can open the file, we'll want to set
      current_source_symtab, but not if throw an error, or return without
@@ -1356,6 +1361,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	     !last_lineno.has_value () ? 0 : last_lineno.value ());
     }
 
+  char buf[20];
   const char *iter = lines.c_str ();
   int new_lineno = line;
   for (; nlines-- > 0 && *iter != '\0'; ++new_lineno)
@@ -1370,7 +1376,11 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 
       uiout->message ("%ps\t", styled_string (line_number_style.style (),
 					      pulongest (new_lineno)));
+      xsnprintf (buf, sizeof (buf), "%d\t", new_lineno);
+      int printed = strlen (buf);
+      printed = ((printed >> 3) + 1) << 3;
 
+      int column = 0;
       while (*iter != '\0')
 	{
 	  /* Find a run of characters that can be emitted at once.
@@ -1382,6 +1392,24 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	      int skip_bytes;
 
 	      char c = *iter;
+	      if (c != '\033')
+		{
+		  column++;
+		  if (column_pos != nullptr && column_in == column)
+		    {
+		      *column_pos = printed;
+		      column_pos = nullptr;
+		    }
+
+		  if (c == '\t')
+		    printed = ((printed >> 3) + 1) << 3;
+		  else if (c >= 0 && c < 040)
+		    printed += 2;
+		  else if (c == 0177)
+		    printed += 2;
+		  else
+		    printed++;
+		}
 	      if (c == '\033' && skip_ansi_escape (iter, &skip_bytes))
 		iter += skip_bytes;
 	      else if (c >= 0 && c < 040 && c != '\t')
@@ -1411,8 +1439,6 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	    }
 	  else if (*iter > 0 && *iter < 040)
 	    {
-	      char buf[20];
-
 	      xsnprintf (buf, sizeof (buf), "^%c", *iter + 0100);
 	      uiout->text (buf);
 	      ++iter;
@@ -1451,6 +1477,14 @@ print_source_lines (struct symtab *s, source_lines_range line_range,
 {
   print_source_lines_base (s, line_range.startline (),
 			   line_range.stopline (), flags);
+}
+
+/* See source.h.  */
+
+void
+print_source_line_column (struct symtab *s, int line, int &column)
+{
+  print_source_lines_base (s, line, line + 1, 0, &column);
 }
 
 /* See source.h.  */
