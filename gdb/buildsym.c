@@ -672,11 +672,11 @@ buildsym_compunit::pop_subfile ()
   return name;
 }
 
-/* Add a linetable entry for line number LINE and address PC to the
-   line vector for SUBFILE.  */
+/* Add a linetable entry for line number LINE, address PC and column
+   number COLUMN to the line vector for SUBFILE.  */
 
 void
-buildsym_compunit::record_line (struct subfile *subfile, int line,
+buildsym_compunit::record_line (struct subfile *subfile, int line, int column,
 				CORE_ADDR pc, bool is_stmt)
 {
   struct linetable_entry *e;
@@ -745,6 +745,7 @@ buildsym_compunit::record_line (struct subfile *subfile, int line,
   e->is_stmt = is_stmt ? 1 : 0;
   e->is_weak = 0;
   e->pc = pc;
+  e->column = column;
 }
 
 
