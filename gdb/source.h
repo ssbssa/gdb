@@ -148,6 +148,12 @@ DEF_ENUM_FLAGS_TYPE (enum print_source_lines_flag, print_source_lines_flags);
 extern void print_source_lines (struct symtab *s, int line, int stopline,
 				print_source_lines_flags flags);
 
+/* Show source line with number LINE from the file of symtab S.
+   The column number COLUMN is updated to the real number of characters
+   printed until the specified column was reached.  */
+extern void print_source_line_column (struct symtab *s, int line,
+				      int &column);
+
 /* Wrap up the logic to build a line number range for passing to
    print_source_lines when using get_lines_to_list.  An instance of this
    class can be built from a single line number and a direction (forward or
