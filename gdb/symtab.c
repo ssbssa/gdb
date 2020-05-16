@@ -3324,6 +3324,7 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
       val.is_weak = best->is_weak;
       val.symtab = best_symtab;
       val.line = best->line;
+      val.column = best->column;
       val.pc = best->pc;
       if (best_end && (!alt || best_end < alt->pc))
 	val.end = best_end;
@@ -3905,6 +3906,7 @@ skip_prologue_sal (struct symtab_and_line *sal)
   sal->section = section;
   sal->symtab = start_sal.symtab;
   sal->line = start_sal.line;
+  sal->column = start_sal.column;
   sal->end = start_sal.end;
 
   /* Check if we are now inside an inlined function.  If we can,
@@ -3923,6 +3925,7 @@ skip_prologue_sal (struct symtab_and_line *sal)
       && SYMBOL_LINE (BLOCK_FUNCTION (function_block)) != 0)
     {
       sal->line = SYMBOL_LINE (BLOCK_FUNCTION (function_block));
+      sal->column = SYMBOL_COLUMN (BLOCK_FUNCTION (function_block));
       sal->symtab = symbol_symtab (BLOCK_FUNCTION (function_block));
     }
 }

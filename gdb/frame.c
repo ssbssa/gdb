@@ -2669,6 +2669,7 @@ find_frame_sal (frame_info *frame)
 	{
 	  sal.symtab = symbol_symtab (sym);
 	  sal.line = SYMBOL_LINE (sym);
+	  sal.column = SYMBOL_COLUMN (sym);
 	}
       else
 	/* If the symbol does not have a location, we don't know where
