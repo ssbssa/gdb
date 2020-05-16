@@ -977,13 +977,15 @@ print_frame_info_to_print_what (const char *print_frame_info)
 		  print_frame_info);
 }
 
-/* Print the PC from FRAME, plus any flags, to UIOUT.  */
+/* Print the PC from FRAME, plus any flags, to UIOUT.
+   Returns number of characters printed.  */
 
-static void
+static int
 print_pc (struct ui_out *uiout, struct gdbarch *gdbarch, const frame_info_ptr &frame,
 	  CORE_ADDR pc)
 {
   uiout->field_core_addr ("addr", gdbarch, pc);
+  int printed = 2 + (gdbarch_addr_bit (gdbarch) <= 32 ? 8 : 16);
 
   std::string flags = gdbarch_get_pc_address_flags (gdbarch, frame, pc);
   if (!flags.empty ())
@@ -991,7 +993,10 @@ print_pc (struct ui_out *uiout, struct gdbarch *gdbarch, const frame_info_ptr &f
       uiout->text (" [");
       uiout->field_string ("addr_flags", flags);
       uiout->text ("]");
+      printed += 3 + flags.size ();
     }
+
+  return printed;
 }
 
 /* See stack.h.  */
@@ -1138,6 +1143,7 @@ do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
       else
 	{
 	  struct value_print_options opts;
+	  int printed = 0;
 
 	  get_user_print_options (&opts);
 	  /* We used to do this earlier, but that is clearly
@@ -1150,11 +1156,18 @@ do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
 	     ability to decide for themselves if it is desired.  */
 	  if (opts.addressprint && mid_statement)
 	    {
-	      print_pc (uiout, gdbarch, frame, get_frame_pc (frame));
+	      printed = print_pc (uiout, gdbarch, frame, get_frame_pc (frame));
 	      uiout->text ("\t");
+	      printed = ((printed >> 3) + 1) << 3;
 	    }
 
-	  print_source_lines (sal.symtab, sal.line, sal.line + 1, 0);
+	  int column = sal.column;
+	  print_source_line_column (sal.symtab, sal.line, column);
+	  if (column > 0)
+	    {
+	      uiout->spaces (printed + column);
+	      uiout->text ("^\n");
+	    }
 	}
 
       /* If disassemble-next-line is set to on and there is line debug
