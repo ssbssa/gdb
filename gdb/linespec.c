@@ -403,7 +403,7 @@ static std::vector<symtab *>
 static std::vector<symtab_and_line> decode_digits_ordinary
   (struct linespec_state *self,
    linespec *ls,
-   int line,
+   int line, int column,
    linetable_entry **best_entry);
 
 static std::vector<symtab_and_line> decode_digits_list_mode
@@ -1740,6 +1740,20 @@ linespec_parse_basic (linespec_parser *parser)
       /* Get the next token.  */
       token = linespec_lexer_consume_token (parser);
 
+      /* If there is an additional colon, followed by another number,
+	 it's the optional column field.  */
+      if (token.type == LSTOKEN_COLON)
+	{
+	  token = linespec_lexer_consume_token (parser);
+	  if (token.type != LSTOKEN_NUMBER)
+	    unexpected_linespec_error (parser);
+
+	  name = copy_token_string (token);
+	  PARSER_EXPLICIT (parser)->column = atoi (name.get ());
+
+	  token = linespec_lexer_consume_token (parser);
+	}
+
       /* If the next token is a comma, stop parsing and return.  */
       if (token.type == LSTOKEN_COMMA)
 	{
@@ -2056,6 +2070,7 @@ create_sals_line_offset (struct linespec_state *self,
 
   symtab_and_line val;
   val.line = ls->explicit_loc.line_offset.offset;
+  val.column = ls->explicit_loc.column;
   switch (ls->explicit_loc.line_offset.sign)
     {
     case LINE_OFFSET_PLUS:
@@ -2087,11 +2102,17 @@ create_sals_line_offset (struct linespec_state *self,
       int i, j;
 
       std::vector<symtab_and_line> intermediate_results
-	= decode_digits_ordinary (self, ls, val.line, &best_entry);
+	= decode_digits_ordinary (self, ls, val.line, val.column, &best_entry);
       if (intermediate_results.empty () && best_entry != NULL)
-	intermediate_results = decode_digits_ordinary (self, ls,
-						       best_entry->line,
-						       &best_entry);
+	{
+	  int best_column = 0;
+	  if (val.column != 0 && val.line == best_entry->line)
+	    best_column = best_entry->column;
+	  intermediate_results = decode_digits_ordinary (self, ls,
+							 best_entry->line,
+							 best_column,
+							 &best_entry);
+	}
 
       /* For optimized code, the compiler can scatter one source line
 	 across disjoint ranges of PC values, even when no duplicate
@@ -2320,7 +2341,8 @@ convert_explicit_location_to_linespec (struct linespec_state *self,
 				       const char *function_name,
 				       symbol_name_match_type fname_match_type,
 				       const char *label_name,
-				       struct line_offset line_offset)
+				       struct line_offset line_offset,
+				       int column)
 {
   std::vector<bound_minimal_symbol> minimal_symbols;
 
@@ -2380,6 +2402,9 @@ convert_explicit_location_to_linespec (struct linespec_state *self,
 
   if (line_offset.sign != LINE_OFFSET_UNKNOWN)
     result->explicit_loc.line_offset = line_offset;
+
+  if (column != 0)
+    result->explicit_loc.column = column;
 }
 
 /* Convert the explicit location EXPLICIT_LOC into SaLs.  */
@@ -2394,7 +2419,8 @@ convert_explicit_location_to_sals (struct linespec_state *self,
 					 explicit_loc->function_name,
 					 explicit_loc->func_name_match_type,
 					 explicit_loc->label_name,
-					 explicit_loc->line_offset);
+					 explicit_loc->line_offset,
+					 explicit_loc->column);
   return convert_linespec_to_sals (self, result);
 }
 
@@ -2863,7 +2889,7 @@ linespec_complete_label (completion_tracker &tracker,
 					     source_filename,
 					     function_name,
 					     func_name_match_type,
-					     NULL, unknown_offset);
+					     NULL, unknown_offset, 0);
     }
   catch (const gdb_exception_error &ex)
     {
@@ -4052,7 +4078,7 @@ decode_digits_list_mode (struct linespec_state *self,
 static std::vector<symtab_and_line>
 decode_digits_ordinary (struct linespec_state *self,
 			linespec *ls,
-			int line,
+			int line, int column,
 			struct linetable_entry **best_entry)
 {
   std::vector<symtab_and_line> sals;
@@ -4066,13 +4092,14 @@ decode_digits_ordinary (struct linespec_state *self,
       set_current_program_space (elt->pspace ());
 
       pcs_and_cols
-	= find_pcs_and_cols_for_symtab_line (elt, line, 0, best_entry);
+	= find_pcs_and_cols_for_symtab_line (elt, line, column, best_entry);
       for (const auto &pc_and_col : pcs_and_cols)
 	{
 	  symtab_and_line sal;
 	  sal.pspace = elt->pspace ();
 	  sal.symtab = elt;
 	  sal.line = line;
+	  sal.column = pc_and_col.second;
 	  sal.explicit_line = true;
 	  sal.pc = pc_and_col.first;
 	  sals.push_back (std::move (sal));

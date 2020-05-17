@@ -102,6 +102,9 @@ struct explicit_location
      identified by the above fields or the current symtab
      if the other fields are NULL.  */
   struct line_offset line_offset;
+
+  /* The column of the line specified by line_offset.  */
+  int column;
 };
 
 /* Return the type of the given event location.  */

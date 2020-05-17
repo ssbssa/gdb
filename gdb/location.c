@@ -283,6 +283,7 @@ private:
 	if (loc->label_name != nullptr)
 	  explicit_loc.label_name = xstrdup (loc->label_name);
 	explicit_loc.line_offset = loc->line_offset;
+	explicit_loc.column = loc->column;
       }
   }
 };
@@ -450,6 +451,14 @@ explicit_to_string_internal (bool as_linespec,
 		   : (explicit_loc->line_offset.sign
 		      == LINE_OFFSET_PLUS ? "+" : "-")),
 		  explicit_loc->line_offset.offset);
+
+      if (explicit_loc->column != 0)
+	{
+	  buf.putc (space);
+	  if (!as_linespec)
+	    buf.puts ("-column ");
+	  buf.printf ("%d", explicit_loc->column);
+	}
     }
 
   return buf.release ();
@@ -877,6 +886,16 @@ string_to_explicit_location (const char **argp,
 	    {
 	      location->explicit_loc.line_offset
 		= linespec_parse_line_offset (oarg.get ());
+	      continue;
+	    }
+	}
+      else if (strncmp (opt.get (), "-column", len) == 0)
+	{
+	  set_oarg (explicit_location_lex_one (argp, language, NULL));
+	  *argp = skip_spaces (*argp);
+	  if (have_oarg)
+	    {
+	      location->explicit_loc.column = atoi (oarg.get ());
 	      continue;
 	    }
 	}
