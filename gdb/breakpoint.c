@@ -6173,6 +6173,12 @@ print_breakpoint_location (const breakpoint *b,
 	uiout->field_string ("fullname", symtab_to_fullname (loc->symtab));
       
       uiout->field_signed ("line", loc->line_number);
+
+      if (loc->column_number != 0)
+	{
+	  uiout->text (":");
+	  uiout->field_signed ("column", loc->column_number);
+	}
     }
   else if (loc)
     {
@@ -8136,6 +8142,7 @@ momentary_breakpoint_from_master (struct breakpoint *orig,
   copy->loc->pspace = orig->loc->pspace;
   copy->loc->probe = orig->loc->probe;
   copy->loc->line_number = orig->loc->line_number;
+  copy->loc->column_number = orig->loc->column_number;
   copy->loc->symtab = orig->loc->symtab;
   copy->loc->enabled = loc_enabled;
 
@@ -8276,6 +8283,7 @@ code_breakpoint::add_location (const symtab_and_line &sal)
   new_loc->section = sal.section;
   new_loc->gdbarch = loc_gdbarch;
   new_loc->line_number = sal.line;
+  new_loc->column_number = sal.column;
   new_loc->symtab = sal.symtab;
   new_loc->symbol = sal.symbol;
   new_loc->msymbol = sal.msymbol;
@@ -10808,6 +10816,7 @@ clear_command (const char *arg, int from_tty)
 		      && sal_fullname != NULL
 		      && sal.pspace == loc->pspace
 		      && loc->line_number == sal.line
+		      && loc->column_number == sal.column
 		      && filename_cmp (symtab_to_fullname (loc->symtab),
 				       sal_fullname) == 0)
 		    line_match = 1;
@@ -11545,10 +11554,13 @@ say_where (const breakpoint *b)
 	    {
 	      const char *filename
 		= symtab_to_filename_for_display (b->loc->symtab);
-	      gdb_printf (": file %ps, line %d.",
+	      gdb_printf (": file %ps, line %d",
 			  styled_string (file_name_style.style (),
 					 filename),
 			  b->loc->line_number);
+	      if (b->loc->column_number != 0)
+		gdb_printf (", column %d", b->loc->column_number);
+	      gdb_printf (".");
 	    }
 	  else
 	    /* This is not ideal, but each location may have a
