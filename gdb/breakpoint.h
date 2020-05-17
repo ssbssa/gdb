@@ -492,6 +492,11 @@ public:
 
   int line_number = 0;
 
+  /* Column number which was used to place this location, or zero if no
+     column number was used.  */
+
+  int column_number = 0;
+
   /* Symtab which was used to place this location.  This is used
      to find the corresponding source file name.  */
 
