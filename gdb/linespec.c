@@ -412,7 +412,7 @@ static std::vector<symtab *>
 static std::vector<symtab_and_line> decode_digits_ordinary
   (struct linespec_state *self,
    linespec *ls,
-   int line,
+   int line, int column,
    const linetable_entry **best_entry);
 
 static std::vector<symtab_and_line> decode_digits_list_mode
@@ -1706,6 +1706,20 @@ linespec_parse_basic (linespec_parser *parser)
       /* Get the next token.  */
       token = linespec_lexer_consume_token (parser);
 
+      /* If there is an additional colon, followed by another number,
+	 it's the optional column field.  */
+      if (token.type == LSTOKEN_COLON)
+	{
+	  token = linespec_lexer_consume_token (parser);
+	  if (token.type != LSTOKEN_NUMBER)
+	    unexpected_linespec_error (parser);
+
+	  name = copy_token_string (token);
+	  parser->result.explicit_loc.column = atoi (name.get ());
+
+	  token = linespec_lexer_consume_token (parser);
+	}
+
       /* If the next token is a comma, stop parsing and return.  */
       if (token.type == LSTOKEN_COMMA)
 	{
@@ -2015,6 +2029,7 @@ create_sals_line_offset (struct linespec_state *self,
     }
 
   int line = ls->explicit_loc.line_offset.offset;
+  int column = ls->explicit_loc.column;
 
   switch (ls->explicit_loc.line_offset.sign)
     {
@@ -2051,12 +2066,16 @@ create_sals_line_offset (struct linespec_state *self,
       bool was_exact = true;
 
       std::vector<symtab_and_line> intermediate_results
-	= decode_digits_ordinary (self, ls, line, &best_entry);
+	= decode_digits_ordinary (self, ls, line, column, &best_entry);
       if (intermediate_results.empty () && best_entry != NULL)
 	{
 	  was_exact = false;
+	  int best_column = 0;
+	  if (column != 0 && line == best_entry->line)
+	    best_column = best_entry->column;
 	  intermediate_results = decode_digits_ordinary (self, ls,
 							 best_entry->line,
+							 best_column,
 							 &best_entry);
 	}
 
@@ -2333,7 +2352,8 @@ convert_explicit_location_spec_to_linespec
    const char *function_name,
    symbol_name_match_type fname_match_type,
    const char *label_name,
-   struct line_offset line_offset)
+   struct line_offset line_offset,
+   int column)
 {
   std::vector<bound_minimal_symbol> minimal_symbols;
 
@@ -2395,6 +2415,9 @@ convert_explicit_location_spec_to_linespec
 
   if (line_offset.sign != LINE_OFFSET_UNKNOWN)
     result->explicit_loc.line_offset = line_offset;
+
+  if (column != 0)
+    result->explicit_loc.column = column;
 }
 
 /* Convert the explicit location EXPLICIT_LOC into SaLs.  */
@@ -2410,7 +2433,8 @@ convert_explicit_location_spec_to_sals
 					      explicit_spec->function_name.get (),
 					      explicit_spec->func_name_match_type,
 					      explicit_spec->label_name.get (),
-					      explicit_spec->line_offset);
+					      explicit_spec->line_offset,
+					      explicit_spec->column);
   return convert_linespec_to_sals (self, result);
 }
 
@@ -2834,7 +2858,7 @@ linespec_complete_label (completion_tracker &tracker,
 						  source_filename,
 						  function_name,
 						  func_name_match_type,
-						  NULL, unknown_offset);
+						  NULL, unknown_offset, 0);
     }
   catch (const gdb_exception_error &ex)
     {
@@ -3962,7 +3986,7 @@ decode_digits_list_mode (linespec_state *self, linespec *ls, int line)
 static std::vector<symtab_and_line>
 decode_digits_ordinary (struct linespec_state *self,
 			linespec *ls,
-			int line,
+			int line, int column,
 			const linetable_entry **best_entry)
 {
   std::vector<symtab_and_line> sals;
@@ -3977,13 +4001,15 @@ decode_digits_ordinary (struct linespec_state *self,
       program_space *pspace = objfile->pspace ();
       set_current_program_space (pspace);
 
-      pcs = find_linetable_entries_for_symtab_line (elt, line, 0, best_entry);
+      pcs = find_linetable_entries_for_symtab_line (elt, line, column,
+						    best_entry);
       for (auto linetable_entry : pcs)
 	{
 	  symtab_and_line sal;
 	  sal.pspace = pspace;
 	  sal.symtab = elt;
 	  sal.line = line;
+	  sal.column = linetable_entry->column;
 	  sal.explicit_line = true;
 	  sal.pc = linetable_entry->pc (objfile);
 	  sals.push_back (std::move (sal));
