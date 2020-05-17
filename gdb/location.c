@@ -202,6 +202,9 @@ new_explicit_location (const struct explicit_location *explicit_loc)
 
       if (explicit_loc->line_offset.sign != LINE_OFFSET_UNKNOWN)
 	EL_EXPLICIT (&tmp)->line_offset = explicit_loc->line_offset;
+
+      if (explicit_loc->column != 0)
+	EL_EXPLICIT (&tmp)->column = explicit_loc->column;
     }
 
   return copy_event_location (&tmp);
@@ -280,6 +283,14 @@ explicit_to_string_internal (int as_linespec,
 		   : (explicit_loc->line_offset.sign
 		      == LINE_OFFSET_PLUS ? "+" : "-")),
 		  explicit_loc->line_offset.offset);
+
+      if (explicit_loc->column != 0)
+	{
+	  buf.putc (space);
+	  if (!as_linespec)
+	    buf.puts ("-column ");
+	  buf.printf ("%d", explicit_loc->column);
+	}
     }
 
   return xstrdup (buf.c_str ());
@@ -341,6 +352,7 @@ copy_event_location (const struct event_location *src)
 	EL_EXPLICIT (dst)->label_name = xstrdup (EL_EXPLICIT (src)->label_name);
 
       EL_EXPLICIT (dst)->line_offset = EL_EXPLICIT (src)->line_offset;
+      EL_EXPLICIT (dst)->column = EL_EXPLICIT (src)->column;
       break;
 
 
@@ -822,6 +834,16 @@ string_to_explicit_location (const char **argp,
 	    {
 	      EL_EXPLICIT (location)->line_offset
 		= linespec_parse_line_offset (oarg.get ());
+	      continue;
+	    }
+	}
+      else if (strncmp (opt.get (), "-column", len) == 0)
+	{
+	  set_oarg (explicit_location_lex_one (argp, language, NULL));
+	  *argp = skip_spaces (*argp);
+	  if (have_oarg)
+	    {
+	      EL_EXPLICIT (location)->column = atoi (oarg.get ());
 	      continue;
 	    }
 	}
