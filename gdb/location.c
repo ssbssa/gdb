@@ -180,7 +180,8 @@ explicit_location_spec::explicit_location_spec
     function_name (maybe_xstrdup (other.function_name)),
     func_name_match_type (other.func_name_match_type),
     label_name (maybe_xstrdup (other.label_name)),
-    line_offset (other.line_offset)
+    line_offset (other.line_offset),
+    column (other.column)
 {
 }
 
@@ -333,6 +334,14 @@ explicit_to_string_internal (bool as_linespec,
 		   : (explicit_loc->line_offset.sign
 		      == LINE_OFFSET_PLUS ? "+" : "-")),
 		  explicit_loc->line_offset.offset);
+
+      if (explicit_loc->column != 0)
+	{
+	  buf.putc (space);
+	  if (!as_linespec)
+	    buf.puts ("-column ");
+	  buf.printf ("%d", explicit_loc->column);
+	}
     }
 
   return buf.release ();
@@ -729,6 +738,16 @@ string_to_explicit_location_spec (const char **argp,
 	  if (have_oarg)
 	    {
 	      locspec->line_offset = linespec_parse_line_offset (oarg.get ());
+	      continue;
+	    }
+	}
+      else if (strncmp (opt.get (), "-column", len) == 0)
+	{
+	  set_oarg (explicit_location_spec_lex_one (argp, language, NULL));
+	  *argp = skip_spaces (*argp);
+	  if (have_oarg)
+	    {
+	      locspec->column = atoi (oarg.get ());
 	      continue;
 	    }
 	}

@@ -223,6 +223,9 @@ struct explicit_location_spec : public location_spec
      if the other fields are NULL.  */
   struct line_offset line_offset;
 
+  /* The column of the line specified by line_offset.  */
+  int column = 0;
+
 protected:
   explicit_location_spec (const explicit_location_spec &other);
 
