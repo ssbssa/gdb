@@ -4261,6 +4261,8 @@ proc gdb_compile {source dest type options} {
 	}
     }
 
+    lappend new_options "additional_flags=-gno-column-info"
+
     # Place (and look for) Fortran `.mod` files in the output
     # directory for this specific test.
     if {[lsearch -exact $options f77] != -1 \
