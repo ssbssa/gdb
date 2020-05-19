@@ -5298,6 +5298,8 @@ proc gdb_compile {source dest type options} {
 	}
     }
 
+    lappend new_options "additional_flags=-gno-column-info"
+
     # Place (and look for) Fortran `.mod` files in the output
     # directory for this specific test.  For Intel compilers the -J
     # option is not supported so instead use the -module flag.
