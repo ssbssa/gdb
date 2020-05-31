@@ -909,8 +909,6 @@ tui_setup_io (int mode)
 
       /* Clean up color information.  */
       last_style = ui_file_style ();
-      color_map.clear ();
-      color_pair_map.clear ();
     }
 }
 
