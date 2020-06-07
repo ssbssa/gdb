@@ -835,34 +835,11 @@ tui_layout_split::apply (int x_, int y_, int width_, int height_,
   int total_weight = 0;
   for (int i = 0; i < m_splits.size (); ++i)
     {
-      bool cmd_win_already_exists = TUI_CMD_WIN != nullptr;
-
       /* Always call get_sizes, to ensure that the window is
 	 instantiated.  This is a bit gross but less gross than adding
 	 special cases for this in other places.  */
       m_splits[i].layout->get_sizes (m_vertical, &info[i].min_size,
 				     &info[i].max_size);
-
-      if (preserve_cmd_win_size_p
-	  && cmd_win_already_exists
-	  && m_splits[i].layout->get_name () != nullptr
-	  && strcmp (m_splits[i].layout->get_name (), "cmd") == 0)
-	{
-	  /* Save the old cmd window information, in case we need to
-	     restore it later.  */
-	  old_cmd_info.emplace (i, info[i].min_size, info[i].max_size);
-
-	  /* If this layout has never been applied, then it means the
-	     user just changed the layout.  In this situation, it's
-	     desirable to keep the size of the command window the
-	     same.  Setting the min and max sizes this way ensures
-	     that the resizing step, below, does the right thing with
-	     this window.  */
-	  info[i].min_size = (m_vertical
-			      ? TUI_CMD_WIN->height
-			      : TUI_CMD_WIN->width);
-	  info[i].max_size = info[i].min_size;
-	}
 
       if (info[i].min_size == info[i].max_size)
 	available_size -= info[i].min_size;
