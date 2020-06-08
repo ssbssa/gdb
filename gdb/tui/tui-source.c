@@ -251,11 +251,16 @@ tui_source_window::click (int mouse_x, int mouse_y, int mouse_button)
 {
   if (mouse_button == 1 || mouse_button == 2)
     {
-      if (mouse_x <= 2)
+      if (mouse_x <= 2 || mouse_x > 14)
 	{
 	  int line = m_start_line_or_addr.u.line_no + mouse_y;
+	  int column = mouse_x > 14 ? mouse_x - 14 + m_horizontal_offset : 0;
 	  gdb::unique_xmalloc_ptr<char> bp_str;
-	  bp_str = xstrprintf ("%s:%d", m_fullname.get (), line);
+	  if (column > 0)
+	    bp_str = xstrprintf ("%s:%d:%d", m_fullname.get (),
+				 line, column);
+	  else
+	    bp_str = xstrprintf ("%s:%d", m_fullname.get (), line);
 
 	  struct linespec_sals lsal;
 	  lsal.canonical = NULL;
@@ -266,6 +271,10 @@ tui_source_window::click (int mouse_x, int mouse_y, int mouse_button)
 	  catch (const gdb_exception_error &e)
 	    {
 	    }
+
+	  if (column > 0 && lsal.sals.size () == 1
+	      && lsal.sals[0].line != line)
+	    lsal.sals.clear ();
 
 	  if (lsal.sals.size () == 1)
 	    {
@@ -280,6 +289,7 @@ tui_source_window::click (int mouse_x, int mouse_y, int mouse_button)
 		    {
 		      if (loc->symtab != NULL
 			  && loc->line_number == sal.line
+			  && (column == 0 || loc->column_number == sal.column)
 			  && filename_cmp (m_fullname.get (),
 					   symtab_to_fullname (loc->symtab)) == 0)
 			{
