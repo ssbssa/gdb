@@ -835,6 +835,7 @@ tui_setup_io (int mode)
       rl_getc_function = tui_getc;
       _rl_echoing_p = 0;
       rl_outstream = tui_rl_outstream;
+      xfree (rl_prompt);
       rl_prompt = 0;
       rl_completion_display_matches_hook = tui_rl_display_match_list;
       rl_already_prompted = 0;
