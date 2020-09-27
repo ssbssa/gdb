@@ -3453,6 +3453,17 @@ coff_core_file_p (bfd *abfd)
 	  != sizeof moduleCount)
 	goto fail;
 
+      if (moduleCount > 0)
+	{
+	  sec = make_bfd_asection (abfd, ".corebase",
+				   SEC_HAS_CONTENTS,
+				   moduleListRva + 4,
+				   8,
+				   0);
+	  if (!sec)
+	    goto fail;
+	}
+
       for (m = 0; m < moduleCount; m++)
 	{
 	  if (bfd_bread (&module, sizeof module, abfd) != sizeof module)
