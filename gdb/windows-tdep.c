@@ -901,6 +901,15 @@ windows_solib_create_inferior_hook (int from_tty)
 	exec_base = extract_unsigned_integer (buf, ptr_bytes, byte_order);
     }
 
+  if (exec_base == 0 && core_bfd != nullptr)
+    {
+      asection *section = bfd_get_section_by_name (core_bfd, ".corebase");
+      uint64_t corebase;
+      if (section != nullptr
+	  && bfd_get_section_contents (core_bfd, section, &corebase, 0, 8))
+	exec_base = corebase;
+    }
+
   /* Rebase executable if the base address changed because of ASLR.  */
   if (current_program_space->symfile_object_file != nullptr && exec_base != 0)
     {
