@@ -222,6 +222,9 @@ struct windows_nat_target : public inf_child_target
 
   void do_initial_windows_stuff (DWORD pid, bool attaching);
 
+  bool supports_dumpcore () override;
+  void dumpcore (const char *filename) override;
+
   bool supports_disable_randomization () override
   {
     return windows_nat::disable_randomization_available ();

@@ -275,6 +275,12 @@ windows_per_inferior *windows_process;
 #define SymCleanup			dyn_SymCleanup
 #define SymFindFileInPath		dyn_SymFindFileInPath
 
+typedef BOOL WINAPI (MiniDumpWriteDump_ftype) (HANDLE, DWORD, HANDLE,
+					       MINIDUMP_TYPE,
+					       PMINIDUMP_EXCEPTION_INFORMATION,
+					       PMINIDUMP_USER_STREAM_INFORMATION,
+					       PMINIDUMP_CALLBACK_INFORMATION);
+
 typedef BOOL WINAPI (SymInitialize_ftype) (HANDLE, PCSTR, BOOL);
 static SymInitialize_ftype *SymInitialize;
 
@@ -2265,6 +2271,74 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
 
   windows_process->windows_initialization_done = 1;
   return;
+}
+
+/* Implement the "supports_dumpcore" target_ops method.  */
+
+bool
+windows_nat_target::supports_dumpcore ()
+{
+  return true;
+}
+
+/* Implement the "dumpcore" target_ops method.  */
+
+void
+windows_nat_target::dumpcore (const char *filename)
+{
+  HMODULE dbghelp = LoadLibrary ("dbghelp.dll");
+  if (!dbghelp)
+    error (_("Cannot load dbghelp.dll."));
+
+  MiniDumpWriteDump_ftype *fMiniDumpWriteDump =
+    (MiniDumpWriteDump_ftype *) GetProcAddress (dbghelp, "MiniDumpWriteDump");
+  if (!fMiniDumpWriteDump)
+    {
+      FreeLibrary (dbghelp);
+      error (_("Cannot find 'MiniDumpWriteDump' function in dbghelp.dll."));
+    }
+
+  HANDLE file = CreateFile (filename, GENERIC_WRITE, 0, NULL,
+			    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (file == INVALID_HANDLE_VALUE)
+    {
+      FreeLibrary (dbghelp);
+      error (_("Failed to open '%s' for output."), filename);
+    }
+
+  windows_thread_info *th = windows_process->find_thread (inferior_ptid);
+  if (th == nullptr)
+    error (_("Current thread not found"));
+
+  CONTEXT context;
+  EXCEPTION_POINTERS ep;
+  MINIDUMP_EXCEPTION_INFORMATION mei;
+  MINIDUMP_EXCEPTION_INFORMATION *meip = NULL;
+  if (th->last_event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT)
+    {
+      context.ContextFlags = WindowsContext<CONTEXT *>::all;
+      CHECK (GetThreadContext (th->h, &context));
+
+      ep.ExceptionRecord = &th->last_event.u.Exception.ExceptionRecord;
+      ep.ContextRecord = &context;
+
+      mei.ThreadId = th->tid;
+      mei.ExceptionPointers = &ep;
+      mei.ClientPointers = FALSE;
+
+      meip = &mei;
+    }
+
+  CHECK (fMiniDumpWriteDump (windows_process->handle,
+			     windows_process->process_id,
+			     file,
+			     MiniDumpWithFullMemory,
+			     meip,
+			     NULL, /* UserStreamParam */
+			     NULL)); /* CallbackParam */
+
+  FreeLibrary (dbghelp);
+  CloseHandle (file);
 }
 
 /* Try to set or remove a user privilege to the current process.  Return -1
