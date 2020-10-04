@@ -79,6 +79,7 @@ case ${gdb_host} in
 	;;
     mingw*)
 	NATDEPFILES='x86-nat.o nat/x86-dregs.o windows-nat.o nat/windows-nat.o'
+	HAVE_NATIVE_GCORE_HOST=1
 	;;
     aix)
 	NATDEPFILES='nat/fork-inferior.o fork-child.o inf-ptrace.o'
