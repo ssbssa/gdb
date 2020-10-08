@@ -519,8 +519,12 @@ tui_resize_all (void)
   int screenheight, screenwidth;
 
   rl_get_screen_size (&screenheight, &screenwidth);
+#ifndef _WIN32
   width_diff = screenwidth - tui_term_width ();
   height_diff = screenheight - tui_term_height ();
+#else
+  width_diff = height_diff = 1;
+#endif
   if (height_diff || width_diff)
     {
 #ifdef HAVE_RESIZE_TERM
