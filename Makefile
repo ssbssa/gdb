@@ -9,6 +9,7 @@ BUILD_DIR_ABS=$(abspath $(BUILD_DIR))
 
 GDB_LIBS=$(abspath gdb-libs$(BUILD_BITS))
 GDB_DIR=$(abspath gdb$(BUILD_BITS))
+BINUTILS_DIR=$(abspath binutils$(BUILD_BITS))
 
 ifeq ($(BUILD_BITS),32)
   MYBUILD=i686-w64-mingw32
@@ -17,7 +18,7 @@ ifeq ($(BUILD_BITS),32)
 else ifeq ($(BUILD_BITS),64)
   MYBUILD=i686-w64-mingw32
   MYTARGET=x86_64-w64-mingw32
-  CROSS_CONF=CC=$(MYTARGET)-gcc CXX=$(MYTARGET)=g++ LIBEXE=$(MYTARGET)-ar
+  CROSS_CONF=CC=$(MYTARGET)-gcc CXX=$(MYTARGET)-g++ LIBEXE=$(MYTARGET)-ar
 else
   $(error BUILD_BITS is $(BUILD_BITS))
 endif
@@ -52,7 +53,7 @@ BOOST_VER=1_69_0
 BOOST_SRC_DIR=boost_$(BOOST_VER)
 BOOST_FILE=$(BOOST_SRC_DIR).tar.bz2
 
-SOURCE_HIGHLIGHT_VER=3.1.8
+SOURCE_HIGHLIGHT_VER=3.1.9
 SOURCE_HIGHLIGHT_SRC_DIR=source-highlight-$(SOURCE_HIGHLIGHT_VER)
 SOURCE_HIGHLIGHT_FILE=$(SOURCE_HIGHLIGHT_SRC_DIR).tar.gz
 SOURCE_HIGHLIGHT_CONF=$(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/configure \
@@ -81,6 +82,38 @@ GDB_GIT_CONF=$(GDB_GIT_DIR)/configure \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
 	 --disable-install-libbfd --disable-install-libiberty \
 	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
+	 --with-pkgversion=$(MYPKG)
+GDB_TEST_CONF=/c/src/repos/gdb-testsuite/configure \
+	 --build=$(MYBUILD) --host=$(MYTARGET) --target=$(MYTARGET) \
+	 --disable-nls \
+	 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
+	 --enable-curses --enable-tui \
+	 --with-libiconv-prefix=$(GDB_LIBS) \
+	 --disable-install-libbfd --disable-install-libiberty \
+	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
+	 --with-pkgversion=$(MYPKG)
+GDB_REDHAT64_CONF=$(GDB_GIT_DIR)/configure \
+	 --build=$(MYBUILD) --host=$(MYBUILD) --target=x86_64-redhat-linux \
+	 --disable-nls \
+	 CPPFLAGS="-I/gdb/gdb-libs32/include" LDFLAGS="-L/gdb/gdb-libs32/lib" \
+	 --disable-curses --disable-tui \
+	 --with-libiconv-prefix=$(GDB_LIBS) \
+	 --disable-install-libbfd --disable-install-libiberty \
+	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
+	 --with-sysroot=$(GDB_DIR)-redhat64/$(MYTARGET)/sys-root
+GDB_REDHAT32_HOST_CONF=$(GDB_GIT_DIR)/configure \
+	 --build=$(MYBUILD) --host=i686-redhat-linux \
+	 --disable-nls \
+	 --disable-curses --disable-tui \
+	 --disable-install-libbfd --disable-install-libiberty \
+	 --disable-binutils --disable-gas --disable-gprof --disable-ld
+
+BINUTILS_GIT_CONF=$(GDB_GIT_DIR)/configure \
+	 --build=$(MYBUILD) --host=$(MYBUILD) --target=$(MYTARGET) \
+	 --disable-multilib --disable-nls --with-sysroot=$(BINUTILS_DIR) \
+	 --prefix=$(BINUTILS_DIR) --enable-targets=$(MYTARGET) \
+	 --disable-install-libbfd --disable-install-libiberty \
+	 --disable-gdb --disable-libdecnumber --disable-readline --disable-sim \
 	 --with-pkgversion=$(MYPKG)
 
 
@@ -227,7 +260,7 @@ $(BUILD_DIR)/boost-03-regex.done: | $(BUILD_DIR)/boost-02-headers.done
 
 # source-highlight
 
-$(SOURCE_DIR)/source-highlight-01-extract.done: | pkg/$(SOURCE_HIGHLIGHT_FILE) $(SOURCE_DIR)/boost-01-extract.done
+$(SOURCE_DIR)/source-highlight-01-extract.done: | pkg/$(SOURCE_HIGHLIGHT_FILE) $(SOURCE_DIR)/boost-01-extract.done $(BUILD_DIR)/boost-03-regex.done
 	tar -C $(SOURCE_DIR) -xzf pkg/$(SOURCE_HIGHLIGHT_FILE)
 	@touch $@
 
@@ -400,6 +433,7 @@ $(BUILD_DIR)/gdb-git-02-make.done: | $(BUILD_DIR)/gdb-git-01-configure.done
 
 $(BUILD_DIR)/gdb-git-03-make-install.done: | $(BUILD_DIR)/gdb-git-02-make.done
 	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git/gdb install-strip
+	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git/gdbserver install-strip
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-04-source-highlight.done: | $(BUILD_DIR)/gdb-git-03-make-install.done
@@ -461,6 +495,54 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 	@touch $@
 
 
+# binutils-git
+
+$(BUILD_DIR)/binutils-git-01-configure.done:
+	@mkdir -p $(BUILD_DIR)/binutils-git
+	cd $(BUILD_DIR)/binutils-git && $(BINUTILS_GIT_CONF)
+	@touch $@
+
+$(BUILD_DIR)/binutils-git-02-make.done: | $(BUILD_DIR)/binutils-git-01-configure.done
+	$(MAKE) -C $(BUILD_DIR)/binutils-git
+	@touch $@
+
+
+# gdb-testsuite
+
+$(BUILD_DIR)/gdb-test-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+	@mkdir -p $(BUILD_DIR)/gdb-test
+	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test
+	@touch $@
+
+$(BUILD_DIR)/gdb-test-02-make.done: | $(BUILD_DIR)/gdb-test-01-configure.done
+	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-test
+	@touch $@
+
+
+# redhat64-gdb
+
+$(BUILD_DIR)/gdb-redhat64-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+	@mkdir -p $(BUILD_DIR)/gdb-redhat64
+	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-redhat64 && $(GDB_REDHAT64_CONF) --prefix=$(GDB_DIR)-redhat64
+	@touch $@
+
+$(BUILD_DIR)/gdb-redhat64-02-make.done: | $(BUILD_DIR)/gdb-redhat64-01-configure.done
+	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-redhat64
+	@touch $@
+
+
+# redhat32-host-gdb
+
+$(BUILD_DIR)/gdb-redhat32-host-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+	@mkdir -p $(BUILD_DIR)/gdb-redhat32-host
+	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-redhat32-host && $(GDB_REDHAT32_HOST_CONF) --prefix=$(GDB_DIR)-redhat32-host
+	@touch $@
+
+$(BUILD_DIR)/gdb-redhat32-host-02-make.done: | $(BUILD_DIR)/gdb-redhat32-host-01-configure.done
+	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-redhat32-host
+	@touch $@
+
+
 extract-all: | \
   $(SOURCE_DIR)/expat-01-extract.done \
   $(SOURCE_DIR)/pdcurses-01-extract.done \
@@ -477,8 +559,11 @@ patch-all: | \
 build-expat: | $(BUILD_DIR)/expat-05-make-install.done
 build-pdcurses: | $(BUILD_DIR)/pdcurses-04-make-install.done
 build-iconv: | $(BUILD_DIR)/iconv-05-make-install.done
+build-boost: | $(BUILD_DIR)/boost-03-regex.done
+build-source-highlight: | $(BUILD_DIR)/source-highlight-05-make-install.done
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
 build-gdb-python: | $(BUILD_DIR)/gdb-git-python-06-licenses.done
+build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done
 
 
 gdb$(BUILD_BITS).7z: | build-gdb

@@ -16,7 +16,7 @@
 +number purple b ;
  preproc darkblue b ;
 -symbol darkred ;
--function black b;
+-function b;
 -cbracket red;
 +symbol red b ;
 +function black b ;
@@ -35,7 +35,7 @@
  oldfile orange;
 --- src/c.lang	2010-05-06 10:32:55.000000000 +0200
 +++ src/c.lang	2019-03-18 18:27:21.699940800 +0100
-@@ -36,7 +36,7 @@
+@@ -33,7 +33,7 @@
  
  include "symbols.lang"
  
