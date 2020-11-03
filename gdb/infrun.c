@@ -7198,6 +7198,31 @@ process_event_stop_test (struct execution_control_state *ecs)
       return;
     }
 
+  /* Handle the case when subroutines have multiple ranges.
+     When we step from one part to the next part of the same subroutine,
+     all subroutine levels are skipped again which begin here.
+     Compensate for this by removing all skipped subroutines,
+     which were already executing from the user's perspective.  */
+
+  if (frame_id_eq (get_stack_frame_id (get_current_frame ()),
+		   ecs->event_thread->control.step_stack_frame_id)
+      && inline_skipped_frames (ecs->event_thread)
+      && ecs->event_thread->control.step_frame_id.artificial_depth > 0
+      && ecs->event_thread->control.step_frame_id.code_addr_p)
+    {
+      const struct block *prev, *curr;
+      int depth = 0;
+      prev = block_for_pc (ecs->event_thread->control.step_frame_id.code_addr);
+      curr = block_for_pc (ecs->event_thread->suspend.stop_pc);
+      while (curr && block_inlined_p (curr) && !contained_in (prev, curr))
+	{
+	  depth ++;
+	  curr = BLOCK_SUPERBLOCK (curr);
+	}
+      while (inline_skipped_frames (ecs->event_thread) > depth)
+	step_into_inline_frame (ecs->event_thread);
+    }
+
   /* Look for "calls" to inlined functions, part one.  If the inline
      frame machinery detected some skipped call sites, we have entered
      a new inline function.  */
@@ -7259,6 +7284,8 @@ process_event_stop_test (struct execution_control_state *ecs)
       infrun_debug_printf ("stepping through inlined function");
 
       if (ecs->event_thread->control.step_over_calls == STEP_OVER_ALL
+	  || ecs->event_thread->suspend.stop_pc != stop_pc_sal.pc
+	  || !stop_pc_sal.is_stmt
 	  || inline_frame_is_marked_for_skip (false, ecs->event_thread))
 	keep_going (ecs);
       else
@@ -7284,8 +7311,8 @@ process_event_stop_test (struct execution_control_state *ecs)
 	  end_stepping_range (ecs);
 	  return;
 	}
-      else if (frame_id_eq (get_frame_id (get_current_frame ()),
-                           ecs->event_thread->control.step_frame_id))
+      else if (frame_id_eq (get_stack_frame_id (get_current_frame ()),
+			    ecs->event_thread->control.step_stack_frame_id))
 	{
 	  /* We are not at the start of a statement, and we have not changed
 	     frame.
@@ -7329,7 +7356,7 @@ process_event_stop_test (struct execution_control_state *ecs)
   ecs->event_thread->control.step_range_end = stop_pc_sal.end;
   ecs->event_thread->control.may_range_step = 1;
   if (refresh_step_info)
-    set_step_info (ecs->event_thread, frame, stop_pc_sal);
+    set_step_info (ecs->event_thread, get_current_frame (), stop_pc_sal);
 
   infrun_debug_printf ("keep going");
   keep_going (ecs);
