@@ -425,6 +425,16 @@ buildsym_compunit::record_block_range (struct block *block,
       || end_inclusive + 1 != BLOCK_END (block))
     m_pending_addrmap_interesting = true;
 
+  if (block_inlined_p (block))
+    {
+      m_inline_end_vector.push_back (end_inclusive + 1);
+      if (end_inclusive + 1 == start)
+	{
+	  end_inclusive = start;
+	  m_pending_addrmap_interesting = true;
+	}
+    }
+
   if (m_pending_addrmap == nullptr)
     m_pending_addrmap = addrmap_create_mutable (&m_pending_addrmap_obstack);
 
@@ -692,19 +702,16 @@ buildsym_compunit::record_line (struct subfile *subfile, int line,
 		      * sizeof (struct linetable_entry))));
     }
 
-  /* Normally, we treat lines as unsorted.  But the end of sequence
-     marker is special.  We sort line markers at the same PC by line
-     number, so end of sequence markers (which have line == 0) appear
-     first.  This is right if the marker ends the previous function,
-     and there is no padding before the next function.  But it is
-     wrong if the previous line was empty and we are now marking a
-     switch to a different subfile.  We must leave the end of sequence
-     marker at the end of this group of lines, not sort the empty line
-     to after the marker.  The easiest way to accomplish this is to
-     delete any empty lines from our table, if they are followed by
-     end of sequence markers.  All we lose is the ability to set
-     breakpoints at some lines which contain no instructions
-     anyway.  */
+  /* The end of sequence marker is special.  We need to delete any
+     previous lines at the same PC, otherwise these lines may cause
+     problems since they might be at the same address as the following
+     function.  For instance suppose a function calls abort there is no
+     reason to emit a ret after that point (no joke).
+     So the label may be at the same address where the following
+     function begins.  There is also a fake end of sequence marker (-1)
+     that we emit internally when switching between different CUs
+     In this case, duplicate line table entries shall not be deleted.
+     We simply set the is_weak marker in this case.  */
   if (line == 0)
     {
       struct linetable_entry *last = nullptr;
@@ -720,11 +727,77 @@ buildsym_compunit::record_line (struct subfile *subfile, int line,
       if (last == nullptr || last->line == 0)
 	return;
     }
+  else if (line == -1)
+    {
+      line = 0;
+      e = subfile->line_vector->item + subfile->line_vector->nitems;
+      while (e > subfile->line_vector->item)
+	{
+	  e--;
+	  if (e->pc != pc)
+	    break;
+	  e->is_weak = 1;
+	}
+    }
 
   e = subfile->line_vector->item + subfile->line_vector->nitems++;
   e->line = line;
   e->is_stmt = is_stmt ? 1 : 0;
+  e->is_weak = 0;
   e->pc = pc;
+}
+
+
+/* Patch the is_stmt bits at the given inline end address.
+   The line table has to be already sorted.  */
+
+static void
+patch_inline_end_pos (struct linetable *table, CORE_ADDR end)
+{
+  int a = 2, b = table->nitems - 1;
+  struct linetable_entry *items = table->item;
+
+  /* We need at least two items with pc = end in the table.
+     The lowest usable items are at pos 0 and 1, the highest
+     usable items are at pos b - 2 and b - 1.  */
+  if (a > b || end < items[1].pc || end > items[b - 2].pc)
+    return;
+
+  /* Look for the first item with pc > end in the range [a,b].
+     The previous element has pc = end or there is no match.
+     We set a = 2, since we need at least two consecutive elements
+     with pc = end to do anything useful.
+     We set b = nitems - 1, since we are not interested in the last
+     element which should be an end of sequence marker with line = 0
+     and is_stmt = 1.  */
+  while (a < b)
+    {
+      int c = (a + b) / 2;
+
+      if (end < items[c].pc)
+	b = c;
+      else
+	a = c + 1;
+    }
+
+  a--;
+  if (items[a].pc != end || items[a].is_stmt)
+    return;
+
+  /* When there is a sequence of line entries at the same address
+     where an inline range ends, and the last item has is_stmt = 0,
+     we force all previous items to have is_weak = 1 as well.  */
+  do
+    {
+      /* We stop at the first line entry with a different address,
+	 or when we see an end of sequence marker.  */
+      a--;
+      if (items[a].pc != end || items[a].line == 0)
+	break;
+
+      items[a].is_weak = 1;
+    }
+  while (a > 0);
 }
 
 
@@ -965,6 +1038,10 @@ buildsym_compunit::end_symtab_with_blockvector (struct block *static_block,
 			      subfile->line_vector->item
 			      + subfile->line_vector->nitems,
 			      lte_is_less_than);
+
+	  for (int i = 0; i < m_inline_end_vector.size (); i++)
+	    patch_inline_end_pos (subfile->line_vector,
+				  m_inline_end_vector[i]);
 	}
 
       /* Allocate a symbol table if necessary.  */

@@ -1397,6 +1397,8 @@ struct linetable_entry
 
   /* True if this PC is a good location to place a breakpoint for LINE.  */
   unsigned is_stmt : 1;
+  /* True if this PC is at a subroutine range end.  */
+  unsigned is_weak : 1;
 
   /* The address for this entry.  */
   CORE_ADDR pc;
@@ -2129,6 +2131,8 @@ struct symtab_and_line
   /* If the line number information is valid, then this indicates if this
      line table entry had the is-stmt flag set or not.  */
   bool is_stmt = false;
+  /* True if this PC is at a subroutine range end.  */
+  bool is_weak = false;
 
   /* The probe associated with this symtab_and_line.  */
   probe *prob = NULL;
