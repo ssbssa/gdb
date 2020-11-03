@@ -446,6 +446,7 @@ arrange_linetable (struct linetable *oldLineTb)
 	    }
 	  fentry[function_count].line = ii;
 	  fentry[function_count].is_stmt = 1;
+	  fentry[function_count].is_weak = 0;
 	  fentry[function_count].pc = oldLineTb->item[ii].pc;
 	  ++function_count;
 
