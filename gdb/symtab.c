@@ -3269,7 +3269,11 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	 save prev if it represents the end of a function (i.e. line number
 	 0) instead of a real line.  */
 
-      if (prev && prev->line && (!best || prev->pc > best->pc))
+      if (prev && prev->line && (!best || prev->pc > best->pc
+				       || (prev->pc == best->pc
+					   && (best->pc == pc
+					       ? !best->is_stmt
+					       : best->is_weak))))
 	{
 	  best = prev;
 	  best_symtab = iter_s;
@@ -3287,7 +3291,7 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	      while (tmp > first && (tmp - 1)->pc == tmp->pc
 		     && (tmp - 1)->line != 0 && !tmp->is_stmt)
 		--tmp;
-	      if (tmp->is_stmt)
+	      if (tmp->is_stmt && (tmp->pc == pc || !tmp->is_weak))
 		best = tmp;
 	    }
 
@@ -3310,18 +3314,14 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	 We used to return alt->line - 1 here, but that could be
 	 anywhere; if we don't have line number info for this PC,
 	 don't make some up.  */
-      val.pc = pc;
-    }
-  else if (best->line == 0)
-    {
-      /* If our best fit is in a range of PC's for which no line
-	 number info is available (line number is zero) then we didn't
-	 find any valid line information.  */
+      if (notcurrent)
+	pc++;
       val.pc = pc;
     }
   else
     {
       val.is_stmt = best->is_stmt;
+      val.is_weak = best->is_weak;
       val.symtab = best_symtab;
       val.line = best->line;
       val.pc = best->pc;

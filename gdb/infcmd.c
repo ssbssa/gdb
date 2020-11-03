@@ -1028,7 +1028,8 @@ prepare_one_step (thread_info *tp, struct step_command_fsm *sm)
 	      if (SYMBOL_CLASS (sym) == LOC_BLOCK)
 		{
 		  const block *block = SYMBOL_BLOCK_VALUE (sym);
-		  if (BLOCK_END (block) < tp->control.step_range_end)
+		  if (BLOCK_END (block) < tp->control.step_range_end
+		      && BLOCK_END (block) > tp->control.step_range_start)
 		    tp->control.step_range_end = BLOCK_END (block);
 		}
 	    }
