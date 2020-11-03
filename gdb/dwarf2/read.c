@@ -14278,6 +14278,18 @@ dwarf2_record_block_ranges (struct die_info *die, struct block *block,
       if (die->tag != DW_TAG_compile_unit)
 	ranges_offset += cu->gnu_ranges_base;
 
+      CORE_ADDR entry_pc = (CORE_ADDR) -1;
+      if (die->tag == DW_TAG_inlined_subroutine)
+	{
+	  attr = dwarf2_attr (die, DW_AT_entry_pc, cu);
+	  if (attr != nullptr)
+	    {
+	      entry_pc = attr->as_address ();
+	      entry_pc += baseaddr;
+	      entry_pc = gdbarch_adjust_dwarf2_addr (gdbarch, entry_pc);
+	    }
+	}
+
       std::vector<blockrange> blockvec;
       dwarf2_ranges_process (ranges_offset, cu, die->tag,
 	[&] (CORE_ADDR start, CORE_ADDR end)
@@ -14288,6 +14300,8 @@ dwarf2_record_block_ranges (struct die_info *die, struct block *block,
 	  end = gdbarch_adjust_dwarf2_addr (gdbarch, end);
 	  cu->get_builder ()->record_block_range (block, start, end - 1);
 	  blockvec.emplace_back (start, end);
+	  if (entry_pc == start && blockvec.size () > 1)
+	    std::swap (blockvec[0], blockvec[blockvec.size () - 1]);
 	});
 
       BLOCK_RANGES(block) = make_blockranges (objfile, blockvec);
