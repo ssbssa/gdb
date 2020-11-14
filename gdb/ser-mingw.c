@@ -599,11 +599,13 @@ console_select_thread (void *arg)
 		  break;
 		}
 	    }
+#ifdef HAVE_MOUSE_SET
 	  else if (record.EventType == MOUSE_EVENT)
 	    {
 	      SetEvent (state->read_event);
 	      break;
 	    }
+#endif
 
 	  /* Otherwise discard it and wait again.  */
 	  ReadConsoleInput (h, &record, 1, &n_records);

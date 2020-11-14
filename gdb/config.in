@@ -283,6 +283,9 @@
 /* Define to 1 if you have the `monstartup' function. */
 #undef HAVE_MONSTARTUP
 
+/* Define to 1 if you have the `mouse_set' function. */
+#undef HAVE_MOUSE_SET
+
 /* Define to 1 if you have the <ncursesw/ncurses.h> header file. */
 #undef HAVE_NCURSESW_NCURSES_H
 

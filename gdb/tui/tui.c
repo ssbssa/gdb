@@ -568,7 +568,9 @@ tui_disable (void)
   rl_startup_hook = 0;
   rl_already_prompted = 0;
 
+#ifdef HAVE_MOUSE_SET
   mouse_set (0);
+#endif
 
   /* Leave curses and restore previous gdb terminal setting.  */
   endwin ();
