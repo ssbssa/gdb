@@ -203,13 +203,13 @@ tui_py_window::output (const char *text)
     {
       wmove (handle.get (), cursor_y + 1, cursor_x + 1);
 
+      const char *prev_text = text;
       std::string line = tui_copy_source_line (&text, 0, 0,
 					       vwidth - cursor_x, 0);
       tui_puts (line.c_str (), handle.get ());
 
-      if (*text == '\n')
+      if (text > prev_text && (text[-1] == '\n' || text[-1] == '\r'))
 	{
-	  ++text;
 	  ++cursor_y;
 	  cursor_x = 0;
 	}
