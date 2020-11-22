@@ -105,7 +105,7 @@ cli_style_option tui_border_style ("tui-border", ui_file_style::CYAN,
 
 cli_style_option tui_active_border_style ("tui-active-border",
 					  ui_file_style::CYAN,
-					  ui_file_style::BOLD);
+					  ui_file_style::WHITE);
 
 /* See cli-style.h.  */
 
@@ -143,6 +143,18 @@ cli_style_option::cli_style_option (const char *name,
     m_name (name),
     m_foreground (cli_colors[fg - ui_file_style::NONE]),
     m_background (cli_colors[0]),
+    m_intensity (cli_intensities[intensity])
+{
+}
+
+cli_style_option::cli_style_option (const char *name,
+				    ui_file_style::basic_color fg,
+				    ui_file_style::basic_color bg,
+				    ui_file_style::intensity intensity)
+  : changed (name),
+    m_name (name),
+    m_foreground (cli_colors[fg - ui_file_style::NONE]),
+    m_background (cli_colors[bg - ui_file_style::NONE]),
     m_intensity (cli_intensities[intensity])
 {
 }
