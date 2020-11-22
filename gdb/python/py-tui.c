@@ -99,7 +99,7 @@ public:
   }
 
   /* Write STR to the window.  */
-  void output (const char *str);
+  void output (const char *str, unsigned int first_column);
 
   /* A helper function to compute the viewport width.  */
   int viewport_width () const
@@ -195,7 +195,7 @@ tui_py_window::do_scroll_vertical (int num_to_scroll)
 }
 
 void
-tui_py_window::output (const char *text)
+tui_py_window::output (const char *text, unsigned int first_column)
 {
   int vwidth = viewport_width ();
 
@@ -204,7 +204,7 @@ tui_py_window::output (const char *text)
       wmove (handle.get (), cursor_y + 1, cursor_x + 1);
 
       const char *prev_text = text;
-      std::string line = tui_copy_source_line (&text, 0, 0,
+      std::string line = tui_copy_source_line (&text, 0, first_column,
 					       vwidth - cursor_x, 0);
       tui_puts (line.c_str (), handle.get ());
 
@@ -375,13 +375,14 @@ gdbpy_tui_write (PyObject *self, PyObject *args)
 {
   gdbpy_tui_window *win = (gdbpy_tui_window *) self;
   const char *text;
+  unsigned int first_column = 0;
 
-  if (!PyArg_ParseTuple (args, "s", &text))
+  if (!PyArg_ParseTuple (args, "s|I", &text, &first_column))
     return nullptr;
 
   REQUIRE_WINDOW (win);
 
-  win->window->output (text);
+  win->window->output (text, first_column);
 
   Py_RETURN_NONE;
 }

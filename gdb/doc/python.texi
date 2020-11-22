@@ -5863,10 +5863,15 @@ displayed above the window.  This attribute can be modified.
 Remove all the contents of the window.
 @end defun
 
-@defun TuiWindow.write (@var{string})
+@defun TuiWindow.write (@var{string} @r{[}, @var{first_column}@r{]})
 Write @var{string} to the window.  @var{string} can contain ANSI
 terminal escape styling sequences; @value{GDBN} will translate these
 as appropriate for the terminal.
+
+The optional @var{first_column} argument indicates how many columns
+should be skipped at the start of each line.  This is meant to simplify
+horizontal scrolling of the window, since this also takes ANSI
+terminal escape sequences into account.
 @end defun
 
 The factory function that you supply should return an object
