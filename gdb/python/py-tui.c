@@ -351,7 +351,7 @@ gdbpy_tui_is_valid (PyObject *self, PyObject *args)
 {
   gdbpy_tui_window *win = (gdbpy_tui_window *) self;
 
-  if (win->window != nullptr)
+  if (tui_active && win->window != nullptr)
     Py_RETURN_TRUE;
   Py_RETURN_FALSE;
 }
