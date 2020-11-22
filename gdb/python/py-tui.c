@@ -99,7 +99,7 @@ public:
   }
 
   /* Write STR to the window.  */
-  void output (const char *str, unsigned int first_column);
+  void output (const char *str, unsigned int first_column, bool full_window);
 
   /* A helper function to compute the viewport width.  */
   int viewport_width () const
@@ -195,9 +195,19 @@ tui_py_window::do_scroll_vertical (int num_to_scroll)
 }
 
 void
-tui_py_window::output (const char *text, unsigned int first_column)
+tui_py_window::output (const char *text, unsigned int first_column,
+		       bool full_window)
 {
   int vwidth = viewport_width ();
+
+  std::string space_line;
+  if (full_window)
+    {
+      check_and_display_highlight_if_needed ();
+      cursor_x = 0;
+      cursor_y = 0;
+      space_line = std::string(vwidth, ' ');
+    }
 
   while (cursor_y < viewport_height () && *text != '\0')
     {
@@ -208,13 +218,23 @@ tui_py_window::output (const char *text, unsigned int first_column)
 					       vwidth - cursor_x, 0);
       tui_puts (line.c_str (), handle.get ());
 
+      cursor_x = getcurx (handle.get ()) - 1;
+
+      if (full_window && cursor_x < vwidth)
+	tui_puts (space_line.c_str() + cursor_x, handle.get ());
+
       if (text > prev_text && (text[-1] == '\n' || text[-1] == '\r'))
 	{
 	  ++cursor_y;
 	  cursor_x = 0;
 	}
-      else
-	cursor_x = getcurx (handle.get ()) - 1;
+    }
+
+  while (full_window && cursor_y < viewport_height ())
+    {
+      wmove (handle.get (), cursor_y + 1, 1);
+      tui_puts (space_line.c_str(), handle.get ());
+      ++cursor_y;
     }
 
   wrefresh (handle.get ());
@@ -376,13 +396,14 @@ gdbpy_tui_write (PyObject *self, PyObject *args)
   gdbpy_tui_window *win = (gdbpy_tui_window *) self;
   const char *text;
   unsigned int first_column = 0;
+  int full_window = 0;
 
-  if (!PyArg_ParseTuple (args, "s|I", &text, &first_column))
+  if (!PyArg_ParseTuple (args, "s|Ii", &text, &first_column, &full_window))
     return nullptr;
 
   REQUIRE_WINDOW (win);
 
-  win->window->output (text, first_column);
+  win->window->output (text, first_column, full_window);
 
   Py_RETURN_NONE;
 }
