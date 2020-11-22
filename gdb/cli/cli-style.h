@@ -32,6 +32,9 @@ public:
   /* Construct a CLI style option with a foreground color.  */
   cli_style_option (const char *name, ui_file_style::basic_color fg,
 		    ui_file_style::intensity inten = ui_file_style::NORMAL);
+  cli_style_option (const char *name, ui_file_style::basic_color fg,
+		    ui_file_style::basic_color bg,
+		    ui_file_style::intensity inten = ui_file_style::NORMAL);
 
   /* Return a ui_file_style corresponding to the settings in this CLI
      style.  */
