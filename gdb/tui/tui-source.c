@@ -302,19 +302,17 @@ tui_source_window::mouse_click (int mouse_x, int mouse_y, int mouse_button)
 		}
 	      else if (mouse_button == 1)
 		{
-		  struct linespec_result canonical;
-		  canonical.lsals.push_back (std::move (lsal));
+		  const char *loc_str = bp_str.get ();
+		  event_location_up location = string_to_event_location_basic
+		    (&loc_str, current_language,
+		     symbol_name_match_type::WILD);
 
-		  bkpt_breakpoint_ops.
-		    create_breakpoints_sal (m_gdbarch,
-					    &canonical,
-					    NULL,
-					    NULL,
-					    bp_breakpoint,
-					    disp_donttouch,
-					    -1, 0, 0,
-					    &bkpt_breakpoint_ops,
-					    0, 1, 0, 0);
+		  reinitialize_more_filter ();
+
+		  create_breakpoint (m_gdbarch, location.get (), NULL, -1,
+				     NULL, 0, 0, bp_breakpoint, 0,
+				     AUTO_BOOLEAN_FALSE,
+				     &bkpt_breakpoint_ops, 0, 1, 0, 0);
 		}
 	    }
 	}
