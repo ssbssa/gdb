@@ -589,9 +589,7 @@ tui_redisplay_readline (void)
 static void
 tui_prep_terminal (int notused1)
 {
-#ifdef HAVE_MOUSE_SET
-  mouse_set (ALL_MOUSE_EVENTS);
-#endif
+  mousemask (ALL_MOUSE_EVENTS, NULL);
 }
 
 /* Readline callback to restore the terminal.  It is called once each
@@ -599,9 +597,7 @@ tui_prep_terminal (int notused1)
 static void
 tui_deprep_terminal (void)
 {
-#ifdef HAVE_MOUSE_SET
-  mouse_set (0);
-#endif
+  mousemask (0, NULL);
 }
 
 #ifdef TUI_USE_PIPE_FOR_READLINE
@@ -933,26 +929,30 @@ tui_dispatch_ctrl_char (unsigned int ch)
     case KEY_LEFT:
       win_info->right_scroll (1);
       break;
-#ifdef HAVE_MOUSE_SET
     case KEY_MOUSE:
-      request_mouse_pos ();
-      if (MOUSE_WHEEL_UP)
-	win_info->backward_scroll (3);
-      else if (MOUSE_WHEEL_DOWN)
-	win_info->forward_scroll (3);
-      else if ((BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_CLICKED)
-	       || (BUTTON_CHANGED(2) && BUTTON_STATUS(2) == BUTTON_CLICKED)
-	       || (BUTTON_CHANGED(3) && BUTTON_STATUS(3) == BUTTON_CLICKED))
 	{
-	  int button
-	    = (BUTTON_CHANGED(1) && BUTTON_STATUS(1) == BUTTON_CLICKED) ? 1
-	    : (BUTTON_CHANGED(2) && BUTTON_STATUS(2) == BUTTON_CLICKED) ? 2
-	    : 3;
-	  if (TUI_SRC_WIN != nullptr)
-	    TUI_SRC_WIN->mouse_click (MOUSE_X_POS, MOUSE_Y_POS, button);
+	  MEVENT mevent;
+	  if (getmouse (&mevent) != OK)
+	    break;
+
+	  if ((mevent.bstate & BUTTON1_CLICKED)
+		   || (mevent.bstate & BUTTON2_CLICKED)
+		   || (mevent.bstate & BUTTON3_CLICKED))
+	    {
+	      int button = (mevent.bstate & BUTTON1_CLICKED) ? 1
+		: (mevent.bstate & BUTTON2_CLICKED) ? 2
+		: 3;
+	      if (TUI_SRC_WIN != nullptr)
+		TUI_SRC_WIN->mouse_click (mevent.x, mevent.y, button);
+	    }
+#ifdef BUTTON5_PRESSED
+          else if (mevent.bstate & BUTTON4_PRESSED)
+	    win_info->backward_scroll (3);
+	  else if (mevent.bstate & BUTTON5_PRESSED)
+	    win_info->forward_scroll (3);
+#endif
 	}
       break;
-#endif
     case '\f':
       break;
     default:
