@@ -931,26 +931,31 @@ tui_dispatch_ctrl_char (unsigned int ch)
       break;
     case KEY_MOUSE:
 	{
-	  MEVENT mevent;
-	  if (getmouse (&mevent) != OK)
+	  MEVENT mev;
+	  if (getmouse (&mev) != OK)
 	    break;
 
-	  if ((mevent.bstate & BUTTON1_CLICKED)
-		   || (mevent.bstate & BUTTON2_CLICKED)
-		   || (mevent.bstate & BUTTON3_CLICKED))
-	    {
-	      int button = (mevent.bstate & BUTTON1_CLICKED) ? 1
-		: (mevent.bstate & BUTTON2_CLICKED) ? 2
-		: 3;
-	      if (TUI_SRC_WIN != nullptr)
-		TUI_SRC_WIN->mouse_click (mevent.x, mevent.y, button);
-	    }
+	  for (tui_win_info *wi : all_tui_windows ())
+	    if (mev.x >= wi->x && mev.x < wi->x + wi->width
+		&& mev.y >= wi->y && mev.y < wi->y + wi->height)
+	      {
+		if ((mev.bstate & BUTTON1_CLICKED)
+		    || (mev.bstate & BUTTON2_CLICKED)
+		    || (mev.bstate & BUTTON3_CLICKED))
+		  {
+		    int button = (mev.bstate & BUTTON1_CLICKED) ? 1
+		      : (mev.bstate & BUTTON2_CLICKED) ? 2
+		      : 3;
+		    wi->mouse_click (mev.x - wi->x, mev.y - wi->y, button);
+		  }
 #ifdef BUTTON5_PRESSED
-          else if (mevent.bstate & BUTTON4_PRESSED)
-	    win_info->backward_scroll (3);
-	  else if (mevent.bstate & BUTTON5_PRESSED)
-	    win_info->forward_scroll (3);
+		else if (mev.bstate & BUTTON4_PRESSED)
+		  wi->backward_scroll (3);
+		else if (mev.bstate & BUTTON5_PRESSED)
+		  wi->forward_scroll (3);
 #endif
+		break;
+	      }
 	}
       break;
     case '\f':

@@ -137,6 +137,10 @@ public:
     return true;
   }
 
+  virtual void mouse_click (int mouse_x, int mouse_y, int mouse_button)
+  {
+  }
+
   void check_and_display_highlight_if_needed ();
 
   /* Window handle.  */
