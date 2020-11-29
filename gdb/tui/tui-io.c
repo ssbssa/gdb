@@ -936,8 +936,8 @@ tui_dispatch_ctrl_char (unsigned int ch)
 	    break;
 
 	  for (tui_win_info *wi : all_tui_windows ())
-	    if (mev.x >= wi->x && mev.x < wi->x + wi->width
-		&& mev.y >= wi->y && mev.y < wi->y + wi->height)
+	    if (mev.x > wi->x && mev.x < wi->x + wi->width - 1
+		&& mev.y > wi->y && mev.y < wi->y + wi->height - 1)
 	      {
 		if ((mev.bstate & BUTTON1_CLICKED)
 		    || (mev.bstate & BUTTON2_CLICKED)
@@ -946,7 +946,7 @@ tui_dispatch_ctrl_char (unsigned int ch)
 		    int button = (mev.bstate & BUTTON1_CLICKED) ? 1
 		      : (mev.bstate & BUTTON2_CLICKED) ? 2
 		      : 3;
-		    wi->mouse_click (mev.x - wi->x, mev.y - wi->y, button);
+		    wi->click (mev.x - wi->x - 1, mev.y - wi->y - 1, button);
 		  }
 #ifdef BUTTON5_PRESSED
 		else if (mev.bstate & BUTTON4_PRESSED)

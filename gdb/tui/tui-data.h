@@ -137,7 +137,7 @@ public:
     return true;
   }
 
-  virtual void mouse_click (int mouse_x, int mouse_y, int mouse_button)
+  virtual void click (int mouse_x, int mouse_y, int mouse_button)
   {
   }
 
