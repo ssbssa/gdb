@@ -28,6 +28,7 @@
 #include "cp-abi.h"
 #include "target.h"
 #include "objfiles.h"
+#include "cli/cli-style.h"
 
 
 /* A helper for c_textual_element_type.  This checks the name of the
@@ -158,7 +159,7 @@ print_unpacked_pointer (struct type *type, struct type *elttype,
 					 demangle);
   else if (options->addressprint)
     {
-      gdb_puts (paddress (gdbarch, address), stream);
+      fputs_styled (paddress (gdbarch, address), address_style.style (), stream);
       want_space = 1;
     }
 
