@@ -617,6 +617,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
       "array_indexes",		/* See set print array-indexes on|off.  */
       "symbols",		/* See set print symbol on|off.  */
       "unions",			/* See set print union on|off.  */
+      "address",		/* See set print address on|off.  */
       "zero_values",		/* See set print zero-values on|off.  */
       /* C++ options.  */
       "deref_refs",		/* No corresponding setting.  */
@@ -661,6 +662,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
   PyObject *array_indexes_obj = NULL;
   PyObject *symbols_obj = NULL;
   PyObject *unions_obj = NULL;
+  PyObject *address_obj = NULL;
   PyObject *zero_values_obj = NULL;
   PyObject *deref_refs_obj = NULL;
   PyObject *actual_objects_obj = NULL;
@@ -668,7 +670,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
   char *format = NULL;
   if (!gdb_PyArg_ParseTupleAndKeywords (args,
 					kw,
-					"|O!O!O!O!O!O!O!O!O!O!IIIs",
+					"|O!O!O!O!O!O!O!O!O!O!O!IIIs",
 					keywords,
 					&PyBool_Type, &raw_obj,
 					&PyBool_Type, &pretty_arrays_obj,
@@ -676,6 +678,7 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
 					&PyBool_Type, &array_indexes_obj,
 					&PyBool_Type, &symbols_obj,
 					&PyBool_Type, &unions_obj,
+					&PyBool_Type, &address_obj,
 					&PyBool_Type, &zero_values_obj,
 					&PyBool_Type, &deref_refs_obj,
 					&PyBool_Type, &actual_objects_obj,
@@ -698,6 +701,8 @@ valpy_format_string (PyObject *self, PyObject *args, PyObject *kw)
   if (!copy_py_bool_obj (&opts.symbol_print, symbols_obj))
     return NULL;
   if (!copy_py_bool_obj (&opts.unionprint, unions_obj))
+    return NULL;
+  if (!copy_py_bool_obj (&opts.addressprint, address_obj))
     return NULL;
   if (!copy_py_bool_obj (&opts.zero_value_print, zero_values_obj))
     return NULL;

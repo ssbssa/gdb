@@ -906,6 +906,11 @@ corresponding symbol name (if one exists), @code{False} if it shouldn't
 should be expanded, @code{False} if they shouldn't (see @code{set print
 union} in @ref{Print Settings}).
 
+@item address
+@code{True} if the string representation of a pointer should include the
+address, @code{False} if it shouldn't (see @code{set print address} in
+@ref{Print Settings}).
+
 @item zero_values
 @code{True} if zero value members should be included in the string
 representation of structures and arrays, @code{False} if they shouldn't
