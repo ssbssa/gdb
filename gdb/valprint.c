@@ -444,7 +444,7 @@ print_unpacked_pointer (struct type *type, struct type *elttype,
   if (options->symbol_print)
     print_address_demangle (options, gdbarch, address, stream, demangle);
   else if (options->addressprint)
-    gdb_puts (paddress (gdbarch, address), stream);
+    fputs_styled (paddress (gdbarch, address), address_style.style (), stream);
 }
 
 /* generic_val_print helper for TYPE_CODE_ARRAY.  */
