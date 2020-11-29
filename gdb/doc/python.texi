@@ -5925,6 +5925,10 @@ contents.  A positive argument should cause the viewport to move down,
 and so the content should appear to move up.
 @end defun
 
+@defun Window.click (@var{x}, @var{y}, @var{button})
+This is called when a mouse click happened inside this window.
+@end defun
+
 @node Python Auto-loading
 @subsection Python Auto-loading
 @cindex Python auto-loading
