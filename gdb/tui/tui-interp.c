@@ -38,6 +38,7 @@
 /* Set to true when the TUI mode must be activated when we first start
    gdb.  */
 static bool tui_start_enabled = false;
+bool tui_auto_display = true;
 
 class tui_interp final : public cli_interp_base
 {
@@ -99,7 +100,8 @@ tui_on_normal_stop (struct bpstat *bs, int print_frame)
 
       thread = inferior_thread ();
       if (should_print_stop_to_console (interp, thread))
-	print_stop_event (tui->interp_ui_out ());
+	print_stop_event (tui->interp_ui_out (),
+			  !tui_active || tui_auto_display);
     }
 }
 
