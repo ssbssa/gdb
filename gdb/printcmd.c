@@ -1726,6 +1726,11 @@ x_command (const char *exp, int from_tty)
 }
 
 
+#ifdef TUI
+extern bool tui_active;
+extern bool tui_auto_display;
+#endif
+
 /* Add an expression to the auto-display chain.
    Specify the expression.  */
 
@@ -1765,6 +1770,11 @@ display_command (const char *arg, int from_tty)
   newobj = new display (exp, std::move (expr), fmt,
 			current_program_space, tracker.block ());
   all_displays.emplace_back (newobj);
+
+#ifdef TUI
+  if (tui_active && !tui_auto_display)
+    from_tty = 0;
+#endif
 
   if (from_tty)
     do_one_display (newobj);
