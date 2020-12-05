@@ -111,6 +111,11 @@ should_print_stop_to_console (struct interp *console_interp,
   return 0;
 }
 
+#ifdef TUI
+extern bool tui_active;
+bool tui_auto_display = true;
+#endif
+
 /* Observers for several run control events.  If the interpreter is
    quiet (i.e., another interpreter is being run with
    interpreter-exec), print nothing.  These are named "cli_base" as
@@ -137,7 +142,11 @@ cli_base_on_normal_stop (struct bpstat *bs, int print_frame)
 
       thread_info *thread = inferior_thread ();
       if (should_print_stop_to_console (interp, thread))
-	print_stop_event (cli->interp_ui_out ());
+	print_stop_event (cli->interp_ui_out ()
+#ifdef TUI
+			  , !tui_active || tui_auto_display
+#endif
+			  );
     }
 }
 
