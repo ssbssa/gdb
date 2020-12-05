@@ -1027,6 +1027,28 @@ gdbpy_invalidate_cached_frames (PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+#ifdef TUI
+extern bool tui_auto_display;
+
+/* Submit an event to the gdb thread.  */
+static PyObject *
+gdbpy_set_tui_auto_display (PyObject *self, PyObject *args)
+{
+  PyObject *auto_display_obj = NULL;
+
+  if (!PyArg_ParseTuple (args, "O!", &PyBool_Type, &auto_display_obj))
+    return NULL;
+
+  int auto_display = PyObject_IsTrue (auto_display_obj);
+  if (auto_display < 0)
+    return NULL;
+
+  tui_auto_display = auto_display;
+
+  Py_RETURN_NONE;
+}
+#endif
+
 /* Read a file as Python code.
    This is the extension_language_script_ops.script_sourcer "method".
    FILE is the file to load.  FILENAME is name of the file FILE.
@@ -2647,6 +2669,10 @@ Set the value of the convenience variable $NAME." },
     METH_VARARGS | METH_KEYWORDS,
     "register_window_type (NAME, CONSTRUCTOR) -> None\n\
 Register a TUI window constructor." },
+
+  { "set_tui_auto_display", gdbpy_set_tui_auto_display, METH_VARARGS,
+    "set_tui_auto_display (value) -> None\n\
+Set automatic display in TUI." },
 #endif	/* TUI */
 
   { "architecture_names", gdbpy_all_architecture_names, METH_NOARGS,
