@@ -2281,7 +2281,9 @@ Num Enb Expression\n"));
 	printf_filtered ("/%d%c%c ", d->format.count, d->format.size,
 			 d->format.format);
       else if (d->format.format)
-	printf_filtered ("/%c ", d->format.format);
+	printf_filtered ("/%s%c ", d->format.raw ? "r" : "", d->format.format);
+      else if (d->format.raw)
+	printf_filtered ("/r ");
       puts_filtered (d->exp_string.c_str ());
       if (d->block && !contained_in (get_selected_block (0), d->block, true))
 	printf_filtered (_(" (cannot be evaluated in the current context)"));
