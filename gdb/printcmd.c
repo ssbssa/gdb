@@ -2300,7 +2300,9 @@ Num Enb Expression\n"));
 	gdb_printf ("/%d%c%c ", d->format.count, d->format.size,
 		    d->format.format);
       else if (d->format.format)
-	gdb_printf ("/%c ", d->format.format);
+	gdb_printf ("/%s%c ", d->format.raw ? "r" : "", d->format.format);
+      else if (d->format.raw)
+	gdb_printf ("/r ");
       gdb_puts (d->exp_string.c_str ());
       if (d->block && !d->block->contains (get_selected_block (0), true))
 	gdb_printf (_(" (cannot be evaluated in the current context)"));
