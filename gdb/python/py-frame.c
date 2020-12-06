@@ -29,6 +29,11 @@
 #include "symfile.h"
 #include "objfiles.h"
 
+#ifdef TUI
+#include "tui/tui.h"
+#include "tui/tui-hooks.h"
+#endif
+
 struct frame_object {
   PyObject_HEAD
   struct frame_id frame_id;
@@ -563,12 +568,34 @@ static PyObject *
 frapy_select (PyObject *self, PyObject *args)
 {
   frame_info_ptr fi;
+  PyObject *update_sal_obj = NULL;
+
+  if (!PyArg_ParseTuple (args, "|O!", &PyBool_Type, &update_sal_obj))
+    return NULL;
+
+  int update_sal = 0;
+  if (update_sal_obj)
+    {
+      update_sal = PyObject_IsTrue (update_sal_obj);
+      if (update_sal < 0)
+	return NULL;
+    }
 
   try
     {
       FRAPY_REQUIRE_VALID (self, fi);
 
       select_frame (fi);
+
+      if (update_sal)
+	{
+	  set_current_sal_from_frame (fi);
+
+#ifdef TUI
+	  if (tui_active)
+	    tui_frame_changed ();
+#endif
+	}
     }
   catch (const gdb_exception &except)
     {
@@ -818,7 +845,7 @@ Return the frame's symtab and line." },
   { "read_var", (PyCFunction) frapy_read_var, METH_VARARGS | METH_KEYWORDS,
     "read_var (variable) -> gdb.Value.\n\
 Return the value of the variable in this frame." },
-  { "select", frapy_select, METH_NOARGS,
+  { "select", frapy_select, METH_VARARGS,
     "Select this frame as the user's current frame." },
   { "level", frapy_level, METH_NOARGS,
     "The stack level of this frame." },
