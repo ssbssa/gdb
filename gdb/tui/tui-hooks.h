@@ -20,6 +20,8 @@
 #ifndef TUI_TUI_HOOKS_H
 #define TUI_TUI_HOOKS_H
 
+extern void tui_frame_changed (void);
+
 extern void tui_install_hooks (void);
 extern void tui_remove_hooks (void);
 
