@@ -187,6 +187,14 @@ tui_before_prompt (const char *current_gdb_prompt)
   from_source_symtab = false;
 }
 
+void
+tui_frame_changed (void)
+{
+  from_stack = true;
+  tui_refresh_frame_and_register_information ();
+  from_stack = false;
+}
+
 /* Observer for the normal_stop notification.  */
 
 static void
