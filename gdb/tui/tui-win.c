@@ -854,6 +854,23 @@ tui_show_compact_source (struct ui_file *file, int from_tty,
   gdb_printf (file, _("TUI source window compactness is %s.\n"), value);
 }
 
+bool asm_function = false;
+
+static void
+tui_set_asm_function (const char *ignore, int from_tty,
+		      struct cmd_list_element *c)
+{
+  if (TUI_DISASM_WIN != nullptr)
+    TUI_DISASM_WIN->refill ();
+}
+
+static void
+tui_show_asm_function (struct ui_file *file, int from_tty,
+		       struct cmd_list_element *c, const char *value)
+{
+  gdb_printf (file, _("Functions in TUI asm window is %s.\n"), value);
+}
+
 /* Set the tab width of the specified window.  */
 static void
 tui_set_tab_width_command (const char *arg, int from_tty)
@@ -1240,6 +1257,14 @@ position indicator is styled."),
 			   show_style_tui_current_position,
 			   &style_set_list,
 			   &style_show_list);
+
+  add_setshow_boolean_cmd ("asm-function", class_tui,
+			   &asm_function, _("\
+Set whether the TUI asm window prints function names."), _("\
+Show whether the TUI asm window prints function names."),
+			   nullptr,
+			   tui_set_asm_function, tui_show_asm_function,
+			   &tui_setlist, &tui_showlist);
 
   tui_border_style.changed.attach (tui_rehighlight_all, "tui-win");
   tui_active_border_style.changed.attach (tui_rehighlight_all, "tui-win");
