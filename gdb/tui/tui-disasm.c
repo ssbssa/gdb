@@ -38,6 +38,9 @@
 #include "tui/tui-location.h"
 #include "gdbsupport/selftest.h"
 #include "inferior.h"
+#include "valprint.h"
+
+extern bool asm_function;
 
 struct tui_asm_line
 {
@@ -96,7 +99,8 @@ static CORE_ADDR
 tui_disassemble (struct gdbarch *gdbarch,
 		 std::vector<tui_asm_line> &asm_lines,
 		 CORE_ADDR pc, int count,
-		 size_t *addr_size = nullptr)
+		 size_t *addr_size = nullptr,
+		 std::string *function_name = nullptr)
 {
   bool term_out = disassembler_styling && gdb_stdout->can_emit_style_escape ();
   string_file gdb_dis_out (term_out);
@@ -140,7 +144,28 @@ tui_disassemble (struct gdbarch *gdbarch,
       tal.insn = gdb_dis_out.release ();
 
       /* And capture the address the instruction is at.  */
-      print_address (gdbarch, tal.addr, &gdb_dis_out);
+      if (asm_function)
+	print_address (gdbarch, tal.addr, &gdb_dis_out);
+      else
+	{
+	  fputs_styled (paddress (gdbarch, tal.addr),
+			address_style.style (), &gdb_dis_out);
+
+	  std::string name, filename;
+	  int unmapped = 0;
+	  int offset = 0;
+	  int line = 0;
+	  if (!build_address_symbolic (gdbarch, tal.addr, asm_demangle, false,
+				       &name, &offset, &filename, &line,
+				       &unmapped))
+	    {
+	      if (i == 0 && function_name != nullptr)
+		*function_name = std::move (name);
+
+	      gdb_printf (&gdb_dis_out, " <%s%+d>",
+			  unmapped ? "*" : "", offset);
+	    }
+	}
       tal.addr_string = gdb_dis_out.release ();
       tal.addr_size = (term_out
 		       ? len_without_escapes (tal.addr_string)
@@ -343,7 +368,9 @@ tui_disasm_window::set_contents (struct gdbarch *arch,
   /* Get temporary table that will hold all strings (addr & insn).  */
   std::vector<tui_asm_line> asm_lines;
   size_t addr_size = 0;
-  tui_disassemble (m_gdbarch, asm_lines, pc, max_lines, &addr_size);
+  std::string function;
+  tui_disassemble (m_gdbarch, asm_lines, pc, max_lines, &addr_size, &function);
+  set_title (std::move (function));
 
   /* Align instructions to the same column.  */
   insn_pos = (1 + (addr_size / tab_len)) * tab_len;
