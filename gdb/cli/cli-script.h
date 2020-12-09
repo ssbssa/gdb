@@ -134,7 +134,7 @@ extern void execute_control_commands (struct command_line *cmdlines,
    will be temporarily set to true.  */
 
 extern std::string execute_control_commands_to_string
-    (struct command_line *commands, int from_tty);
+    (struct command_line *commands, int from_tty, bool styled = false);
 
 /* Exported to gdb/breakpoint.c */
 
