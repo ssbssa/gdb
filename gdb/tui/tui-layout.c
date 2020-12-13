@@ -97,6 +97,8 @@ tui_apply_current_layout (bool preserve_cmd_win_size_p)
 
   /* Replace the global list of active windows.  */
   tui_windows = std::move (new_tui_windows);
+
+  tui_update_gdb_sizes ();
 }
 
 /* See tui-layout.  */
