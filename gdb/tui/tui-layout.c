@@ -113,6 +113,8 @@ tui_apply_current_layout (bool preserve_cmd_win_size_p)
   if (gdbarch == nullptr && TUI_DISASM_WIN != nullptr)
     tui_get_begin_asm_address (&gdbarch, &addr);
   tui_update_source_windows_with_addr (gdbarch, addr);
+
+  tui_update_gdb_sizes ();
 }
 
 /* See tui-layout.  */
