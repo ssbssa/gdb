@@ -757,6 +757,69 @@ typy_volatile (PyObject *self, PyObject *args)
   return type_to_type_object (type);
 }
 
+static PyObject *
+search_struct_method (struct type *type, const char *name)
+{
+  type = check_typedef (type);
+  if (type->code () != TYPE_CODE_STRUCT
+      && type->code () != TYPE_CODE_UNION)
+    error (_("This type does not have methods."));
+
+  for (int i = TYPE_NFN_FIELDS (type) - 1; i >= 0; i--)
+    {
+      const char *t_field_name = TYPE_FN_FIELDLIST_NAME (type, i);
+
+      if (t_field_name && (strcmp_iw (t_field_name, name) == 0))
+	{
+	  int l = TYPE_FN_FIELDLIST_LENGTH (type, i);
+	  struct fn_field *f = TYPE_FN_FIELDLIST1 (type, i);
+
+	  check_stub_method_group (type, i);
+	  if (l == 1)
+	    return type_to_type_object (TYPE_FN_FIELD_TYPE (f, 0));
+
+	  gdbpy_ref<> return_list (PyList_New (0));
+
+	  if (return_list == NULL)
+	    return NULL;
+
+	  for (int j = 0; j < l; j++)
+	    {
+	      gdbpy_ref<> obj (type_to_type_object (TYPE_FN_FIELD_TYPE (f, j)));
+
+	      if (PyList_Append (return_list.get (), obj.get ()) == -1)
+		return NULL;
+	    }
+
+	  return return_list.release ();
+	}
+    }
+
+  error (_("This type does not have method `%s'."), name);
+}
+
+static PyObject *
+typy_method (PyObject *self, PyObject *args)
+{
+  struct type *type = ((type_object *) self)->type;
+  const char *name;
+
+  if (!PyArg_ParseTuple (args, "s", &name))
+    return nullptr;
+
+  PyObject *type_obj = NULL;
+  try
+    {
+      type_obj = search_struct_method (type, name);
+    }
+  catch (const gdb_exception &except)
+    {
+      GDB_PY_HANDLE_EXCEPTION (except);
+    }
+
+  return type_obj;
+}
+
 /* Return an unqualified type variant.  */
 static PyObject *
 typy_unqualified (PyObject *self, PyObject *args)
@@ -1655,6 +1718,10 @@ Each field is a gdb.Field object." },
   { "volatile", typy_volatile, METH_NOARGS,
     "volatile () -> Type\n\
 Return a volatile variant of this type" },
+  { "method", typy_method, METH_VARARGS,
+    "method (name) -> Type\n\
+Return the type of the method."
+  },
   { NULL }
 };
 
