@@ -426,7 +426,9 @@ tui_layout_window::apply (int x_, int y_, int width_, int height_)
   height = height_;
   gdb_assert (m_window != nullptr);
   m_window->resize (height, width, x, y);
-  tui_windows.push_back (m_window);
+  if (std::find (tui_windows.begin (), tui_windows.end (),
+		 m_window) == tui_windows.end ())
+    tui_windows.push_back (m_window);
 }
 
 /* See tui-layout.h.  */
