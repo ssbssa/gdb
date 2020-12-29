@@ -142,10 +142,12 @@ extern void execute_control_commands (struct command_line *cmdlines,
 
 /* Run execute_control_commands for COMMANDS.  Capture its output into
    the returned string, do not display it to the screen.  BATCH_FLAG
-   will be temporarily set to true.  */
+   will be temporarily set to true.  With STYLED=true the returned string
+   also contains the ANSI terminal escape styling sequences used for
+   colored output.  */
 
 extern std::string execute_control_commands_to_string
-    (struct command_line *commands, int from_tty);
+    (struct command_line *commands, int from_tty, bool styled = false);
 
 /* Exported to gdb/breakpoint.c */
 
