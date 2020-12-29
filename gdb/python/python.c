@@ -573,13 +573,16 @@ static PyObject *
 execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
 {
   const char *arg;
-  PyObject *from_tty_obj = NULL, *to_string_obj = NULL;
+  PyObject *from_tty_obj = NULL, *to_string_obj = NULL, *styled_obj = NULL;
   int from_tty, to_string;
-  static const char *keywords[] = { "command", "from_tty", "to_string", NULL };
+  bool styled;
+  static const char *keywords[] = { "command", "from_tty", "to_string",
+				    "styled", NULL };
 
-  if (!gdb_PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!", keywords, &arg,
+  if (!gdb_PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!O!", keywords, &arg,
 					&PyBool_Type, &from_tty_obj,
-					&PyBool_Type, &to_string_obj))
+					&PyBool_Type, &to_string_obj,
+					&PyBool_Type, &styled_obj))
     return NULL;
 
   from_tty = 0;
@@ -598,6 +601,15 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
       if (cmp < 0)
 	return NULL;
       to_string = cmp;
+    }
+
+  styled = false;
+  if (styled_obj)
+    {
+      int cmp = PyObject_IsTrue (styled_obj);
+      if (cmp < 0)
+	return NULL;
+      styled = cmp != 0;
     }
 
   std::string to_string_res;
@@ -637,7 +649,8 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
 
 	if (to_string)
 	  to_string_res = execute_control_commands_to_string (lines.get (),
-							      from_tty);
+							      from_tty,
+							      styled);
 	else
 	  execute_control_commands (lines.get (), from_tty);
       }
