@@ -422,13 +422,13 @@ execute_control_commands (struct command_line *cmdlines, int from_tty)
 
 std::string
 execute_control_commands_to_string (struct command_line *commands,
-				    int from_tty)
+				    int from_tty, bool styled)
 {
   /* GDB_STDOUT should be better already restored during these
      restoration callbacks.  */
   set_batch_flag_and_restore_page_info save_page_info;
 
-  string_file str_file;
+  string_file str_file (styled);
 
   {
     current_uiout->redirect (&str_file);
