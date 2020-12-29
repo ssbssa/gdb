@@ -422,14 +422,14 @@ execute_control_commands (struct command_line *cmdlines, int from_tty)
 
 std::string
 execute_control_commands_to_string (struct command_line *commands,
-				    int from_tty)
+				    int from_tty, bool styled)
 {
   std::string result;
 
   execute_fn_to_string (result, [&] ()
     {
       execute_control_commands (commands, from_tty);
-    }, false);
+    }, styled);
 
   return result;
 }
