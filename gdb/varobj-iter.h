@@ -26,6 +26,10 @@ struct varobj_item
 
   /* Value of this item.  */
   value_ref_ptr value;
+
+#if HAVE_PYTHON
+  void *pretty_printer;
+#endif
 };
 
 /* A dynamic varobj iterator "class".  */
