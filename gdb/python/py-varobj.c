@@ -102,9 +102,17 @@ py_varobj_iter_next (struct varobj_iter *self)
     }
 
   vitem = new varobj_item ();
-  vitem->value = convert_value_from_python (py_v);
-  if (vitem->value == NULL)
-    gdbpy_print_stack ();
+  if (PyObject_HasAttr (py_v, gdbpy_to_string_cst)
+      || PyObject_HasAttr (py_v, gdbpy_children_cst))
+    {
+      vitem->pretty_printer = py_v;
+    }
+  else
+    {
+      vitem->value = convert_value_from_python (py_v);
+      if (vitem->value == NULL)
+	gdbpy_print_stack ();
+    }
   vitem->name = name;
 
   self->next_raw_index++;

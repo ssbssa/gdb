@@ -26,6 +26,10 @@ typedef struct varobj_item
 
   /* Value of this item.  */
   struct value *value;
+
+#if HAVE_PYTHON
+  void *pretty_printer;
+#endif
 } varobj_item;
 
 struct varobj_iter_ops;
