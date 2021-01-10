@@ -350,6 +350,13 @@ print_string_repr (PyObject *printer, const char *hint,
   return result;
 }
 
+static enum ext_lang_rc
+gdbpy_apply_pretty_printer(PyObject *printer, struct ui_file *stream,
+			   int recurse,
+			   const struct value_print_options *options,
+			   const struct language_defn *language,
+			   struct gdbarch *gdbarch);
+
 /* Helper for gdbpy_apply_val_pretty_printer that formats children of the
    printer, if any exist.  If is_py_none is true, then nothing has
    been printed by to_string, and format output accordingly. */
@@ -358,6 +365,7 @@ print_children (PyObject *printer, const char *hint,
 		struct ui_file *stream, int recurse,
 		const struct value_print_options *options,
 		const struct language_defn *language,
+		struct gdbarch *gdbarch,
 		int is_py_none)
 {
   int is_map, is_array, done_flag, pretty;
@@ -520,6 +528,12 @@ print_children (PyObject *printer, const char *hint,
 	  else
 	    gdb_puts (output.get (), stream);
 	}
+      else if (PyObject_HasAttr (py_v, gdbpy_to_string_cst)
+	       || PyObject_HasAttr (py_v, gdbpy_children_cst))
+	{
+	  gdbpy_apply_pretty_printer(py_v, stream, recurse + 1, options,
+				     language, gdbarch);
+	}
       else
 	{
 	  struct value *value = convert_value_from_python (py_v);
@@ -576,7 +590,6 @@ gdbpy_apply_val_pretty_printer (const struct extension_language_defn *extlang,
 {
   struct type *type = value_type (value);
   struct gdbarch *gdbarch = type->arch ();
-  enum gdbpy_string_repr_result print_result;
 
   if (value_lazy (value))
     value_fetch_lazy (value);
@@ -611,15 +624,27 @@ gdbpy_apply_val_pretty_printer (const struct extension_language_defn *extlang,
   scoped_restore set_options = make_scoped_restore (&gdbpy_current_print_options,
 						    options);
 
+  return gdbpy_apply_pretty_printer(printer.get (), stream, recurse, options, language, gdbarch);
+}
+
+static enum ext_lang_rc
+gdbpy_apply_pretty_printer(PyObject *printer, struct ui_file *stream,
+			   int recurse,
+			   const struct value_print_options *options,
+			   const struct language_defn *language,
+			   struct gdbarch *gdbarch)
+{
+  enum gdbpy_string_repr_result print_result;
+
   /* If we are printing a map, we want some special formatting.  */
-  gdb::unique_xmalloc_ptr<char> hint (gdbpy_get_display_hint (printer.get ()));
+  gdb::unique_xmalloc_ptr<char> hint (gdbpy_get_display_hint (printer));
 
   /* Print the section */
-  print_result = print_string_repr (printer.get (), hint.get (), stream,
+  print_result = print_string_repr (printer, hint.get (), stream,
 				    recurse, options, language, gdbarch);
   if (print_result != string_repr_error)
-    print_children (printer.get (), hint.get (), stream, recurse, options,
-		    language, print_result == string_repr_none);
+    print_children (printer, hint.get (), stream, recurse, options,
+		    language, gdbarch, print_result == string_repr_none);
 
   if (PyErr_Occurred ())
     print_stack_unless_memory_error (stream);
