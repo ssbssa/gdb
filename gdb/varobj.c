@@ -1794,6 +1794,9 @@ create_child (struct varobj *parent, int index, std::string &name)
 
   std::swap (item.name, name);
   item.value = release_value (value_of_child (parent, index));
+#if HAVE_PYTHON
+  item.pretty_printer = NULL;
+#endif
 
   return create_child_with_value (parent, index, &item);
 }
@@ -1808,6 +1811,11 @@ create_child_with_value (struct varobj *parent, int index,
   std::swap (child->name, item->name);
   child->index = index;
   child->parent = parent;
+
+#if HAVE_PYTHON
+  child->dynamic->pretty_printer = (PyObject *) item->pretty_printer;
+  Py_XINCREF (child->dynamic->pretty_printer);
+#endif
 
   if (varobj_is_anonymous_child (child))
     child->obj_name = string_printf ("%s.%d_anonymous",
@@ -2161,7 +2169,11 @@ varobj_value_get_print_value (struct value *value,
   CORE_ADDR str_addr = 0;
   bool string_print = false;
 
-  if (value == NULL)
+  if (value == NULL
+#if HAVE_PYTHON
+      && var->dynamic->pretty_printer == NULL
+#endif
+      )
     return std::string ();
 
   string_file stb;
@@ -2257,6 +2269,10 @@ varobj_value_get_print_value (struct value *value,
     /* Otherwise, if string_print is set, and it is not a regular
        string, it is a lazy string.  */
     val_print_string (type, encoding.get (), str_addr, len, &stb, &opts);
+#if HAVE_PYTHON
+  else if (value == NULL)
+    return std::string ();
+#endif
   else
     /* All other cases.  */
     common_val_print (value, &stb, 0, &opts, current_language);

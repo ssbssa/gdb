@@ -119,9 +119,17 @@ py_varobj_iter::next ()
     }
 
   vitem = new varobj_item ();
-  vitem->value = release_value (convert_value_from_python (py_v));
-  if (vitem->value == NULL)
-    gdbpy_print_stack ();
+  if (PyObject_HasAttr (py_v, gdbpy_to_string_cst)
+      || PyObject_HasAttr (py_v, gdbpy_children_cst))
+    {
+      vitem->pretty_printer = py_v;
+    }
+  else
+    {
+      vitem->value = release_value (convert_value_from_python (py_v));
+      if (vitem->value == NULL)
+	gdbpy_print_stack ();
+    }
   vitem->name = name;
 
   m_next_raw_index++;
