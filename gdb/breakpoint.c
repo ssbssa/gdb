@@ -422,6 +422,8 @@ static std::string dprintf_channel;
    has disconnected.  */
 static bool disconnected_dprintf = true;
 
+static bool plt_breakpoints = false;
+
 struct command_line *
 breakpoint_commands (struct breakpoint *b)
 {
@@ -8406,6 +8408,13 @@ update_dprintf_commands (const char *args, int from_tty,
 	update_dprintf_command_list (b);
 }
 
+static bool is_plt_sal (const symtab_and_line &sal)
+{
+  return sal.section != nullptr && sal.section->the_bfd_section != nullptr
+    && sal.section->the_bfd_section->name != nullptr
+    && strcmp (sal.section->the_bfd_section->name, ".plt") == 0;
+}
+
 code_breakpoint::code_breakpoint (struct gdbarch *gdbarch_,
 				  enum bptype type_,
 				  gdb::array_view<const symtab_and_line> sals,
@@ -8482,6 +8491,9 @@ code_breakpoint::code_breakpoint (struct gdbarch *gdbarch_,
 
   for (const auto &sal : sals)
     {
+      if (!plt_breakpoints && sals.size() > 1 && is_plt_sal (sal))
+	continue;
+
       if (from_tty)
 	{
 	  struct gdbarch *loc_gdbarch = get_sal_arch (sal);
@@ -12702,6 +12714,9 @@ update_breakpoint_locations (code_breakpoint *b,
     {
       struct bp_location *new_loc;
 
+      if (!plt_breakpoints && sals.size() > 1 && is_plt_sal (sal))
+	continue;
+
       switch_to_program_space_and_thread (sal.pspace);
 
       new_loc = b->add_location (sal);
@@ -14928,6 +14943,15 @@ Target agent only formatted printing, like the C \"printf\" function.\n\
 Usage: agent-printf \"format string\", ARG1, ARG2, ARG3, ..., ARGN\n\
 This supports most C printf format specifications, like %s, %d, etc.\n\
 This is useful for formatted output in user-defined commands."));
+
+  add_setshow_boolean_cmd ("plt-breakpoints", no_class,
+			   &plt_breakpoints, _("\
+Set whether breakpoints are created for plt functions."), _("\
+Show whether breakpoints are created for plt functions."), _("\
+If set, breakpoints are created for plt functions as well."),
+			   NULL,
+			   NULL,
+			   &setlist, &showlist);
 
   automatic_hardware_breakpoints = true;
 
