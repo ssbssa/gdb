@@ -292,6 +292,8 @@ static char *dprintf_channel;
    has disconnected.  */
 static bool disconnected_dprintf = true;
 
+static bool plt_breakpoints = false;
+
 struct command_line *
 breakpoint_commands (struct breakpoint *b)
 {
@@ -8830,6 +8832,13 @@ update_dprintf_commands (const char *args, int from_tty,
 	update_dprintf_command_list (b);
 }
 
+static bool is_plt_sal (const symtab_and_line &sal)
+{
+  return sal.section != nullptr && sal.section->the_bfd_section != nullptr
+    && sal.section->the_bfd_section->name != nullptr
+    && strcmp (sal.section->the_bfd_section->name, ".plt") == 0;
+}
+
 /* Create a breakpoint with SAL as location.  Use LOCATION
    as a description of the location, and COND_STRING
    as condition expression.  If LOCATION is NULL then create an
@@ -8866,9 +8875,13 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 
   gdb_assert (!sals.empty ());
 
+  bool is_first_sal = true;
   for (const auto &sal : sals)
     {
       struct bp_location *loc;
+
+      if (!plt_breakpoints && sals.size() > 1 && is_plt_sal (sal))
+	continue;
 
       if (from_tty)
 	{
@@ -8880,8 +8893,10 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 				      sal.pspace, sal.pc, sal.section, thread);
 	}
 
-      if (&sal == &sals[0])
+      if (is_first_sal)
 	{
+	  is_first_sal = false;
+
 	  init_raw_breakpoint (b, gdbarch, sal, type, ops);
 	  b->thread = thread;
 	  b->task = task;
@@ -13619,6 +13634,9 @@ update_breakpoint_locations (struct breakpoint *b,
     {
       struct bp_location *new_loc;
 
+      if (!plt_breakpoints && sals.size() > 1 && is_plt_sal (sal))
+	continue;
+
       switch_to_program_space_and_thread (sal.pspace);
 
       new_loc = add_location_to_breakpoint (b, &sal);
@@ -16072,6 +16090,15 @@ Target agent only formatted printing, like the C \"printf\" function.\n\
 Usage: agent-printf \"format string\", ARG1, ARG2, ARG3, ..., ARGN\n\
 This supports most C printf format specifications, like %s, %d, etc.\n\
 This is useful for formatted output in user-defined commands."));
+
+  add_setshow_boolean_cmd ("plt-breakpoints", no_class,
+			   &plt_breakpoints, _("\
+Set whether breakpoints are created for plt functions."), _("\
+Show whether breakpoints are created for plt functions."), _("\
+If set, breakpoints are created for plt functions as well."),
+			   NULL,
+			   NULL,
+			   &setlist, &showlist);
 
   automatic_hardware_breakpoints = true;
 
