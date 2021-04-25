@@ -24,9 +24,9 @@ else
 endif
 
 
-EXPAT_VER=2.2.6
+EXPAT_VER=2.3.0
 EXPAT_SRC_DIR=expat-$(EXPAT_VER)
-EXPAT_FILE=$(EXPAT_SRC_DIR).tar.bz2
+EXPAT_FILE=$(EXPAT_SRC_DIR).tar.xz
 EXPAT_CONF=$(SOURCE_DIR_ABS)/$(EXPAT_SRC_DIR)/configure \
 	   --build=$(MYBUILD) --host=$(MYTARGET) \
 	   --enable-static --disable-shared --prefix=$(GDB_LIBS)
@@ -38,7 +38,7 @@ PDCURSES_CONF=$(SOURCE_DIR_ABS)/$(PDCURSES_SRC_DIR)/configure \
 	      --build=$(MYBUILD) --host=$(MYTARGET) \
 	      --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
-ICONV_VER=1.15
+ICONV_VER=1.16
 ICONV_SRC_DIR=libiconv-$(ICONV_VER)
 ICONV_FILE=$(ICONV_SRC_DIR).tar.gz
 ICONV_CONF=$(SOURCE_DIR_ABS)/$(ICONV_SRC_DIR)/configure \
@@ -61,6 +61,13 @@ SOURCE_HIGHLIGHT_CONF=$(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/configure \
 		      --with-boost=$(GDB_LIBS) \
 		      --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
+LZMA_VER=5.2.5
+LZMA_SRC_DIR=xz-$(LZMA_VER)
+LZMA_FILE=$(LZMA_SRC_DIR).tar.xz
+LZMA_CONF=$(SOURCE_DIR_ABS)/$(LZMA_SRC_DIR)/configure \
+	  --build=$(MYBUILD) --host=$(MYTARGET) \
+	  --enable-static --disable-shared --prefix=$(GDB_LIBS)
+
 GDB_VER=8.1.1
 GDB_SRC_DIR=gdb-$(GDB_VER)
 GDB_FILE=$(GDB_SRC_DIR).tar.xz
@@ -80,6 +87,7 @@ GDB_GIT_CONF=$(GDB_GIT_DIR)/configure \
 	 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
 	 --enable-curses --enable-tui \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
+	 --with-liblzma-prefix=$(GDB_LIBS) \
 	 --disable-install-libbfd --disable-install-libiberty \
 	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
 	 --with-pkgversion=$(MYPKG)
@@ -89,6 +97,7 @@ GDB_TEST_CONF=/c/src/repos/gdb-testsuite/configure \
 	 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
 	 --enable-curses --enable-tui \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
+	 --with-liblzma-prefix=$(GDB_LIBS) \
 	 --disable-install-libbfd --disable-install-libiberty \
 	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
 	 --with-pkgversion=$(MYPKG)
@@ -134,7 +143,7 @@ $(BUILD_DIR):
 # expat
 
 $(SOURCE_DIR)/expat-01-extract.done: | $(SOURCE_DIR) pkg/$(EXPAT_FILE)
-	tar -C $(SOURCE_DIR) -xjf pkg/$(EXPAT_FILE)
+	tar -C $(SOURCE_DIR) -xJf pkg/$(EXPAT_FILE)
 	@touch $@
 
 $(BUILD_DIR)/expat-03-configure.done: | $(SOURCE_DIR)/expat-01-extract.done
@@ -201,7 +210,15 @@ $(SOURCE_DIR)/pdcurses-02-patch-11-processed-input.done: | $(SOURCE_DIR)/pdcurse
 	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0011-processed-input.patch
 	@touch $@
 
-$(BUILD_DIR)/pdcurses-03-make.done: | $(BUILD_DIR)/expat-05-make-install.done $(SOURCE_DIR)/pdcurses-02-patch-11-processed-input.done
+$(SOURCE_DIR)/pdcurses-02-patch-12-wheel-coordinates.done: | $(SOURCE_DIR)/pdcurses-02-patch-11-processed-input.done
+	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0012-wheel-coordinates.patch
+	@touch $@
+
+$(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done: | $(SOURCE_DIR)/pdcurses-02-patch-12-wheel-coordinates.done
+	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0013-ncurses-mouse-api.patch
+	@touch $@
+
+$(BUILD_DIR)/pdcurses-03-make.done: | $(BUILD_DIR)/expat-05-make-install.done $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done
 	@mkdir -p $(BUILD_DIR)/pdcurses
 	$(MAKE) -C $(BUILD_DIR)/pdcurses -f $(SOURCE_DIR_ABS)/$(PDCURSES_SRC_DIR)/win32/gccwin32.mak $(CROSS_CONF) PDCURSES_SRCDIR=$(SOURCE_DIR_ABS)/$(PDCURSES_SRC_DIR) pdcurses.a
 	@touch $@
@@ -268,7 +285,7 @@ $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done: | $(SOURCE_DIR)/source-h
 	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p0 <patches/source-hightlight/console-colors.patch
 	@touch $@
 
-$(BUILD_DIR)/source-highlight-03-configure.done: | $(BUILD_DIR)/boost-03-regex.done
+$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done $(BUILD_DIR)/boost-03-regex.done
 	@mkdir -p $(BUILD_DIR)/source-highlight
 	cd $(BUILD_DIR)/source-highlight && $(SOURCE_HIGHLIGHT_CONF)
 	@touch $@
@@ -279,6 +296,26 @@ $(BUILD_DIR)/source-highlight-04-make.done: | $(BUILD_DIR)/source-highlight-03-c
 
 $(BUILD_DIR)/source-highlight-05-make-install.done: | $(BUILD_DIR)/source-highlight-04-make.done
 	$(MAKE) -C $(BUILD_DIR)/source-highlight install
+	@touch $@
+
+
+# lzma
+
+$(SOURCE_DIR)/lzma-01-extract.done: | pkg/$(LZMA_FILE) $(SOURCE_DIR)/source-highlight-01-extract.done
+	tar -C $(SOURCE_DIR) -xJf pkg/$(LZMA_FILE)
+	@touch $@
+
+$(BUILD_DIR)/lzma-03-configure.done: | $(SOURCE_DIR)/lzma-01-extract.done
+	@mkdir -p $(BUILD_DIR)/lzma
+	cd $(BUILD_DIR)/lzma && $(LZMA_CONF)
+	@touch $@
+
+$(BUILD_DIR)/lzma-04-make.done: | $(BUILD_DIR)/lzma-03-configure.done
+	$(MAKE) -C $(BUILD_DIR)/lzma/src/liblzma
+	@touch $@
+
+$(BUILD_DIR)/lzma-05-make-install.done: | $(BUILD_DIR)/lzma-04-make.done
+	$(MAKE) -C $(BUILD_DIR)/lzma/src/liblzma install
 	@touch $@
 
 
@@ -422,7 +459,7 @@ $(BUILD_DIR)/gdb-python-04-python.done: | $(BUILD_DIR)/gdb-python-03-make-instal
 
 # gdb-git
 
-$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git
 	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git
 	@touch $@
@@ -456,7 +493,7 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 
 # gdb-git-python
 
-$(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+$(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python
 	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
 	@touch $@
@@ -472,6 +509,8 @@ $(BUILD_DIR)/gdb-git-python-03-make-install.done: | $(BUILD_DIR)/gdb-git-python-
 $(BUILD_DIR)/gdb-git-python-04-python.done: | $(BUILD_DIR)/gdb-git-python-03-make-install.done
 	cp -af $(GDB_LIBS)/$(PYTHON_DIR)/python27.dll $(GDB_DIR)-git-python/bin/
 	cp -arf $(GDB_LIBS)/$(PYTHON_DIR)/Lib $(GDB_DIR)-git-python/lib
+	mkdir -p $(GDB_DIR)-git-python/DLLs
+	cp -af $(GDB_LIBS)/$(PYTHON_DIR)/DLLs/_ctypes.pyd $(GDB_DIR)-git-python/DLLs
 	rm -rf $(GDB_DIR)-git-python/lib/test
 	@touch $@
 
@@ -511,7 +550,7 @@ $(BUILD_DIR)/binutils-git-02-make.done: | $(BUILD_DIR)/binutils-git-01-configure
 
 $(BUILD_DIR)/gdb-test-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-test
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test
+	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
 	@touch $@
 
 $(BUILD_DIR)/gdb-test-02-make.done: | $(BUILD_DIR)/gdb-test-01-configure.done
@@ -549,10 +588,11 @@ extract-all: | \
   $(SOURCE_DIR)/iconv-01-extract.done \
   $(SOURCE_DIR)/boost-01-extract.done \
   $(SOURCE_DIR)/source-highlight-01-extract.done \
+  $(SOURCE_DIR)/lzma-01-extract.done \
 
 
 patch-all: | \
-  $(SOURCE_DIR)/pdcurses-02-patch-11-processed-input.done \
+  $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done \
   $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done \
 
 
@@ -561,6 +601,7 @@ build-pdcurses: | $(BUILD_DIR)/pdcurses-04-make-install.done
 build-iconv: | $(BUILD_DIR)/iconv-05-make-install.done
 build-boost: | $(BUILD_DIR)/boost-03-regex.done
 build-source-highlight: | $(BUILD_DIR)/source-highlight-05-make-install.done
+build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
 build-gdb-python: | $(BUILD_DIR)/gdb-git-python-06-licenses.done
 build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done

@@ -1,0 +1,12 @@
+--- a/curses.h	2008-07-15 19:13:25.000000000 +0200
++++ b/curses.h	2020-12-20 16:03:54.139176900 +0100
+@@ -37,6 +37,9 @@
+ #define SYSVcurses      1      /* System V Curses routines */
+ #define BSDcurses       1      /* BSD Curses routines */
+ #define CHTYPE_LONG     1      /* size of chtype; long */
++#ifndef CURSES_LIBRARY
++#define NCURSES_MOUSE_VERSION 1
++#endif
+ 
+ /*----------------------------------------------------------------------*/
+ 

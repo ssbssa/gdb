@@ -1,0 +1,25 @@
+--- a/win32/pdckbd.c	2019-03-17 16:34:47.714015200 +0100
++++ b/win32/pdckbd.c	2020-11-26 20:06:30.657733200 +0100
+@@ -481,6 +481,22 @@
+         pdc_mouse_status.x = -1;
+         pdc_mouse_status.y = -1;
+ 
++        POINT cursor;
++        GetCursorPos(&cursor);
++        HWND hwnd = GetConsoleWindow();
++        RECT rc;
++        GetClientRect(hwnd, &rc);
++        ScreenToClient(hwnd, &cursor);
++        if (cursor.x >= 0 && cursor.x < rc.right &&
++            cursor.y >= 0 && cursor.y < rc.bottom)
++        {
++            CONSOLE_SCREEN_BUFFER_INFO csbi;
++            GetConsoleScreenBufferInfo(pdc_con_out, &csbi);
++
++            pdc_mouse_status.x = cursor.x / (rc.right / csbi.srWindow.Right);
++            pdc_mouse_status.y = cursor.y / (rc.bottom / csbi.srWindow.Bottom);
++        }
++
+         memset(&old_mouse_status, 0, sizeof(old_mouse_status));
+ 
+         return KEY_MOUSE;
