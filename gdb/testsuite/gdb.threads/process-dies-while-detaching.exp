@@ -215,6 +215,7 @@ proc test_detach {multi_process cmd} {
 	global binfile
 
 	clean_restart ${binfile}
+	gdb_test_no_output "tty /dev/tty"
 
 	if ![runto_main] {
 	    return -1
@@ -243,6 +244,7 @@ proc test_detach_watch {wp multi_process cmd} {
 	global binfile decimal
 
 	clean_restart ${binfile}
+	gdb_test_no_output "tty /dev/tty"
 
 	if ![runto_main] {
 	    return -1
@@ -291,6 +293,7 @@ proc test_detach_killed_outside {multi_process cmd} {
 	global binfile
 
 	clean_restart ${binfile}
+	gdb_test_no_output "tty /dev/tty"
 
 	if ![runto_main] {
 	    return -1
