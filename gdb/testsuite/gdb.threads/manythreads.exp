@@ -53,7 +53,7 @@ gdb_test_multiple "continue" "first continue" {
 # we don't lose GDB's output while we do it.
 remote_expect host 1 { timeout { } }
 
-# Send a Ctrl-C and wait for the SIGINT.
+# Send a Ctrl-C and wait for the stop.
 
 proc interrupt_and_wait { message } {
     global gdb_prompt
@@ -96,7 +96,7 @@ proc interrupt_and_wait { message } {
 	-re "\r\n\\\[\[^\r\n]* exited\\\](?=\r\n)" {
 	    exp_continue
 	}
-	-re "\r\n\[^\r\n]* received signal SIGINT\[^\r\n\]*(?=\r\n)" {
+	-re "\r\n\[^\r\n]* (received signal SIGINT|stopped)\[^\r\n\]*(?=\r\n)" {
 	    set saw_signal 1
 	    exp_continue
 	}
