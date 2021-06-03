@@ -78,7 +78,7 @@ if {![file exists $binfile]} {
 	send_gdb "\003"
 	set msg "send_gdb control C"
 	gdb_test_multiple "" $msg {
-	    -re "Program received signal SIGINT.*$gdb_prompt $" {
+	    -re "Program (received signal SIGINT|stopped).*$gdb_prompt $" {
 		pass $msg
 	    }
 	}
@@ -162,7 +162,7 @@ if {![file exists $binfile]} {
 	    set msg "Send Control-C, second time"
 	    send_gdb "\003"
 	    gdb_test_multiple "" "$msg" {
-		-re "Program received signal SIGINT.*$gdb_prompt $" {
+		-re "Program (received signal SIGINT|stopped).*$gdb_prompt $" {
 		    pass "$msg"
 		}
 	    }
