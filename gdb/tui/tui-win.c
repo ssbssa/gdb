@@ -35,6 +35,7 @@
 #include "gdbsupport/event-loop.h"
 #include "async-event.h"
 #include "utils.h"
+#include "inferior.h"
 
 #include "tui/tui.h"
 #include "tui/tui-io.h"
@@ -573,6 +574,8 @@ tui_async_resize_screen (gdb_client_data arg)
 	}
       tui_redisplay_readline ();
     }
+
+  child_terminal_on_sigwinch ();
 }
 #endif
 
