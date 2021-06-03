@@ -62,6 +62,7 @@ libgdbsupport_a_SOURCES = \
     gdb_wait.cc \
     gdb_vecs.cc \
     job-control.cc \
+    managed-tty.cc \
     netstuff.cc \
     new-op.cc \
     pathstuff.cc \
