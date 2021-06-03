@@ -221,6 +221,11 @@ is_gdb_terminal (const char *tty)
   struct stat other_tty;
   int res;
 
+  /* Users can explicitly set the inferior tty to "/dev/tty" to mean
+     "the GDB terminal".  */
+  if (strcmp (tty, "/dev/tty") == 0)
+    return TRIBOOL_TRUE;
+
   res = stat (tty, &other_tty);
   if (res == -1)
     return TRIBOOL_UNKNOWN;
@@ -774,9 +779,10 @@ check_syscall (const char *msg, int result)
 #endif
 
 void
-new_tty (void)
+new_tty ()
 {
-  if (inferior_thisrun_terminal.empty ())
+  if (inferior_thisrun_terminal.empty ()
+      || is_gdb_terminal (inferior_thisrun_terminal.c_str ()))
     return;
 #if !defined(__GO32__) && !defined(_WIN32)
   int tty;
@@ -843,8 +849,13 @@ new_tty_postfork (void)
   struct inferior *inf = current_inferior ();
   struct terminal_info *tinfo = get_inflow_inferior_data (inf);
 
-  tinfo->run_terminal = std::move (inferior_thisrun_terminal);
-  inferior_thisrun_terminal.clear ();
+  if (!inferior_thisrun_terminal.empty ())
+    {
+      tinfo->run_terminal = std::move (inferior_thisrun_terminal);
+      inferior_thisrun_terminal.clear ();
+    }
+  else
+    tinfo->run_terminal = "/dev/tty";
 }
 
 
@@ -901,7 +912,9 @@ create_tty_session (void)
 #ifdef HAVE_SETSID
   pid_t ret;
 
-  if (!job_control || inferior_thisrun_terminal.empty ())
+  if (!job_control
+      || inferior_thisrun_terminal.empty ()
+      || is_gdb_terminal (inferior_thisrun_terminal.c_str ()))
     return 0;
 
   ret = setsid ();
