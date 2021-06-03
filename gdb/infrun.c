@@ -9766,7 +9766,10 @@ normal_stop ()
 	 been reported (when the thread list was parsed), so making this a
 	 spurious stop will cause GDB to drop back to the prompt.  */
       if (inferior_thread ()->state () != THREAD_EXITED)
-	notify_signal_received (inferior_thread ()->stop_signal ());
+	{
+	  target_terminal::ours_for_output ();
+	  notify_signal_received (inferior_thread ()->stop_signal ());
+	}
       else
 	{
 	  warning (_("command aborted, %s unexpectedly exited after signal stop event"),
