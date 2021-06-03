@@ -27,7 +27,11 @@
 #include "gdbsupport/signals-state-save-restore.h"
 #include "gdbsupport/gdb_tilde_expand.h"
 #include "gdbsupport/gdb_signals.h"
+#include "gdbsupport/scoped_ignore_sigttou.h"
+#include "gdbsupport/managed-tty.h"
 #include <vector>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 extern char **environ;
 
@@ -80,6 +84,33 @@ private:
      {"$SHELL" "-c", SHELL_COMMAND, NULL}.  */
   std::string m_storage;
 };
+
+#if GDB_MANAGED_TERMINALS
+
+/* SIGHUP handler for the session leader processes.  GDB sends this
+   explicitly, though it'll also be called if GDB crashes and the
+   terminal is abruptly closed.  */
+
+static void
+session_leader_hup (int sig)
+{
+  scoped_ignore_sigttou ignore_sigttou;
+
+  /* We put the inferior (a child of the session leader) in the
+     foreground, so by default, on detach, if we did nothing else, the
+     inferior would get a SIGHUP when the terminal is closed by GDB.
+     That SIGHUP would likely kill the inferior.  To avoid it, we put
+     the session leader in the foreground before the terminal is
+     closed.  Only processes in the foreground process group get the
+     automatic SIGHUP, so the detached process doesn't get it.  */
+  int res = tcsetpgrp (0, getpid ());
+  if (res == -1)
+    trace_start_error (_("tcsetpgrp failed in session leader\n"));
+
+  _exit (0);
+}
+
+#endif
 
 /* Create argument vector for straight call to execvp.  Breaks up
    ALLARGS into an argument vector suitable for passing to execvp and
@@ -268,7 +299,8 @@ pid_t
 fork_inferior (const char *exec_file, const std::string &allargs, char **env,
 	       traceme_ftype traceme_fun, init_trace_ftype init_trace_fun,
 	       pre_trace_ftype pre_trace_fun, const char *shell_file_arg,
-	       exec_ftype exec_fun)
+	       exec_ftype exec_fun,
+	       pid_t (*handle_session_leader_fork) (pid_t sl_pid))
 {
   pid_t pid;
   /* Set debug_fork then attach to the child while it sleeps, to debug.  */
@@ -342,7 +374,7 @@ fork_inferior (const char *exec_file, const std::string &allargs, char **env,
      actually be a call to fork(2) due to the fact that autoconf will
      ``#define vfork fork'' on certain platforms.  */
 #if !(defined(__UCLIBC__) && defined(HAS_NOMMU))
-  if (pre_trace_fun || debug_fork)
+  if (pre_trace_fun || debug_fork || child_has_managed_tty_hook ())
     pid = fork ();
   else
 #endif
@@ -393,6 +425,85 @@ fork_inferior (const char *exec_file, const std::string &allargs, char **env,
 
       restore_original_signals_state ();
 
+      /* Fork again so that the resulting inferior process is not the
+	 session leader.  This makes it possible for the inferior to
+	 exit without killing its own children.  If we instead let the
+	 inferior process be the session leader, when it exits, it'd
+	 cause a SIGHUP to be sent to all processes in its session
+	 (i.e., it's children).  The code is disabled on no-MMU
+	 machines because those can't do fork, only vfork.  In theory
+	 we could make this work with vfork by making the session
+	 leader process exec a helper process, probably gdb itself in
+	 a special mode (e.g., something like
+	   exec /proc/self/exe --session-leader-for PID
+      */
+#if GDB_MANAGED_TERMINALS
+      if (child_has_managed_tty_hook ())
+	{
+	  /* Fork again, to make sure the inferior is not the new
+	     session's leader.  */
+	  pid_t child2 = fork ();
+	  if (child2 != 0)
+	    {
+	      /* This is the parent / session leader process.  It just
+		 stays around until GDB closes the terminal.  */
+
+	      /* Gracefully handle SIGHUP.  */
+	      signal (SIGHUP, session_leader_hup);
+
+	      managed_tty_debug_printf
+		(_("session-leader (sid=%d): waiting for child pid=%d exit\n"),
+		 (int) getpid (), (int) child2);
+
+	      /* Reap the child/inferior exit status.  */
+	      int status;
+	      int res = waitpid (child2, &status, 0);
+
+	      managed_tty_debug_printf (_("session-leader (sid=%d): "
+					  "wait for child pid=%d returned: "
+					  "res=%d, waitstatus=0x%x\n"),
+					(int) getpid (), child2, res, status);
+
+	      if (res == -1)
+		warning (_("session-leader (sid=%d): unexpected waitstatus "
+			   "reaping child pid=%d: "
+			   "res=-1, errno=%d (%s)"),
+			 (int) getpid (), child2, errno, safe_strerror (errno));
+	      else if (res != child2)
+		warning (_("session-leader (sid=%d): unexpected waitstatus "
+			   "reaping child pid=%d: "
+			   "res=%d, status=0x%x"),
+			 (int) getpid (), child2, res, status);
+
+	      /* Don't exit yet.  While our direct child is gone,
+		 there may still be grandchildren attached to our
+		 session.  We'll exit when our parent (GDB) closes the
+		 pty, killing us with SIGHUP.  */
+	      while (1)
+		pause ();
+	    }
+	  else
+	    {
+	      /* This is the child / final inferior process.  */
+
+	      int res;
+
+	      /* Run the inferior in its own process group, and make
+		 it the session's foreground pgrp.  */
+
+	      res = gdb_setpgid ();
+	      if (res == -1)
+		trace_start_error (_("setpgid failed in grandchild"));
+
+	      scoped_ignore_sigttou ignore_sigttou;
+
+	      res = tcsetpgrp (0, getpid ());
+	      if (res == -1)
+		trace_start_error (_("tcsetpgrp failed in grandchild\n"));
+	    }
+	}
+#endif /* GDB_MANAGED_TERMINALS */
+
       /* There is no execlpe call, so we have to set the environment
 	 for our child in the global variable.  If we've vforked, this
 	 clobbers the parent, but environ is restored a few lines down
@@ -421,6 +532,9 @@ fork_inferior (const char *exec_file, const std::string &allargs, char **env,
 
   /* Restore our environment in case a vforked child clob'd it.  */
   environ = save_our_env;
+
+  if (child_has_managed_tty_hook () && handle_session_leader_fork != nullptr)
+    pid = handle_session_leader_fork (pid);
 
   postfork_hook (pid);
 
