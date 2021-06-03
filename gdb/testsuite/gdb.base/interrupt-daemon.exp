@@ -52,7 +52,7 @@ proc do_test {} {
 
 	set test "ctrl-c stops process"
 	gdb_test_multiple "" $test {
-	    -re "received signal SIGINT.*\r\n$gdb_prompt $" {
+	    -re "(received signal SIGINT|stopped).*\r\n$gdb_prompt $" {
 		pass $test
 	    }
 	}
@@ -78,7 +78,7 @@ proc do_test {} {
 
 	set test "interrupt cmd stops process"
 	gdb_test_multiple "" $test {
-	    -re "received signal SIGINT" {
+	    -re "(received signal SIGINT|stopped)" {
 		pass $test
 	    }
 	}
