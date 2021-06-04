@@ -92,6 +92,7 @@ PYTHON_FILE_LIST = \
 	gdb/command/missing_files.py \
 	gdb/command/pretty_printers.py \
 	gdb/command/prompt.py \
+	gdb/command/tui_windows.py \
 	gdb/command/type_printers.py \
 	gdb/command/unwinders.py \
 	gdb/command/xmethods.py \
