@@ -813,6 +813,8 @@ call_function_by_hand_dummy (struct value *function,
   type *values_type;
   CORE_ADDR funaddr = find_function_addr (function, &values_type, &ftype);
 
+  frame = get_current_frame ();
+
   if (values_type == NULL)
     values_type = default_return_type;
   if (values_type == NULL)
