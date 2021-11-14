@@ -260,6 +260,24 @@ class CoreAddrPrettyPrinter:
         return hex(int(self._val))
 
 
+class ArrayViewPrettyPrinter:
+    """Print an object of type gdb::array_view"""
+
+    def __init__(self, val):
+        self._val = val
+
+    def to_string(self):
+        return "array_view with %d elements" % self._val["m_size"]
+
+    def children(self):
+        array = self._val["m_array"]
+        for i in range(int(self._val["m_size"])):
+            yield "[%d]" % i, array[i]
+
+    def display_hint(self):
+        return "array"
+
+
 def type_lookup_function(val):
     """A routine that returns the correct pretty printer for VAL
     if appropriate.  Returns None otherwise.
@@ -272,6 +290,8 @@ def type_lookup_function(val):
         return StructFieldPrettyPrinter(val)
     elif val.type.name == "CORE_ADDR":
         return CoreAddrPrettyPrinter(val)
+    elif val.type.name != None and val.type.name.startswith("gdb::array_view<"):
+        return ArrayViewPrettyPrinter(val)
     return None
 
 
