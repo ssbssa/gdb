@@ -4156,7 +4156,8 @@ compare_badness (const badness_vector &a, const badness_vector &b)
 
 badness_vector
 rank_function (gdb::array_view<type *> parms,
-	       gdb::array_view<value *> args)
+	       gdb::array_view<value *> args,
+	       bool varargs)
 {
   /* add 1 for the length-match rank.  */
   badness_vector bv;
@@ -4182,7 +4183,8 @@ rank_function (gdb::array_view<type *> parms,
 
   /* If more arguments than parameters, add dummy entries.  */
   for (size_t i = min_len; i < args.size (); i++)
-    bv.push_back (TOO_FEW_PARAMS_BADNESS);
+    bv.push_back (varargs ? INTEGER_PROMOTION_BADNESS
+		  : TOO_FEW_PARAMS_BADNESS);
 
   return bv;
 }
