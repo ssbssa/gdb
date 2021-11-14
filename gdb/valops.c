@@ -3225,6 +3225,7 @@ find_oload_champ (gdb::array_view<value *> args,
     {
       int jj;
       int static_offset = 0;
+      bool varargs = false;
       std::vector<type *> parm_types;
 
       if (xmethods != NULL)
@@ -3237,9 +3238,13 @@ find_oload_champ (gdb::array_view<value *> args,
 	    {
 	      nparms = TYPE_FN_FIELD_TYPE (methods, ix)->num_fields ();
 	      static_offset = oload_method_static_p (methods, ix);
+	      varargs = TYPE_FN_FIELD_TYPE (methods, ix)->has_varargs ();
 	    }
 	  else
-	    nparms = functions[ix]->type ()->num_fields ();
+	    {
+	      nparms = functions[ix]->type ()->num_fields ();
+	      varargs = functions[ix]->type ()->has_varargs ();
+	    }
 
 	  parm_types.reserve (nparms);
 	  for (jj = 0; jj < nparms; jj++)
@@ -3254,7 +3259,8 @@ find_oload_champ (gdb::array_view<value *> args,
       /* Compare parameter types to supplied argument types.  Skip
 	 THIS for static methods.  */
       bv = rank_function (parm_types,
-			  args.slice (static_offset));
+			  args.slice (static_offset),
+			  varargs);
 
       if (overload_debug)
 	{
