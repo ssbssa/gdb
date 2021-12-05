@@ -178,7 +178,7 @@ static std::string inferior_thisrun_terminal;
 #if GDB_MANAGED_TERMINALS
 
 /* The file descriptor of the master end of the pty that we're giving
-   to the inferior when starting it up, iff we created the terminal
+   to the inferior when starting it up, if we created the terminal
    ourselves.  This is set by new_tty_prefork, and like
    INFERIOR_THISRUN_TERMINAL, is transient.  */
 static int inferior_thisrun_terminal_pty_fd = -1;
@@ -448,8 +448,8 @@ private:
   /* The saved termios data.  */
   struct termios m_saved_termios;
 
-  /* True iff M_SAVED_TERMIOS is valid.  */
-  bool m_saved_termios_p;
+  /* True if M_SAVED_TERMIOS is valid.  */
+  bool m_saved_termios_p = false;
 };
 
 /* Flush input/output from READ_FD to WRITE_FD.  WHAT is used for
