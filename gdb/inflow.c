@@ -448,7 +448,7 @@ private:
   struct termios m_saved_termios;
 
   /* True iff M_SAVED_TERMIOS is valid.  */
-  bool m_saved_termios_p;
+  bool m_saved_termios_p = false;
 };
 
 /* Flush input/output from READ_FD to WRITE_FD.  WHAT is used for
