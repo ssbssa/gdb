@@ -189,3 +189,7 @@
 #define SHLIB_COMPAT(lib, introduced, obsoleted) 0
 #define compat_symbol(lib, local, symbol, version) extern int dummy
 #define versioned_symbol(lib, local, symbol, version) extern int dummy
+
+#ifndef __THROWNL
+#define __THROWNL __THROW
+#endif
