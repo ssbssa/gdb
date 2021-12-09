@@ -3789,6 +3789,8 @@ linux_nat_target::xfer_partial (enum target_object object,
 				const gdb_byte *writebuf,
 				ULONGEST offset, ULONGEST len, ULONGEST *xfered_len)
 {
+  enum target_xfer_status xfer;
+
   if (object == TARGET_OBJECT_SIGNAL_INFO)
     return linux_xfer_siginfo (object, annex, readbuf, writebuf,
 			       offset, len, xfered_len);
@@ -3818,10 +3820,12 @@ linux_nat_target::xfer_partial (enum target_object object,
 
       if (addr_bit < (sizeof (ULONGEST) * HOST_CHAR_BIT))
 	offset &= ((ULONGEST) 1 << addr_bit) - 1;
-
-      return linux_proc_xfer_memory_partial (readbuf, writebuf,
-					     offset, len, xfered_len);
     }
+
+  xfer = linux_proc_xfer_memory_partial (readbuf, writebuf,
+					 offset, len, xfered_len);
+  if (xfer != TARGET_XFER_EOF)
+    return xfer;
 
   return inf_ptrace_target::xfer_partial (object, annex, readbuf, writebuf,
 					  offset, len, xfered_len);
