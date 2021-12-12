@@ -60,6 +60,10 @@
 #include "cli-out.h"
 #include "bt-utils.h"
 
+#ifdef TUI
+#include "tui/tui-cmd-history.h"
+#endif
+
 /* The selected interpreter.  */
 std::string interpreter_p;
 
@@ -679,6 +683,13 @@ captured_main_1 (struct captured_main_args *context)
   main_ui = new ui (stdin, stdout, stderr);
   gdb_internal_backtrace_init_str ();
   current_ui = main_ui;
+
+#ifdef TUI
+  gdb_stdout = new tee_file (gdb_stdout,
+			     new cmd_history_ui_file (stdout));
+  gdb_stderr = new tee_file (gdb_stderr,
+			     new cmd_history_ui_file (stderr));
+#endif
 
   gdb_stdtarg = gdb_stderr;
   gdb_stdtargin = gdb_stdin;
