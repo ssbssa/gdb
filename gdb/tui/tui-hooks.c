@@ -47,6 +47,7 @@
 #include "tui/tui-stack.h"
 #include "tui/tui-winsource.h"
 #include "tui/tui-cmd-history.h"
+#include "tui/tui-output.h"
 
 #include "gdb_curses.h"
 
@@ -228,6 +229,14 @@ tui_symtab_changed ()
   from_source_symtab = true;
 }
 
+#if GDB_MANAGED_TERMINALS
+static void
+tui_target_resumed (ptid_t ignore)
+{
+  tui_output_write (nullptr, 0);
+}
+#endif
+
 /* Token associated with observers registered while TUI hooks are
    installed.  */
 static const gdb::observers::token tui_observers_token {};
@@ -267,6 +276,10 @@ tui_attach_detach_observers (bool attach)
 		    tui_context_changed, attach);
   attach_or_detach (gdb::observers::current_source_symtab_and_line_changed,
 		    tui_symtab_changed, attach);
+#if GDB_MANAGED_TERMINALS
+  attach_or_detach (gdb::observers::target_resumed,
+		    tui_target_resumed, attach);
+#endif
 }
 
 /* Install the TUI specific hooks.  */
