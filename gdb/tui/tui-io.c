@@ -956,7 +956,7 @@ tui_initialize_io (void)
 
   /* Create tui output streams.  */
   tui_stdout = new pager_file (std::make_unique<logging_file<ui_file_up>>
-			       (std::make_unique<tui_file> (stdout, true)));
+			       (std::make_unique<tui_file> (stdout, false)));
   ui_file *err_out = new tui_file (stderr, false);
   /* Let tui_stderr own ERR_OUT.  */
   tui_stderr = new logging_file<ui_file_up> (ui_file_up (err_out));
