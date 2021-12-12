@@ -44,6 +44,7 @@
 #include "tui/tui-layout.h"
 #include "tui/tui-source.h"
 #include "tui/tui-cmd-history.h"
+#include "tui/tui-output.h"
 #include "gdb_curses.h"
 
 static void extract_display_start_addr (struct gdbarch **, CORE_ADDR *);
@@ -381,6 +382,11 @@ initialize_known_windows ()
   known_window_types->emplace (CMD_HISTORY_NAME,
 			       make_standard_window<CMD_HISTORY_WIN,
 						    tui_cmd_history_window>);
+#if GDB_MANAGED_TERMINALS
+  known_window_types->emplace (OUTPUT_NAME,
+			       make_standard_window<OUTPUT_WIN,
+						    tui_output_window>);
+#endif
 }
 
 /* See tui-layout.h.  */
@@ -392,7 +398,7 @@ tui_register_window (const char *name, window_factory &&factory)
 
   if (name_copy == SRC_NAME || name_copy == CMD_NAME || name_copy == DATA_NAME
       || name_copy == DISASSEM_NAME || name_copy == STATUS_NAME
-      || name_copy == CMD_HISTORY_NAME)
+      || name_copy == CMD_HISTORY_NAME || name_copy == OUTPUT_NAME)
     error (_("Window type \"%s\" is built-in"), name);
 
   known_window_types->emplace (std::move (name_copy),
@@ -904,6 +910,15 @@ initialize_layouts ()
   layout->add_window (STATUS_NAME, 0);
   layout->add_window (CMD_NAME, 1);
   add_layout_command (CMD_HISTORY_NAME, layout);
+
+#if GDB_MANAGED_TERMINALS
+  layout = new tui_layout_split ();
+  layout->add_window (SRC_NAME, 2);
+  layout->add_window (OUTPUT_NAME, 1);
+  layout->add_window (STATUS_NAME, 0);
+  layout->add_window (CMD_NAME, 1);
+  add_layout_command (OUTPUT_NAME, layout);
+#endif
 }
 
 
