@@ -40,6 +40,10 @@
 #include "gdbsupport/gdb_wait.h"
 #include "gdbsupport/managed-tty.h"
 
+#ifdef TUI
+#include "tui/tui-output.h"
+#endif
+
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -456,7 +460,7 @@ private:
    logging purposes.  */
 
 static void
-child_terminal_flush_from_to (int read_fd, int write_fd, const char *what)
+child_terminal_flush_from_to (int read_fd, int write_fd, bool is_stdout)
 {
   char buf[1024];
 
@@ -479,16 +483,22 @@ child_terminal_flush_from_to (int read_fd, int write_fd, const char *what)
 	  else if (r == -1 && errno == EIO)
 	    {
 	      managed_tty_debug_printf (_("%s: bad read: closed?\n"),
-					what);
+					is_stdout ? "stdout" : "stdin");
 	    }
 	  else
 	    {
 	      /* Unexpected.  */
-	      warning (_("%s: bad read: %d: (%d) %s"), what, r,
+	      warning (_("%s: bad read: %d: (%d) %s"),
+		       is_stdout ? "stdout" : "stdin", r,
 		       errno, safe_strerror (errno));
 	    }
 	  return;
 	}
+
+#ifdef TUI
+      if (is_stdout && tui_output_write (buf, r))
+	continue;
+#endif
 
       const char *p = buf;
 
@@ -505,7 +515,8 @@ child_terminal_flush_from_to (int read_fd, int write_fd, const char *what)
 		 warning.  */
 	      save_termios.reset ();
 
-	      warning (_("%s: bad write: %d: (%d) %s"), what, r,
+	      warning (_("%s: bad write: %d: (%d) %s"),
+		       is_stdout ? "stdout" : "stdin", r,
 		       err, safe_strerror (err));
 	      return;
 	    }
@@ -525,7 +536,7 @@ child_terminal_flush_stdout (run_terminal_info *run_terminal)
 {
   gdb_assert (run_terminal->pty_fd != -1);
   child_terminal_flush_from_to (run_terminal->pty_fd, STDOUT_FILENO,
-				"stdout");
+				true);
 }
 
 /* Event handler associated with the inferior's terminal pty.  Used
@@ -553,7 +564,7 @@ inferior_stdin_event_handler (int error, gdb_client_data client_data)
   run_terminal_info *run_terminal = (run_terminal_info *) client_data;
   gdb_assert (run_terminal->pty_fd != -1);
   child_terminal_flush_from_to (STDIN_FILENO, run_terminal->pty_fd,
-				"stdin");
+				false);
 }
 
 #endif /* GDB_MANAGED_TERMINALS */
