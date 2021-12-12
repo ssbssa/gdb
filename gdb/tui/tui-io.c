@@ -34,6 +34,7 @@
 #include "tui/tui-wingeneral.h"
 #include "tui/tui-file.h"
 #include "tui/tui-out.h"
+#include "tui/tui-cmd-history.h"
 #include "ui-out.h"
 #include "cli-out.h"
 #include <fcntl.h>
@@ -456,11 +457,12 @@ tui_write (const char *buf, size_t length)
    necessary.  */
 
 void
-tui_puts (const char *string, WINDOW *w)
+tui_puts (const char *string, WINDOW *w, int exact_count, int *printed)
 {
   if (w == nullptr)
     w = TUI_CMD_WIN->handle.get ();
 
+  int count = 0;
   while (true)
     {
       const char *next = strpbrk (string, "\n\1\2\033\t");
@@ -468,7 +470,16 @@ tui_puts (const char *string, WINDOW *w)
       /* Print the plain text prefix.  */
       size_t n_chars = next == nullptr ? strlen (string) : next - string;
       if (n_chars > 0)
-	waddnstr (w, string, n_chars);
+	{
+	  if (exact_count >= 0 && count + n_chars > exact_count)
+	    n_chars = exact_count - count;
+
+	  waddnstr (w, string, n_chars);
+
+	  count += n_chars;
+	  if (exact_count >= 0 && count >= exact_count)
+	    break;
+	}
 
       /* We finished.  */
       if (next == nullptr)
@@ -509,6 +520,12 @@ tui_puts (const char *string, WINDOW *w)
 
       string = next;
     }
+
+  if (printed != nullptr)
+    *printed = count;
+  if (exact_count >= 0)
+    while (count++ < exact_count)
+      do_tui_putc (w, ' ');
 
   if (TUI_CMD_WIN != nullptr && w == TUI_CMD_WIN->handle.get ())
     update_cmdwin_start_line ();
@@ -915,6 +932,10 @@ tui_initialize_io (void)
   /* Create tui output streams.  */
   tui_stdout = new pager_file (new tui_file (stdout, true));
   tui_stderr = new tui_file (stderr, false);
+  tui_stdout = new tee_file (tui_stdout,
+			     new cmd_history_ui_file (stdout));
+  tui_stderr = new tee_file (tui_stderr,
+			     new cmd_history_ui_file (stderr));
   tui_stdlog = new timestamped_file (tui_stderr);
   tui_out = new tui_ui_out (tui_stdout);
 
