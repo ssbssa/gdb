@@ -931,7 +931,7 @@ tui_initialize_io (void)
 #endif
 
   /* Create tui output streams.  */
-  tui_stdout = new pager_file (new tui_file (stdout, true));
+  tui_stdout = new pager_file (new tui_file (stdout, false));
   tui_stderr = new tui_file (stderr, false);
   tui_stdout = new tee_file (tui_stdout,
 			     new cmd_history_ui_file (stdout));
