@@ -22,6 +22,8 @@
 #ifndef GDB_TUI_TUI_H
 #define GDB_TUI_TUI_H
 
+#include <gdbsupport/managed-tty.h>
+
 /* Flag to control tui debugging.  */
 
 extern bool debug_tui;
@@ -55,6 +57,9 @@ enum tui_win_type
   CMD_WIN,
   STATUS_WIN,
   CMD_HISTORY_WIN,
+#if GDB_MANAGED_TERMINALS
+  OUTPUT_WIN,
+#endif
   /* This must ALWAYS be AFTER the major windows last.  */
   MAX_MAJOR_WINDOWS,
 };
