@@ -188,6 +188,7 @@ private:
 #define DATA_NAME               "regs"
 #define DISASSEM_NAME           "asm"
 #define STATUS_NAME		"status"
+#define CMD_HISTORY_NAME	"cmd-history"
 
 /* Global Data.  */
 extern struct tui_win_info *tui_win_list[MAX_MAJOR_WINDOWS];
@@ -197,6 +198,7 @@ extern struct tui_win_info *tui_win_list[MAX_MAJOR_WINDOWS];
 #define TUI_DATA_WIN    ((tui_data_window *) tui_win_list[DATA_WIN])
 #define TUI_CMD_WIN     ((tui_cmd_window *) tui_win_list[CMD_WIN])
 #define TUI_STATUS_WIN  ((tui_locator_window *) tui_win_list[STATUS_WIN])
+#define TUI_CMD_HISTORY_WIN ((tui_cmd_history_window *) tui_win_list[CMD_HISTORY_WIN])
 
 /* All the windows that are currently instantiated, in layout
    order.  */

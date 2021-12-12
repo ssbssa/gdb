@@ -56,6 +56,7 @@ enum tui_win_type
   DATA_WIN,
   CMD_WIN,
   STATUS_WIN,
+  CMD_HISTORY_WIN,
   /* This must ALWAYS be AFTER the major windows last.  */
   MAX_MAJOR_WINDOWS,
 };
