@@ -56,6 +56,10 @@
 #include "observable.h"
 #include "serial.h"
 
+#ifdef TUI
+#include "tui/tui-cmd-history.h"
+#endif
+
 /* The selected interpreter.  */
 std::string interpreter_p;
 
@@ -675,6 +679,13 @@ captured_main_1 (struct captured_main_args *context)
      caller will crash when trying to print the exception.  */
   main_ui = new ui (stdin, stdout, stderr);
   current_ui = main_ui;
+
+#ifdef TUI
+  gdb_stdout = new tee_file (gdb_stdout,
+			     new cmd_history_ui_file (stdout));
+  gdb_stderr = new tee_file (gdb_stderr,
+			     new cmd_history_ui_file (stderr));
+#endif
 
   gdb_stdtarg = gdb_stderr;
   gdb_stdtargerr = gdb_stderr;
