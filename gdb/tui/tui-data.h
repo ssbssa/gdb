@@ -269,6 +269,7 @@ struct tui_always_visible_window : public virtual tui_win_info
 #define DISASSEM_NAME           "asm"
 #define STATUS_NAME		"status"
 #define CMD_HISTORY_NAME	"cmd-history"
+#define OUTPUT_NAME		"output"
 
 /* Global Data.  */
 extern struct tui_win_info *tui_win_list[MAX_MAJOR_WINDOWS];
