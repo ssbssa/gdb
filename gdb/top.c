@@ -78,6 +78,7 @@
 #if defined(TUI)
 # include "tui/tui.h"
 # include "tui/tui-io.h"
+# include "tui/tui-cmd-history.h"
 #endif
 
 #ifndef O_NOCTTY
@@ -490,6 +491,16 @@ execute_command (const char *p, int from_tty)
 
       /* If trace-commands is set then this will print this command.  */
       print_command_trace ("%s", p);
+
+#ifdef TUI
+      if (from_tty)
+	{
+	  const std::string &prompt = get_prompt ();
+	  write_to_cmd_history (prompt.c_str (), prompt.size ());
+	  write_to_cmd_history (p, strlen (p));
+	  write_to_cmd_history ("\n", 1);
+	}
+#endif
 
       c = lookup_cmd (&cmd, cmdlist, "", &default_args, 0, 1);
       p = cmd;
