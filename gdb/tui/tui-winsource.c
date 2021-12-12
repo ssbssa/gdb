@@ -40,6 +40,7 @@
 #include "tui/tui-source.h"
 #include "tui/tui-disasm.h"
 #include "tui/tui-location.h"
+#include "tui/tui-output.h"
 #include "gdb_curses.h"
 
 /* Function to display the "main" routine.  */
@@ -60,6 +61,10 @@ tui_display_main ()
 	  tui_update_source_windows_with_addr (gdbarch, addr);
 	  s = find_pc_line_symtab (addr);
 	  tui_location.set_location (s);
+
+#if GDB_MANAGED_TERMINALS
+	  tui_output_write (nullptr, 0);
+#endif
 	}
     }
 }
