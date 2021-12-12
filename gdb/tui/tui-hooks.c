@@ -45,6 +45,7 @@
 #include "tui/tui-win.h"
 #include "tui/tui-status.h"
 #include "tui/tui-winsource.h"
+#include "tui/tui-cmd-history.h"
 
 #include "gdb_curses.h"
 
@@ -174,6 +175,7 @@ static void
 tui_before_prompt (const char *current_gdb_prompt)
 {
   tui_refresh_frame_and_register_information ();
+  tui_cmd_history_refresh ();
   from_stack = false;
   from_source_symtab = false;
 }
