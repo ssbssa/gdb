@@ -29,7 +29,8 @@ class cli_ui_out;
 
 /* Print the string in the given curses window.  If no window is
    provided, the command window is used.  */
-extern void tui_puts (const char *, WINDOW * = nullptr);
+extern void tui_puts (const char *, WINDOW * = nullptr,
+		      int = -1, int * = nullptr);
 
 /* Print LENGTH characters from the buffer pointed to by BUF to the
    curses command window.  */

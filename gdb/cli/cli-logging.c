@@ -24,6 +24,10 @@
 #include "cli/cli-style.h"
 #include "cli/cli-decode.h"
 
+#ifdef TUI
+#include "tui/tui-cmd-history.h"
+#endif
+
 static std::string saved_filename;
 
 static void
@@ -74,6 +78,10 @@ show_logging_overwrite (struct ui_file *file, int from_tty,
 
 /* The current log file, or nullptr if none.  */
 static ui_file_up log_file;
+
+#ifdef TUI
+static ui_file_up tui_history_file;
+#endif
 
 /* Value as configured by the user.  */
 static bool logging_redirect;
@@ -168,7 +176,12 @@ logging_file<T>::write (const char *buf, long length_buf)
   if (log_file != nullptr)
     log_file->write (buf, length_buf);
   if (ordinary_output ())
-    m_out->write (buf, length_buf);
+    {
+      m_out->write (buf, length_buf);
+#ifdef TUI
+      tui_history_file->write (buf, length_buf);
+#endif
+    }
 }
 
 /* See logging-file.h.  */
@@ -192,7 +205,12 @@ logging_file<T>::puts (const char *linebuffer)
   if (log_file != nullptr)
     log_file->puts (linebuffer);
   if (ordinary_output ())
-    m_out->puts (linebuffer);
+    {
+      m_out->puts (linebuffer);
+#ifdef TUI
+      tui_history_file->puts (linebuffer);
+#endif
+    }
 }
 
 /* See logging-file.h.  */
@@ -204,7 +222,12 @@ logging_file<T>::emit_style_escape (const ui_file_style &style)
   if (log_file != nullptr)
     log_file->emit_style_escape (style);
   if (ordinary_output ())
-    m_out->emit_style_escape (style);
+    {
+      m_out->emit_style_escape (style);
+#ifdef TUI
+      tui_history_file->emit_style_escape (style);
+#endif
+    }
 }
 
 /* See logging-file.h.  */
@@ -216,7 +239,12 @@ logging_file<T>::puts_unfiltered (const char *str)
   if (log_file != nullptr)
     log_file->puts_unfiltered (str);
   if (ordinary_output ())
-    m_out->puts_unfiltered (str);
+    {
+      m_out->puts_unfiltered (str);
+#ifdef TUI
+      tui_history_file->puts_unfiltered (str);
+#endif
+    }
 }
 
 /* The available instantiations of logging_file.  */
@@ -388,4 +416,8 @@ The logfile is used when directing GDB's output."),
 		     false, &set_logging_cmdlist);
   deprecate_cmd (set_logging_off_cmd, "set logging enabled off");
   set_logging_off_cmd->default_args = "off";
+
+#ifdef TUI
+  tui_history_file = std::make_unique<cmd_history_ui_file> ();
+#endif
 }

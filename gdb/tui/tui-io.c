@@ -483,11 +483,12 @@ tui_write (const char *buf, size_t length)
    necessary.  */
 
 void
-tui_puts (const char *string, WINDOW *w)
+tui_puts (const char *string, WINDOW *w, int exact_count, int *printed)
 {
   if (w == nullptr)
     w = tui_cmd_win ()->handle.get ();
 
+  int count = 0;
   while (true)
     {
       const char *next = strpbrk (string, "\n\1\2\033\t");
@@ -495,7 +496,16 @@ tui_puts (const char *string, WINDOW *w)
       /* Print the plain text prefix.  */
       size_t n_chars = next == nullptr ? strlen (string) : next - string;
       if (n_chars > 0)
-	waddnstr (w, string, n_chars);
+	{
+	  if (exact_count >= 0 && count + n_chars > exact_count)
+	    n_chars = exact_count - count;
+
+	  waddnstr (w, string, n_chars);
+
+	  count += n_chars;
+	  if (exact_count >= 0 && count >= exact_count)
+	    break;
+	}
 
       /* We finished.  */
       if (next == nullptr)
@@ -536,6 +546,12 @@ tui_puts (const char *string, WINDOW *w)
 
       string = next;
     }
+
+  if (printed != nullptr)
+    *printed = count;
+  if (exact_count >= 0)
+    while (count++ < exact_count)
+      do_tui_putc (w, ' ');
 
   if (tui_cmd_win () != nullptr && w == tui_cmd_win ()->handle.get ())
     update_cmdwin_start_line ();
