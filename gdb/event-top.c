@@ -42,6 +42,10 @@
 #include "gdbsupport/gdb-sigmask.h"
 #include "async-event.h"
 
+#ifdef TUI
+#include "tui/tui-cmd-history.h"
+#endif
+
 /* readline include files.  */
 #include "readline/readline.h"
 #include "readline/history.h"
@@ -1245,6 +1249,13 @@ gdb_setup_readline (int editing)
   gdb_stdlog = gdb_stderr;  /* for moment */
   gdb_stdtarg = gdb_stderr; /* for moment */
   gdb_stdtargerr = gdb_stderr; /* for moment */
+
+#ifdef TUI
+  gdb_stdout = new tee_file (gdb_stdout,
+			     ui_file_up (new cmd_history_ui_file));
+  gdb_stderr = new tee_file (gdb_stderr,
+			     ui_file_up (new cmd_history_ui_file));
+#endif
 
   /* If the input stream is connected to a terminal, turn on editing.
      However, that is only allowed on the main UI, as we can only have

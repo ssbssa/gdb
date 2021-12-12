@@ -302,6 +302,7 @@ SUBDIR_MI_CFLAGS =
 #
 SUBDIR_TUI_SRCS = \
 	tui/tui.c \
+	tui/tui-cmd-history.c \
 	tui/tui-command.c \
 	tui/tui-data.c \
 	tui/tui-disasm.c \
@@ -312,6 +313,7 @@ SUBDIR_TUI_SRCS = \
 	tui/tui-layout.c \
 	tui/tui-location.c \
 	tui/tui-out.c \
+	tui/tui-output-base.c \
 	tui/tui-regs.c \
 	tui/tui-source.c \
 	tui/tui-stack.c \
@@ -1545,6 +1547,7 @@ HFILES_NO_SRCDIR = \
 	target/wait.h \
 	target/waitstatus.h \
 	tui/tui.h \
+	tui/tui-cmd-history.h \
 	tui/tui-command.h \
 	tui/tui-data.h \
 	tui/tui-disasm.h \
@@ -1554,6 +1557,7 @@ HFILES_NO_SRCDIR = \
 	tui/tui-layout.h \
 	tui/tui-location.h \
 	tui/tui-out.h \
+	tui/tui-output-base.h \
 	tui/tui-regs.h \
 	tui/tui-source.h \
 	tui/tui-stack.h \
