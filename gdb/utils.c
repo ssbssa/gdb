@@ -57,6 +57,9 @@
 #include "inferior.h"		/* for signed_pointer_to_address */
 
 #include "gdb_curses.h"
+#if defined (HAVE_NCURSESW_NCURSES_H)
+#include <tic.h>
+#endif
 
 #include "readline/readline.h"
 
@@ -1258,6 +1261,16 @@ static ui_file_style wrap_style;
 void
 init_page_info (void)
 {
+#if defined (HAVE_NCURSESW_NCURSES_H)
+  static bool init_terminfo_dir = false;
+  if (!init_terminfo_dir)
+    {
+      std::string ti_dir = gdb_datadir + "/../terminfo";
+      _nc_tic_dir (strdup (ti_dir.c_str()));
+      init_terminfo_dir = true;
+    }
+#endif
+
   if (batch_flag)
     {
       lines_per_page = UINT_MAX;
