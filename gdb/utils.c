@@ -57,6 +57,9 @@
 #include "inferior.h"		/* for signed_pointer_to_address */
 
 #include "gdb_curses.h"
+#ifdef USE_RELATIVE_TERMINFO
+#include <tic.h>
+#endif
 
 #include "readline/readline.h"
 
@@ -1182,6 +1185,16 @@ static bool filter_initialized = false;
 void
 init_page_info (void)
 {
+#ifdef USE_RELATIVE_TERMINFO
+  static bool init_terminfo_dir = false;
+  if (!init_terminfo_dir)
+    {
+      std::string ti_dir = gdb_datadir + "/../terminfo";
+      _nc_tic_dir (strdup (ti_dir.c_str()));
+      init_terminfo_dir = true;
+    }
+#endif
+
   if (batch_flag)
     {
       lines_per_page = UINT_MAX;
