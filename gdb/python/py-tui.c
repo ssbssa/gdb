@@ -101,6 +101,8 @@ public:
       tui_win_info::refresh_window ();
   }
 
+  void resize (int height, int width, int origin_x, int origin_y) override;
+
   void click (int mouse_x, int mouse_y, int mouse_button) override;
 
   /* Erase and re-box the window.  */
@@ -229,6 +231,17 @@ tui_py_window::do_scroll_vertical (int num_to_scroll)
       if (result == nullptr)
 	gdbpy_print_stack ();
     }
+}
+
+void
+tui_py_window::resize (int height_, int width_, int origin_x_, int origin_y_)
+{
+  if (m_inner_window != nullptr
+      && (width != width_ || height != height_
+	  || x != origin_x_ || y != origin_y_))
+    m_inner_window.reset (nullptr);
+
+  tui_win_info::resize (height_, width_, origin_x_, origin_y_);
 }
 
 void
