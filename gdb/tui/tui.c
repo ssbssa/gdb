@@ -453,6 +453,7 @@ tui_enable (void)
       tui_set_win_focus_to (TUI_SRC_WIN);
       keypad (TUI_CMD_WIN->handle.get (), TRUE);
       wrefresh (TUI_CMD_WIN->handle.get ());
+      tui_set_win_resized_to (false);
       tui_finish_init = false;
     }
   else
