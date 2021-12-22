@@ -61,7 +61,7 @@ line_header::add_file_name (const char *name,
 }
 
 gdb::unique_xmalloc_ptr<char>
-line_header::file_file_name (int file) const
+line_header::file_file_name (int file, bool absolute) const
 {
   /* Is the file number a valid index into the line header's file name
      table?  Remember that file numbers start with one, not zero.  */
@@ -69,7 +69,11 @@ line_header::file_file_name (int file) const
     {
       const file_entry *fe = file_name_at (file);
 
-      if (!IS_ABSOLUTE_PATH (fe->name))
+      /* The directory index 0 always means the compilation directory.
+	 For DWARF 4 and before because 0 means DW_AT_comp_dir, and
+	 for DWARF 5 because the first entry of the directory table is
+	 the compilation directory.  */
+      if (!IS_ABSOLUTE_PATH (fe->name) && (absolute || fe->d_index > 0))
 	{
 	  const char *dir = fe->include_dir (this);
 	  if (dir != NULL)
@@ -103,7 +107,7 @@ line_header::file_full_name (int file, const char *comp_dir) const
      table?  Remember that file numbers start with one, not zero.  */
   if (is_valid_file_index (file))
     {
-      gdb::unique_xmalloc_ptr<char> relative = file_file_name (file);
+      gdb::unique_xmalloc_ptr<char> relative = file_file_name (file, true);
 
       if (IS_ABSOLUTE_PATH (relative.get ()) || comp_dir == NULL)
 	return relative;
