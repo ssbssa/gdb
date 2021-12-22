@@ -69,7 +69,11 @@ line_header::file_file_name (int file) const
     {
       const file_entry *fe = file_name_at (file);
 
-      if (!IS_ABSOLUTE_PATH (fe->name))
+      /* The directory index 0 always means the compilation directory.
+	 For DWARF 4 and before because 0 means DW_AT_comp_dir, and
+	 for DWARF 5 because the first entry of the directory table is
+	 the compilation directory.  */
+      if (!IS_ABSOLUTE_PATH (fe->name) && fe->d_index > 0)
 	{
 	  const char *dir = fe->include_dir (this);
 	  if (dir != NULL)
