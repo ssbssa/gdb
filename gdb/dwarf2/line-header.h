@@ -173,7 +173,8 @@ struct line_header
      number I in this object's file name table.  The result is
      allocated using xmalloc; the caller is responsible for freeing
      it.  */
-  gdb::unique_xmalloc_ptr<char> file_file_name (int file) const;
+  gdb::unique_xmalloc_ptr<char> file_file_name (int file,
+						bool absolute = false) const;
 
  private:
   /* The include_directories table.  Note these are observing
