@@ -31,6 +31,7 @@
 #include "coff/pe.h"
 #include "libcoff.h"
 #include "value.h"
+#include "language.h"
 #include <algorithm>
 
 /* The registers used to pass integer arguments during a function call.  */
@@ -382,9 +383,11 @@ amd64_windows_return_value (struct gdbarch *gdbarch, struct value *function,
 	  }
 	/* fall through */
       default:
+	if (!language_pass_by_reference (type).trivially_copyable)
+	  {}
 	/* All other values that are 1, 2, 4 or 8 bytes long are returned
 	   via RAX.  */
-	if (len == 1 || len == 2 || len == 4 || len == 8)
+	else if (len == 1 || len == 2 || len == 4 || len == 8)
 	  regnum = AMD64_RAX_REGNUM;
 	else if (len == 16 && type->code () == TYPE_CODE_INT)
 	  regnum = AMD64_XMM0_REGNUM;
