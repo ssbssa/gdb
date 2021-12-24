@@ -1045,8 +1045,80 @@ class DisplayWindow(VariableWindow):
                 )
 
 
+template_re = None
+
+
+def filter_templates(n):
+    global template_re
+    if template_re is None:
+        template_re = re.compile(r"(?<!\boperator)(<|>)")
+    level = 0
+    rest_arr = []
+    for s in template_re.split(n):
+        if s == "<":
+            level += 1
+        elif s == ">":
+            if level > 0:
+                level -= 1
+        elif level == 0:
+            rest_arr.append(s)
+    return "".join(rest_arr)
+
+
+class ChoiceWindow(TextWindow):
+    def refill(self):
+        self.lines = []
+        for prefix, text, selected in self.choices():
+            text_col_s, text_col_e = "", ""
+            if selected:
+                text_col_s, text_col_e = "\033[1;37m", "\033[0m"
+            self.lines.append(prefix + text_col_s + text + text_col_e)
+
+    def click(self, x, y, button):
+        line = y + self.line_ofs
+        if button == 1 and line < len(self.lines):
+            self.select(line)
+            refresh_tui_windows()
+
+
+class ThreadsWindow(ChoiceWindow):
+    def choices(self):
+        self.threads = []
+        inferior = gdb.selected_inferior()
+        if inferior and inferior.is_valid():
+            sel_thread = gdb.selected_thread()
+            if sel_thread and sel_thread.is_valid():
+                sel_frame = gdb.selected_frame()
+                try:
+                    for thread in reversed(inferior.threads()):
+                        thread.switch()
+                        frame = gdb.newest_frame()
+                        name = frame.name()
+                        if not name:
+                            name = format(frame.pc(), "#x")
+                        else:
+                            name = filter_templates(name)
+                        num_str = "%d: " % thread.num
+                        if thread.ptid[1] > 0:
+                            thread_id = thread.ptid[1]
+                        else:
+                            thread_id = thread.ptid[2]
+                        text = "[%d] %s" % (thread_id, name)
+
+                        self.threads.append(thread)
+                        yield num_str, text, thread.ptid == sel_thread.ptid
+                finally:
+                    sel_thread.switch()
+                    sel_frame.select()
+
+    def select(self, line):
+        self.threads[line].switch()
+        gdb.selected_frame().select(True)
+
+
 LocalsWindow.register_window_type("locals")
 DisplayWindow.register_window_type("display")
+ThreadsWindow.register_window_type("threads")
 
 
 def refresh_tui_windows(event=None):
@@ -1066,3 +1138,4 @@ gdb.execute("tui new-layout display {-horizontal src 2 display 1} 2 status 0 cmd
 gdb.execute(
     "tui new-layout locals-display {-horizontal src 2 {locals 1 display 1} 1} 2 status 0 cmd 1"
 )
+gdb.execute("tui new-layout threads {-horizontal src 2 threads 1} 2 status 0 cmd 1")
