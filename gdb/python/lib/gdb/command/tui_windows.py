@@ -32,6 +32,70 @@ custom_windows = {}
 encoding = locale.getdefaultlocale()[1]
 
 
+if sys.platform == "win32":
+    import ctypes
+    import ctypes.wintypes as w
+
+    CF_TEXT = 1
+
+    u32 = ctypes.WinDLL("user32")
+    k32 = ctypes.WinDLL("kernel32")
+
+    OpenClipboard = u32.OpenClipboard
+    OpenClipboard.argtypes = (w.HWND,)
+    OpenClipboard.restype = w.BOOL
+
+    EmptyClipboard = u32.EmptyClipboard
+    EmptyClipboard.restype = w.BOOL
+
+    SetClipboardData = u32.SetClipboardData
+    SetClipboardData.argtypes = (
+        w.UINT,
+        w.HANDLE,
+    )
+    SetClipboardData.restype = w.HANDLE
+
+    CloseClipboard = u32.CloseClipboard
+    CloseClipboard.restype = w.BOOL
+
+    GHND = 0x0042
+
+    GlobalAlloc = k32.GlobalAlloc
+    GlobalAlloc.argtypes = (
+        w.UINT,
+        ctypes.c_size_t,
+    )
+    GlobalAlloc.restype = w.HGLOBAL
+
+    GlobalLock = k32.GlobalLock
+    GlobalLock.argtypes = (w.HGLOBAL,)
+    GlobalLock.restype = w.LPVOID
+
+    GlobalUnlock = k32.GlobalUnlock
+    GlobalUnlock.argtypes = (w.HGLOBAL,)
+    GlobalUnlock.restype = w.BOOL
+
+    def set_clipboard_text(s):
+        if OpenClipboard(None):
+            s = s.encode("utf-8")
+            EmptyClipboard()
+            h = GlobalAlloc(GHND, len(s) + 1)
+            p = GlobalLock(h)
+            ctypes.memmove(p, s, len(s))
+            GlobalUnlock(h)
+            SetClipboardData(CF_TEXT, h)
+            CloseClipboard()
+
+
+else:
+    import base64
+
+    def set_clipboard_text(s):
+        b64 = base64.b64encode(s.encode("utf-8")).decode()
+        sys.__stdout__.write("\x1b]52;c;" + b64 + "\x07")
+        sys.__stdout__.flush()
+
+
 col_esc_seq_re = re.compile("(\033\\[[0-9;]*m)")
 
 
@@ -404,6 +468,24 @@ class VariableWindow(TextWindow):
                         gdb.set_convenience_variable(self.convenience_name, prev[3])
                         self.refill(True)
                         self.redraw()
+                elif button == 2:
+                    # On middle-click, copy value(s) to clipboard
+                    if prev is not None:
+                        if prev[0]:
+                            name2 = name + ":"
+                            child_texts = []
+                            for l in range(line + 1, len(self.line_names)):
+                                child_name = self.line_names[l]
+                                if not child_name:
+                                    continue
+                                if not child_name.startswith(name2):
+                                    break
+                                child = self.prev_vals[child_name]
+                                if child is not None and child[1] != False:
+                                    child_texts.append(child[1])
+                            set_clipboard_text("\n".join(child_texts))
+                        elif prev[1] != False:
+                            set_clipboard_text(prev[1])
 
     def refill(self, keep_prev=False):
         self.lines = []
