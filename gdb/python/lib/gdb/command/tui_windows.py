@@ -1064,9 +1064,45 @@ class ThreadsWindow(TextWindow):
             before_prompt_handler()
 
 
+class FramesWindow(TextWindow):
+    def __init__(self, win):
+        super(FramesWindow, self).__init__(win, "frames")
+
+    def refill(self):
+        self.lines = []
+        self.frames = []
+        thread = gdb.selected_thread()
+        thread_valid = thread and thread.is_valid()
+        if thread_valid:
+            frame = gdb.newest_frame()
+            selected = gdb.selected_frame()
+            num = 0
+            while frame:
+                name = frame.name()
+                if not name:
+                    name = format(frame.pc(), "#x")
+                else:
+                    name = filter_templates(name)
+                num_str = "#%-2d " % num
+                name_col_s, name_col_e = "", ""
+                if frame == selected:
+                    name_col_s, name_col_e = "\033[1;37m", "\033[0m"
+                self.lines.append(num_str + name_col_s + name + name_col_e)
+                self.frames.append(frame)
+                frame = frame.older()
+                num += 1
+
+    def click(self, x, y, button):
+        line = y + self.line_ofs
+        if button == 1 and line < len(self.frames):
+            self.frames[line].select(True)
+            before_prompt_handler()
+
+
 gdb.register_window_type("locals", LocalsWindow)
 gdb.register_window_type("display", DisplayWindow)
 gdb.register_window_type("threads", ThreadsWindow)
+gdb.register_window_type("frames", FramesWindow)
 
 
 def before_prompt_handler(event=None):
@@ -1087,3 +1123,19 @@ gdb.execute(
     "tui new-layout locals-display {-horizontal src 2 {locals 1 display 1} 1} 2 status 0 cmd 1"
 )
 gdb.execute("tui new-layout threads {-horizontal src 2 threads 1} 2 status 0 cmd 1")
+gdb.execute("tui new-layout frames {-horizontal src 2 frames 1} 2 status 0 cmd 1")
+gdb.execute(
+    "tui new-layout threads-frames {-horizontal src 2 {threads 1 frames 1} 1} 2 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout locals-frames {-horizontal src 2 {locals 2 frames 1} 1} 2 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout display-frames {-horizontal src 2 {display 2 frames 1} 1} 2 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout locals-display-frames {-horizontal src 2 {locals 2 display 2 frames 1} 1} 3 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout threads-locals-frames-display {-horizontal src 3 {threads 1 locals 2} 1 {frames 1 display 2} 1} 3 status 0 cmd 1"
+)
