@@ -23,6 +23,7 @@ PY3 = sys.version_info[0] == 3
 
 if PY3:
     basestring = str
+    long = int
 
 custom_windows = {}
 
@@ -1141,10 +1142,75 @@ class FramesWindow(ChoiceWindow):
         self.frames[line].select(True)
 
 
+class MemoryWindow(TextWindow):
+    def __init__(self, win):
+        super(MemoryWindow, self).__init__(win)
+        self.pointer = 0
+
+    def refill(self):
+        self.lines = []
+        pointer = self.pointer
+        try:
+            mem = gdb.selected_inferior().read_memory(pointer, 16 * self.win.height)
+            ptr_hex_count = int(gdb.lookup_type("void").pointer().sizeof) * 2
+            ofs = 0
+            for h in range(self.win.height):
+                l = "0x%0*x  " % (ptr_hex_count, pointer + ofs)
+                l += " ".join(
+                    [
+                        "%02x%02x" % (ord(mem[ofs + i]), ord(mem[ofs + i + 1]))
+                        for i in range(0, 16, 2)
+                    ]
+                )
+                l += "  "
+                l += "".join([self.printable(mem[ofs + i]) for i in range(16)])
+                self.lines.append(l)
+                ofs += 16
+        except:
+            self.lines = [str(sys.exc_info()[1])]
+
+    def vscroll(self, num):
+        self.pointer += num * 16
+        if self.pointer < 0:
+            self.pointer = 0
+        self.refill()
+        self.redraw()
+
+    def printable(self, c):
+        o = ord(c)
+        if o < 0x20 or o >= 0x7F:
+            return "."
+        return chr(o)
+
+
+class MemoryCommand(gdb.Command):
+    """Set start pointer for memory window."""
+
+    def __init__(self):
+        super(MemoryCommand, self).__init__(
+            "memory", gdb.COMMAND_TUI, gdb.COMPLETE_EXPRESSION
+        )
+
+    def invoke(self, arg, from_tty):
+        self.dont_repeat()
+        global custom_windows
+        if (
+            "memory" not in custom_windows
+            or not custom_windows["memory"].win.is_valid()
+        ):
+            gdb.execute("layout memory")
+        memory_window = custom_windows["memory"]
+        memory_window.pointer = long(gdb.parse_and_eval(arg))
+
+
+MemoryCommand()
+
+
 LocalsWindow.register_window_type("locals")
 DisplayWindow.register_window_type("display")
 ThreadsWindow.register_window_type("threads")
 FramesWindow.register_window_type("frames")
+MemoryWindow.register_window_type("memory")
 
 
 def refresh_tui_windows(event=None):
@@ -1181,3 +1247,4 @@ gdb.execute(
 gdb.execute(
     "tui new-layout threads-locals-frames-display {-horizontal src 3 {threads 1 locals 2} 1 {frames 1 display 2} 1} 3 status 0 cmd 1"
 )
+gdb.execute("tui new-layout memory memory 1 src 2 status 0 cmd 1")
