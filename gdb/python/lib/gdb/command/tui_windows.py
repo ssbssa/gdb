@@ -1116,9 +1116,35 @@ class ThreadsWindow(ChoiceWindow):
         gdb.selected_frame().select(True)
 
 
+class FramesWindow(ChoiceWindow):
+    def choices(self):
+        self.frames = []
+        thread = gdb.selected_thread()
+        thread_valid = thread and thread.is_valid()
+        if thread_valid:
+            frame = gdb.newest_frame()
+            selected = gdb.selected_frame()
+            while frame:
+                name = frame.name()
+                if not name:
+                    name = format(frame.pc(), "#x")
+                else:
+                    name = filter_templates(name)
+                num_str = "#%-2d " % frame.level()
+
+                self.frames.append(frame)
+                yield num_str, name, frame == selected
+
+                frame = frame.older()
+
+    def select(self, line):
+        self.frames[line].select(True)
+
+
 LocalsWindow.register_window_type("locals")
 DisplayWindow.register_window_type("display")
 ThreadsWindow.register_window_type("threads")
+FramesWindow.register_window_type("frames")
 
 
 def refresh_tui_windows(event=None):
@@ -1139,3 +1165,19 @@ gdb.execute(
     "tui new-layout locals-display {-horizontal src 2 {locals 1 display 1} 1} 2 status 0 cmd 1"
 )
 gdb.execute("tui new-layout threads {-horizontal src 2 threads 1} 2 status 0 cmd 1")
+gdb.execute("tui new-layout frames {-horizontal src 2 frames 1} 2 status 0 cmd 1")
+gdb.execute(
+    "tui new-layout threads-frames {-horizontal src 2 {threads 1 frames 1} 1} 2 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout locals-frames {-horizontal src 2 {locals 2 frames 1} 1} 2 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout display-frames {-horizontal src 2 {display 2 frames 1} 1} 2 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout locals-display-frames {-horizontal src 2 {locals 2 display 2 frames 1} 1} 3 status 0 cmd 1"
+)
+gdb.execute(
+    "tui new-layout threads-locals-frames-display {-horizontal src 3 {threads 1 locals 2} 1 {frames 1 display 2} 1} 3 status 0 cmd 1"
+)
