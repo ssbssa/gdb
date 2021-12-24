@@ -1171,6 +1171,53 @@ gdb.register_window_type("frames", FramesWindow)
 gdb.register_window_type("memory", MemoryWindow)
 
 
+class CustomCommandWindow(TextWindow):
+    def __init__(self, win, title, command):
+        super(CustomCommandWindow, self).__init__(win, title)
+        self.commands = command.splitlines()
+
+    def refill(self):
+        self.lines = []
+        for c in self.commands:
+            try:
+                self.lines.extend(
+                    [
+                        output_convert(l)
+                        for l in gdb.execute(c, to_string=True, styled=True).split("\n")
+                    ]
+                )
+                if self.lines and self.lines[-1] == "":
+                    del self.lines[-1]
+            except:
+                self.lines.append(str(sys.exc_info()[1]))
+
+
+class CustomCommandWindowFactory:
+    def __init__(self, title, command):
+        self.title = title
+        self.command = command
+
+    def __call__(self, win):
+        return CustomCommandWindow(win, self.title, self.command)
+
+
+class CreateCustomCommandWindow(gdb.Command):
+    """Create custom command window."""
+
+    def __init__(self):
+        super(CreateCustomCommandWindow, self).__init__("cccw", gdb.COMMAND_TUI)
+
+    def invoke(self, arg, from_tty):
+        self.dont_repeat()
+        argv = gdb.string_to_argv(arg)
+        if len(argv) != 2:
+            raise gdb.GdbError("This expects the 2 arguments title and command.")
+        gdb.register_window_type(argv[0], CustomCommandWindowFactory(argv[0], argv[1]))
+
+
+CreateCustomCommandWindow()
+
+
 def before_prompt_handler(event=None):
     """Refresh all TextWindow instances when user is presented a prompt."""
     global custom_windows
