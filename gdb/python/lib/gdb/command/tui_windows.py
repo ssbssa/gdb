@@ -982,7 +982,71 @@ class LocalsWindow(VariableWindow):
                 block = block.superblock
 
 
+class DisplayWindow(VariableWindow):
+    def __init__(self, win):
+        super(DisplayWindow, self).__init__(win, "dv")
+        self.disp_re = re.compile(
+            "^(?P<num>\\d+): +(?P<enabled>[yn]) +(?P<fmt>\\/\\w+ +)?(?P<expr>.*)"
+        )
+        gdb.set_tui_auto_display(False)
+
+    def close(self):
+        VariableWindow.close(self)
+        gdb.set_tui_auto_display(True)
+
+    def variables(self):
+        thread = gdb.selected_thread()
+        thread_valid = thread and thread.is_valid()
+        cant_eval_str = " (cannot be evaluated in the current context)"
+        display = gdb.execute("info display", to_string=True).split("\n")
+        formats = "xduotacfszi"
+        for d in display:
+            m = self.disp_re.search(d)
+            if m:
+                num = int(m.group("num"))
+                expr = m.group("expr").strip()
+                cant_eval = expr.endswith(cant_eval_str)
+                if cant_eval:
+                    expr = expr[: -len(cant_eval_str)].strip()
+                v = None
+                sym_not_init = False
+                raw = False
+                fmt = None
+                error = None
+                if m.group("enabled") != "y":
+                    sym_not_init = True
+                elif thread_valid and not cant_eval:
+                    format_flags = m.group("fmt")
+                    if format_flags:
+                        raw = "r" in format_flags
+                        for f in format_flags:
+                            if f in formats:
+                                fmt = f
+                    try:
+                        v = gdb.parse_and_eval(expr)
+                        if v is not None:
+                            if fmt == "i":
+                                dis = (
+                                    gdb.selected_inferior()
+                                    .architecture()
+                                    .disassemble(int(v))
+                                )
+                                if len(dis):
+                                    v = dis[0]["asm"]
+                                fmt = None
+                            elif fmt == "s":
+                                v = v.cast(gdb.lookup_type("char").pointer())
+                                fmt = None
+                    except:
+                        v = None
+                        error = str(sys.exc_info()[1])
+                yield VarNameValue(
+                    expr, v, undecl=sym_not_init, num=num, r=raw, fmt=fmt, err=error
+                )
+
+
 LocalsWindow.register_window_type("locals")
+DisplayWindow.register_window_type("display")
 
 
 def refresh_tui_windows(event=None):
@@ -998,3 +1062,7 @@ gdb.events.before_prompt.connect(refresh_tui_windows)
 
 
 gdb.execute("tui new-layout locals {-horizontal src 2 locals 1} 2 status 0 cmd 1")
+gdb.execute("tui new-layout display {-horizontal src 2 display 1} 2 status 0 cmd 1")
+gdb.execute(
+    "tui new-layout locals-display {-horizontal src 2 {locals 1 display 1} 1} 2 status 0 cmd 1"
+)
