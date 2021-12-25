@@ -1431,6 +1431,18 @@ gdb.execute(
 )
 gdb.execute("tui new-layout memory memory 1 src 2 status 0 cmd 1")
 
+gdb.execute("alias ll = layout locals")
+gdb.execute("alias ld = layout display")
+gdb.execute("alias lld = layout locals-display")
+gdb.execute("alias lt = layout threads")
+gdb.execute("alias lf = layout frames")
+gdb.execute("alias ltf = layout threads-frames")
+gdb.execute("alias llf = layout locals-frames")
+gdb.execute("alias ldf = layout display-frames")
+gdb.execute("alias lldf = layout locals-display-frames")
+gdb.execute("alias ltlfd = layout threads-locals-frames-display")
+gdb.execute("alias lm = layout memory")
+
 try:
     gdb.execute(
         "tui new-layout locals-output {-horizontal src 2 locals 1} 2 output 1 status 0 cmd 1"
@@ -1462,5 +1474,16 @@ try:
     gdb.execute(
         "tui new-layout threads-locals-frames-display-output {-horizontal src 3 {threads 1 locals 2} 1 {frames 1 display 2} 1} 3 output 1 status 0 cmd 1"
     )
+
+    gdb.execute("alias llo = layout locals-output")
+    gdb.execute("alias ldo = layout display-output")
+    gdb.execute("alias lldo = layout locals-display-output")
+    gdb.execute("alias lto = layout threads-output")
+    gdb.execute("alias lfo = layout frames-output")
+    gdb.execute("alias ltfo = layout threads-frames-output")
+    gdb.execute("alias llfo = layout locals-frames-output")
+    gdb.execute("alias ldfo = layout display-frames-output")
+    gdb.execute("alias lldfo = layout locals-display-frames-output")
+    gdb.execute("alias ltlfdo = layout threads-locals-frames-display-output")
 except:
     pass
