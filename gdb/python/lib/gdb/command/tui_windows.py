@@ -1430,3 +1430,37 @@ gdb.execute(
     "tui new-layout threads-locals-frames-display {-horizontal src 3 {threads 1 locals 2} 1 {frames 1 display 2} 1} 3 status 0 cmd 1"
 )
 gdb.execute("tui new-layout memory memory 1 src 2 status 0 cmd 1")
+
+try:
+    gdb.execute(
+        "tui new-layout locals-output {-horizontal src 2 locals 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout display-output {-horizontal src 2 display 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout locals-display-output {-horizontal src 2 {locals 1 display 1} 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout threads-output {-horizontal src 2 threads 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout frames-output {-horizontal src 2 frames 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout threads-frames-output {-horizontal src 2 {threads 1 frames 1} 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout locals-frames-output {-horizontal src 2 {locals 2 frames 1} 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout display-frames-output {-horizontal src 2 {display 2 frames 1} 1} 2 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout locals-display-frames-output {-horizontal src 2 {locals 2 display 2 frames 1} 1} 3 output 1 status 0 cmd 1"
+    )
+    gdb.execute(
+        "tui new-layout threads-locals-frames-display-output {-horizontal src 3 {threads 1 locals 2} 1 {frames 1 display 2} 1} 3 output 1 status 0 cmd 1"
+    )
+except:
+    pass
