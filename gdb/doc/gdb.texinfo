@@ -5116,7 +5116,7 @@ slow down the running of your program.
 
 @table @code
 @kindex watch
-@item watch @r{[}-l@r{|}-location@r{]} @var{expr} @r{[}thread @var{thread-id}@r{]} @r{[}mask @var{maskvalue}@r{]} @r{[}task @var{task-id}@r{]}
+@item watch @r{[}-l@r{|}-location@r{]} @var{expr} @r{[}no-change on@r{]} @r{[}thread @var{thread-id}@r{]} @r{[}mask @var{maskvalue}@r{]} @r{[}task @var{task-id}@r{]}
 Set a watchpoint for an expression.  @value{GDBN} will break when the
 expression @var{expr} is written into by the program and its value
 changes.  The simplest (and the most popular) use of this command is
@@ -5161,6 +5161,10 @@ Examples:
 (@value{GDBP}) watch foo mask 0xffff00ff
 (@value{GDBP}) watch *0xdeadbeef mask 0xffffff00
 @end smallexample
+
+Usually a hardware watchpoint only stops if its value changes, but with the
+@code{@r{[}no-change on@r{]}} argument it stops on any write, even if its
+value doesn't change.
 
 @kindex rwatch
 @item rwatch @r{[}-l@r{|}-location@r{]} @var{expr} @r{[}thread @var{thread-id}@r{]} @r{[}mask @var{maskvalue}@r{]}
