@@ -1058,6 +1058,10 @@ struct watchpoint : public breakpoint
 
   /* The mask address for a masked hardware watchpoint.  */
   CORE_ADDR hw_wp_mask;
+
+  /* Whether this hardware watchpoint triggers on writes where the value
+     doesn't change.  */
+  bool no_change;
 };
 
 /* Return true if BPT is either a software breakpoint or a hardware
