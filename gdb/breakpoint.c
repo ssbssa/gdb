@@ -5330,6 +5330,7 @@ watchpoint_check (bpstat *bs)
 	 the address of the array instead of its contents.  This is
 	 not what we want.  */
       if ((b->val != NULL) != (new_val != NULL)
+	  || (b->type == bp_hardware_watchpoint && b->no_change)
 	  || (b->val != NULL && !value_equal_contents (b->val.get (),
 						       new_val)))
 	{
@@ -10102,6 +10103,8 @@ watchpoint::print_recreate (struct ui_file *fp) const
     }
 
   gdb_printf (fp, " %s", exp_string.get ());
+  if (no_change)
+    gdb_printf (fp, " no-change on");
   print_recreate_thread (fp);
 }
 
@@ -10324,6 +10327,7 @@ watch_command_1 (const char *arg, int accessflag, int from_tty,
   bool use_mask = false;
   CORE_ADDR mask = 0;
   int task = -1;
+  bool no_change = false;
 
   /* Make sure that we actually have parameters to parse.  */
   if (arg != NULL && arg[0] != '\0')
@@ -10406,6 +10410,10 @@ watch_command_1 (const char *arg, int accessflag, int from_tty,
 	    {
 	      /* Support for watchpoints will be added in a later commit.  */
 	      error (_("Cannot use 'inferior' keyword with watchpoints"));
+	    }
+	  else if (toklen == 9 && startswith (tok, "no-change"))
+	    {
+	      no_change = startswith (value_start, "on");
 	    }
 	  else if (toklen == 4 && startswith (tok, "mask"))
 	    {
@@ -10586,6 +10594,7 @@ watch_command_1 (const char *arg, int accessflag, int from_tty,
   w->exp = std::move (exp);
   w->exp_valid_block = exp_valid_block;
   w->cond_exp_valid_block = cond_exp_valid_block;
+  w->no_change = no_change;
   if (just_location)
     {
       struct type *t = val->type ();
