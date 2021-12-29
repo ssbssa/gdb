@@ -18,7 +18,9 @@
 
 #include "nat/windows-nat.h"
 #include "gdbsupport/common-debug.h"
+#include "gdbsupport/xml-utils.h"
 #include "target/target.h"
+#include <winternl.h>
 
 #undef GetModuleFileNameEx
 
@@ -28,6 +30,13 @@
 #include <sys/cygwin.h>
 #define __USEWIDE
 #define GetModuleFileNameEx GetModuleFileNameExW
+#endif
+
+#ifndef STATUS_SUCCESS
+#define STATUS_SUCCESS 0
+#endif
+#ifndef STATUS_INFO_LENGTH_MISMATCH
+#define STATUS_INFO_LENGTH_MISMATCH 0xc0000004
 #endif
 
 namespace windows_nat
@@ -238,6 +247,319 @@ windows_process_info::pid_to_exec_file (int pid)
     path[0] = '\0';
 
   return path;
+}
+
+static std::string
+wcstostring (const wchar_t *in, int len)
+{
+  std::string out;
+  if (in != nullptr && (len > 0 || (len < 0 && in[0])))
+    {
+      if (len < 0)
+	len = wcslen (in);
+      int needed = WideCharToMultiByte (CP_ACP, 0, in, len, nullptr, 0,
+					nullptr, nullptr);
+      if (needed > 0)
+	{
+	  out.resize (needed + 1);
+	  WideCharToMultiByte (CP_ACP, 0, in, len, out.data (), needed,
+			       nullptr, nullptr);
+	}
+    }
+  return out;
+}
+
+static std::string
+process_user (HANDLE process)
+{
+  std::string user;
+  HANDLE token;
+  if (OpenProcessToken (process, TOKEN_QUERY, &token))
+  {
+    DWORD tu_size = 0;
+    char name[256];
+    DWORD name_size = sizeof (name);
+    SID_NAME_USE sid;
+    if (!GetTokenInformation (token, TokenUser,
+			      NULL, 0, &tu_size)
+	&& GetLastError () == ERROR_INSUFFICIENT_BUFFER)
+      {
+	gdb::unique_xmalloc_ptr<TOKEN_USER> tu
+	  ((TOKEN_USER *) xmalloc (tu_size));
+	if (GetTokenInformation (token, TokenUser,
+				 tu.get (), tu_size, &tu_size)
+	    && LookupAccountSidA (NULL, tu->User.Sid, name,
+				  &name_size, NULL, &tu_size, &sid))
+	  user = name;
+      }
+
+    CloseHandle (token);
+  }
+  return user;
+}
+
+typedef LONG NTAPI NtQuerySystemInformation_ftype (int, PVOID, ULONG, PULONG);
+typedef LONG NTAPI NtQueryInformationProcess_ftype (HANDLE, int,
+						    PVOID, ULONG, PULONG);
+
+static void
+process_cmdline (HANDLE process, std::string &exe, std::string &cmdline,
+		 NtQueryInformationProcess_ftype *query_process_info)
+{
+  PROCESS_BASIC_INFORMATION pbi;
+  PRTL_USER_PROCESS_PARAMETERS rupp;
+  SIZE_T done;
+  if (query_process_info (process, ProcessBasicInformation,
+			  &pbi, sizeof (pbi), NULL) == STATUS_SUCCESS
+      && ReadProcessMemory (process, &pbi.PebBaseAddress->ProcessParameters,
+			    &rupp, sizeof (rupp), &done)
+      && done == sizeof (rupp))
+    {
+      UNICODE_STRING us;
+      wchar_t buf[65536];
+
+      if (ReadProcessMemory (process, &rupp->ImagePathName,
+			     &us, sizeof (us), &done)
+	  && done == sizeof (us)
+	  && us.Length > 0 && us.Buffer != NULL
+	  && ReadProcessMemory (process, us.Buffer, buf, us.Length, &done)
+	  && done == us.Length)
+	exe = wcstostring (buf, us.Length / 2);
+
+      if (ReadProcessMemory (process, &rupp->CommandLine,
+			     &us, sizeof (us), &done)
+	  && done == sizeof (us)
+	  && us.Length > 0 && us.Buffer != NULL
+	  && ReadProcessMemory (process, us.Buffer, buf, us.Length, &done)
+	  && done == us.Length)
+	cmdline = wcstostring (buf, us.Length / 2);
+    }
+}
+
+#define SystemProcessIdInformation 0x58
+
+static std::string
+process_path (HANDLE pid, NtQuerySystemInformation_ftype *query_system_info)
+{
+  struct SYSTEM_PROCESS_ID_INFORMATION
+    {
+      HANDLE ProcessId;
+      UNICODE_STRING ImageName;
+    };
+  wchar_t buf[65536];
+  SYSTEM_PROCESS_ID_INFORMATION spii = { pid, { 0, 65534, buf } };
+  if (query_system_info (SystemProcessIdInformation,
+			 &spii, sizeof (spii), 0) == STATUS_SUCCESS
+      && spii.ImageName.Length >= 2)
+    {
+      int len = spii.ImageName.Length / 2;
+      buf[len] = 0;
+      wchar_t drives[128];
+      if (GetLogicalDriveStringsW (127, drives))
+	{
+	  wchar_t path[MAX_PATH];
+	  wchar_t drive[3] = L" :";
+	  wchar_t *p = drives;
+	  do
+	    {
+	      drive[0] = *p;
+	      if (QueryDosDeviceW (drive, path, MAX_PATH)
+		  && wcslen (path) > 2
+		  && wcsncmp (buf, path, wcslen (path)) == 0
+		  && wcslen (path) + len < MAX_PATH)
+		{
+		  p = buf + wcslen (path) - 2;
+		  wcsncpy (p, drive, 2);
+		  return wcstostring (p, -1);
+		}
+	    }
+	  while (*p++);
+	}
+      return wcstostring (buf, len);
+    }
+  return {};
+}
+
+static std::string
+win32_xfer_osdata_processes ()
+{
+  std::string buffer = "<osdata type=\"processes\">\n";
+
+  HMODULE ntdll = GetModuleHandle ("ntdll.dll");
+  NtQuerySystemInformation_ftype *query_system_info
+    = (NtQuerySystemInformation_ftype *) GetProcAddress
+    (ntdll, "NtQuerySystemInformation");
+  NtQueryInformationProcess_ftype *query_process_info
+    = (NtQueryInformationProcess_ftype *) GetProcAddress
+    (ntdll, "NtQueryInformationProcess");
+
+#ifndef __x86_64__
+  BOOL wow64me = 0;
+  IsWow64Process(GetCurrentProcess (), &wow64me);
+#endif
+
+  ULONG spi_size = 0;
+  if (query_system_info != nullptr
+      && query_system_info (SystemProcessInformation, NULL, 0, &spi_size)
+      == STATUS_INFO_LENGTH_MISMATCH)
+    {
+      spi_size += 100000;
+      gdb::unique_xmalloc_ptr<SYSTEM_PROCESS_INFORMATION> spi
+	((SYSTEM_PROCESS_INFORMATION *) xmalloc (spi_size));
+
+      if (query_system_info (SystemProcessInformation, spi.get (),
+			     spi_size, NULL) == STATUS_SUCCESS)
+	{
+	  SYSTEM_PROCESS_INFORMATION *p = spi.get ();
+	  while (true)
+	    {
+	      unsigned pid = (uintptr_t)p->UniqueProcessId;
+
+	      int bitness = 0;
+	      std::string user, exe, cmdline;
+
+	      HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION
+					   | PROCESS_VM_READ, FALSE, pid);
+	      if (process != NULL)
+		{
+#ifndef __x86_64__
+		  if (!wow64me)
+		    bitness = 32;
+		  else
+#endif
+		    {
+		      BOOL wow64 = 0;
+		      IsWow64Process(process, &wow64);
+		      bitness = wow64 ? 32 : 64;
+		    }
+
+		  user = process_user (process);
+
+		  process_cmdline (process, exe, cmdline, query_process_info);
+
+		  CloseHandle (process);
+		}
+
+	      const char *bitness_str
+		= bitness == 32 ? "32" : bitness == 64 ? "64" : "";
+
+	      if (exe.empty ())
+		exe = process_path (p->UniqueProcessId, query_system_info);
+	      if (exe.empty ())
+		exe = wcstostring (p->ImageName.Buffer,
+				   p->ImageName.Length / 2);
+
+	      string_xml_appendf
+		(buffer,
+		 "<item>"
+		 "<column name=\"pid\">%u</column>"
+		 "<column name=\"user\">%s</column>"
+		 "<column name=\"command\">%s</column>"
+		 "<column name=\"executable\">%s</column>"
+		 "<column name=\"bitness\">%s</column>"
+		 "</item>",
+		 pid,
+		 user.c_str (),
+		 cmdline.c_str (),
+		 exe.c_str (),
+		 bitness_str);
+
+	      if (p->NextEntryOffset == 0)
+		break;
+	      p = (SYSTEM_PROCESS_INFORMATION *)((char *)p
+						 + p->NextEntryOffset);
+	    }
+	}
+    }
+
+  buffer += "</osdata>\n";
+
+  return buffer;
+}
+
+static std::string win32_xfer_osdata_info_os_types ();
+
+static struct osdata_type {
+  const char *type;
+  const char *title;
+  const char *description;
+  std::string (*take_snapshot) ();
+  std::string buffer;
+} osdata_table[] = {
+  { "types", "Types", "Listing of info os types you can list",
+    win32_xfer_osdata_info_os_types },
+  { "processes", "Processes", "Listing of all processes",
+    win32_xfer_osdata_processes },
+  { NULL, NULL, NULL }
+};
+
+static std::string
+win32_xfer_osdata_info_os_types ()
+{
+  std::string buffer =  "<osdata type=\"types\">\n";
+
+  /* Start the below loop at 1, as we do not want to list ourselves.  */
+  for (int i = 1; osdata_table[i].type; ++i)
+    string_xml_appendf (buffer,
+			"<item>"
+			"<column name=\"Type\">%s</column>"
+			"<column name=\"Description\">%s</column>"
+			"<column name=\"Title\">%s</column>"
+			"</item>",
+			osdata_table[i].type,
+			osdata_table[i].description,
+			osdata_table[i].title);
+
+  buffer += "</osdata>\n";
+
+  return buffer;
+}
+
+static LONGEST
+common_getter (struct osdata_type *osd,
+	       gdb_byte *readbuf, ULONGEST offset, ULONGEST len)
+{
+  gdb_assert (readbuf);
+
+  if (offset == 0)
+    osd->buffer = osd->take_snapshot();
+
+  if (offset >= osd->buffer.size ())
+    {
+      /* Done.  Get rid of the buffer.  */
+      osd->buffer.clear ();
+      return 0;
+    }
+
+  len = std::min (len, osd->buffer.size () - offset);
+  memcpy (readbuf, &osd->buffer[offset], len);
+
+  return len;
+
+}
+
+LONGEST
+win32_common_xfer_osdata (const char *annex, gdb_byte *readbuf,
+			  ULONGEST offset, ULONGEST len)
+{
+  if (!annex || *annex == '\0')
+    {
+      return common_getter (&osdata_table[0],
+			    readbuf, offset, len);
+    }
+  else
+    {
+      int i;
+
+      for (i = 0; osdata_table[i].type; ++i)
+	{
+	  if (strcmp (annex, osdata_table[i].type) == 0)
+	    return common_getter (&osdata_table[i],
+				  readbuf, offset, len);
+	}
+
+      return 0;
+    }
 }
 
 /* Return the name of the DLL referenced by H at ADDRESS.  UNICODE
