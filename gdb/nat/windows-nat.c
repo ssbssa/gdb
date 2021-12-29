@@ -19,6 +19,7 @@
 #include "gdbsupport/common-defs.h"
 #include "nat/windows-nat.h"
 #include "gdbsupport/common-debug.h"
+#include "gdbsupport/xml-utils.h"
 #include "target/target.h"
 
 #undef GetModuleFileNameEx
@@ -251,6 +252,158 @@ windows_process_info::pid_to_exec_file (int pid)
     path[0] = '\0';
 
   return path;
+}
+
+static std::string
+win32_xfer_osdata_processes ()
+{
+  std::string buffer = "<osdata type=\"processes\">\n";
+
+  typedef LONG NTAPI NtGetNextProcess_ftype (HANDLE, ACCESS_MASK, ULONG,
+					     ULONG, HANDLE *);
+  typedef BOOL WINAPI QueryFullProcessImageNameA_ftype (HANDLE, DWORD, LPSTR,
+							PDWORD);
+  HMODULE ntdll = GetModuleHandle ("ntdll.dll");
+  HMODULE kernel32 = GetModuleHandle ("kernel32.dll");
+  NtGetNextProcess_ftype *NtGetNextProcess
+    = (NtGetNextProcess_ftype *) GetProcAddress (ntdll, "NtGetNextProcess");
+  QueryFullProcessImageNameA_ftype *QueryFullProcessImageNameA
+    = (QueryFullProcessImageNameA_ftype *)
+    GetProcAddress (kernel32, "QueryFullProcessImageNameA");
+  if (NtGetNextProcess && QueryFullProcessImageNameA)
+    {
+      HANDLE process = NULL;
+      char imageName[MAX_PATH];
+      while (1)
+	{
+	  HANDLE processNext;
+	  LONG status = NtGetNextProcess (process, PROCESS_QUERY_INFORMATION,
+					  0, 0, &processNext);
+	  if (process)
+	    CloseHandle (process);
+	  if (status)
+	    break;
+	  process = processNext;
+
+	  DWORD pid = GetProcessId(process);
+
+	  DWORD size = MAX_PATH;
+	  if (pid > 0
+	      && QueryFullProcessImageNameA (process, 0, imageName, &size)
+	      && size < MAX_PATH)
+	    {
+	      BOOL wow64 = false;
+	      IsWow64Process(process, &wow64);
+	      int bitness = wow64 ? 32 : 64;
+#ifndef __x86_64__
+	      BOOL wow64me = false;
+	      IsWow64Process(GetCurrentProcess (), &wow64me);
+	      if (!wow64me)
+		bitness = 32;
+#endif
+
+	      string_xml_appendf
+		(buffer,
+		 "<item>"
+		 "<column name=\"pid\">%lu</column>"
+		 "<column name=\"bitness\">%d</column>"
+		 "<column name=\"executable\">%s</column>"
+		 "</item>",
+		 pid,
+		 bitness,
+		 imageName);
+	    }
+	}
+    }
+
+  buffer += "</osdata>\n";
+
+  return buffer;
+}
+
+static std::string win32_xfer_osdata_info_os_types ();
+
+static struct osdata_type {
+  const char *type;
+  const char *title;
+  const char *description;
+  std::string (*take_snapshot) ();
+  std::string buffer;
+} osdata_table[] = {
+  { "types", "Types", "Listing of info os types you can list",
+    win32_xfer_osdata_info_os_types },
+  { "processes", "Processes", "Listing of all processes",
+    win32_xfer_osdata_processes },
+  { NULL, NULL, NULL }
+};
+
+static std::string
+win32_xfer_osdata_info_os_types ()
+{
+  std::string buffer =  "<osdata type=\"types\">\n";
+
+  /* Start the below loop at 1, as we do not want to list ourselves.  */
+  for (int i = 1; osdata_table[i].type; ++i)
+    string_xml_appendf (buffer,
+			"<item>"
+			"<column name=\"Type\">%s</column>"
+			"<column name=\"Description\">%s</column>"
+			"<column name=\"Title\">%s</column>"
+			"</item>",
+			osdata_table[i].type,
+			osdata_table[i].description,
+			osdata_table[i].title);
+
+  buffer += "</osdata>\n";
+
+  return buffer;
+}
+
+static LONGEST
+common_getter (struct osdata_type *osd,
+	       gdb_byte *readbuf, ULONGEST offset, ULONGEST len)
+{
+  gdb_assert (readbuf);
+
+  if (offset == 0)
+    osd->buffer = osd->take_snapshot();
+
+  if (offset >= osd->buffer.size ())
+    {
+      /* Done.  Get rid of the buffer.  */
+      osd->buffer.clear ();
+      return 0;
+    }
+
+  len = std::min (len, osd->buffer.size () - offset);
+  memcpy (readbuf, &osd->buffer[offset], len);
+
+  return len;
+
+}
+
+LONGEST
+win32_common_xfer_osdata (const char *annex, gdb_byte *readbuf,
+			  ULONGEST offset, ULONGEST len)
+{
+  if (!annex || *annex == '\0')
+    {
+      return common_getter (&osdata_table[0],
+			    readbuf, offset, len);
+    }
+  else
+    {
+      int i;
+
+      for (i = 0; osdata_table[i].type; ++i)
+	{
+	  if (strcmp (annex, osdata_table[i].type) == 0)
+	    return common_getter (&osdata_table[i],
+				  readbuf, offset, len);
+	}
+
+      return 0;
+    }
 }
 
 /* Return the name of the DLL referenced by H at ADDRESS.  UNICODE
