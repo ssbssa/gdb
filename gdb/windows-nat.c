@@ -3267,6 +3267,17 @@ windows_xfer_siginfo (gdb_byte *readbuf, ULONGEST offset, ULONGEST len,
   return TARGET_XFER_OK;
 }
 
+static enum target_xfer_status
+windows_xfer_osdata (const char *annex, gdb_byte *readbuf,
+		     ULONGEST offset, ULONGEST len, ULONGEST *xfered_len)
+{
+  *xfered_len = win32_common_xfer_osdata (annex, readbuf, offset, len);
+  if (*xfered_len == 0)
+    return TARGET_XFER_EOF;
+  else
+    return TARGET_XFER_OK;
+}
+
 enum target_xfer_status
 windows_nat_target::xfer_partial (enum target_object object,
 				  const char *annex, gdb_byte *readbuf,
@@ -3284,6 +3295,9 @@ windows_nat_target::xfer_partial (enum target_object object,
 
     case TARGET_OBJECT_SIGNAL_INFO:
       return windows_xfer_siginfo (readbuf, offset, len, xfered_len);
+
+    case TARGET_OBJECT_OSDATA:
+      return windows_xfer_osdata (annex, readbuf, offset, len, xfered_len);
 
     default:
       if (beneath () == NULL)
