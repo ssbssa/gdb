@@ -168,6 +168,9 @@ extern bool handle_ms_vc_exception (const EXCEPTION_RECORD *rec);
 
 extern bool handle_access_violation (const EXCEPTION_RECORD *rec);
 
+extern LONGEST win32_common_xfer_osdata (const char *annex, gdb_byte *readbuf,
+					 ULONGEST offset, ULONGEST len);
+
 
 /* Currently executing process */
 extern HANDLE current_process_handle;
