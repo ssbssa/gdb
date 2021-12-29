@@ -1311,6 +1311,21 @@ win32_process_target::supports_hardware_single_step ()
 }
 
 bool
+win32_process_target::supports_qxfer_osdata ()
+{
+  return true;
+}
+
+int
+win32_process_target::qxfer_osdata (const char *annex,
+				    unsigned char *readbuf,
+				    unsigned const char *writebuf,
+				    CORE_ADDR offset, int len)
+{
+  return win32_common_xfer_osdata (annex, readbuf, offset, len);
+}
+
+bool
 win32_process_target::supports_qxfer_siginfo ()
 {
   return true;
