@@ -282,6 +282,9 @@ private:
   int get_exec_module_filename (char *exe_name_ret, size_t exe_name_max_len);
 };
 
+extern LONGEST win32_common_xfer_osdata (const char *annex, gdb_byte *readbuf,
+					 ULONGEST offset, ULONGEST len);
+
 /* A simple wrapper for ContinueDebugEvent that continues the last
    waited-for event.  If DEBUG_EVENTS is true, logging will be
    enabled.  */
