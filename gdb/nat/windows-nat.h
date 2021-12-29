@@ -393,6 +393,9 @@ extern bool inferior_started_by_cygwin (DWORD winpid, bool attaching);
 
 extern std::string event_code_to_string (DWORD event_code);
 
+extern LONGEST win32_common_xfer_osdata (const char *annex, gdb_byte *readbuf,
+					 ULONGEST offset, ULONGEST len);
+
 /* A simple wrapper for ContinueDebugEvent that continues the last
    waited-for event.  If DEBUG_EVENTS is true, logging will be
    enabled.  */
