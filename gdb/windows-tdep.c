@@ -41,6 +41,7 @@
 #include "windows-nat.h"
 #endif
 #include "observable.h"
+#include "gdbsupport/gdb_optional.h"
 
 #define CYGWIN_DLL_NAME "cygwin1.dll"
 
@@ -732,6 +733,123 @@ cygwin_gdb_signal_to_target (struct gdbarch *gdbarch, enum gdb_signal signal)
   return -1;
 }
 
+static gdb::optional<std::string>
+read_unicode_string (CORE_ADDR addr, enum bfd_endian byte_order,
+		     int ptr_bytes, struct gdbarch *gdbarch)
+{
+  gdb::optional<std::string> str;
+  gdb_byte buf[8];
+  if (!target_read_memory (addr, buf, 2))
+    {
+      unsigned length = extract_unsigned_integer (buf, 2, byte_order);
+      gdb_byte *str_buf;
+      if (length > 0
+	  && !target_read_memory (addr + ptr_bytes, buf, ptr_bytes)
+	  && (str_buf = (gdb_byte *) xmalloc (length)) != nullptr)
+	{
+	  CORE_ADDR buffer = extract_unsigned_integer (buf, ptr_bytes,
+						       byte_order);
+	  if (!target_read_memory (buffer, str_buf, length))
+	    {
+	      auto_obstack obs;
+	      convert_between_encodings (target_wide_charset (gdbarch),
+					 host_charset (),
+					 str_buf, length, 2,
+					 &obs, translit_char);
+	      obstack_grow_str0 (&obs, "");
+	      str = (char *) obstack_base (&obs);
+	    }
+	  xfree (str_buf);
+	}
+    }
+  return str;
+}
+
+/* Implement the "info proc" command.  */
+
+static void
+windows_info_proc (struct gdbarch *gdbarch, const char *args,
+		   enum info_proc_what what)
+{
+  if (args && args[0])
+    error (_("Only supported for the current process"));
+  if (!target_has_execution () && core_bfd == nullptr)
+    error (_("No current process"));
+
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  int ptr_bytes;
+  int peb_offset;  /* Offset of process_environment_block in TIB.  */
+  int pp_offset;   /* Offset of process_parameters in PEB.  */
+  int cmd_offset;  /* Offset of command_line in rtl_user_process_parameters.  */
+  int cwd_offset;  /* Offset of current_directory in rtl_user_process_parameters.  */
+  int exe_offset;  /* Offset of image_path_name in rtl_user_process_parameters.  */
+  if (gdbarch_ptr_bit (gdbarch) == 32)
+    {
+      ptr_bytes = 4;
+      peb_offset = 48;
+      pp_offset = 16;
+      cmd_offset = 64;
+      cwd_offset = 36;
+      exe_offset = 56;
+    }
+  else
+    {
+      ptr_bytes = 8;
+      peb_offset = 96;
+      pp_offset = 32;
+      cmd_offset = 112;
+      cwd_offset = 56;
+      exe_offset = 96;
+    }
+  bool want_cmd = what == IP_MINIMAL || what == IP_CMDLINE || what == IP_ALL;
+  bool want_cwd = what == IP_MINIMAL || what == IP_CWD || what == IP_ALL;
+  bool want_exe = what == IP_MINIMAL || what == IP_EXE || what == IP_ALL;
+  gdb::optional<std::string> cmd_str, cwd_str, exe_str;
+  CORE_ADDR tlb;
+  gdb_byte buf[8];
+  if ((want_cmd || want_cwd || want_exe)
+      && target_get_tib_address (inferior_ptid, &tlb)
+      && !target_read_memory (tlb + peb_offset, buf, ptr_bytes))
+    {
+      CORE_ADDR peb = extract_unsigned_integer (buf, ptr_bytes, byte_order);
+      if (!target_read_memory (peb + pp_offset, buf, ptr_bytes))
+	{
+	  CORE_ADDR pp = extract_unsigned_integer (buf, ptr_bytes, byte_order);
+
+	  if (want_cmd)
+	    cmd_str = read_unicode_string (pp + cmd_offset, byte_order,
+					   ptr_bytes, gdbarch);
+	  if (want_cwd)
+	    cwd_str = read_unicode_string (pp + cwd_offset, byte_order,
+					   ptr_bytes, gdbarch);
+	  if (want_exe)
+	    exe_str = read_unicode_string (pp + exe_offset, byte_order,
+					   ptr_bytes, gdbarch);
+	}
+    }
+  if (want_cmd)
+    {
+      if (cmd_str.has_value ())
+	gdb_printf ("cmdline = '%s'\n", cmd_str->c_str ());
+      else
+	warning (_("unable to read cmdline"));
+    }
+  if (want_cwd)
+    {
+      if (cwd_str.has_value ())
+	gdb_printf ("cwd = '%s'\n", cwd_str->c_str ());
+      else
+	warning (_("unable to read cwd"));
+    }
+  if (want_exe)
+    {
+      if (exe_str.has_value ())
+	gdb_printf ("exe = '%s'\n", exe_str->c_str ());
+      else
+	warning (_("unable to read exe"));
+    }
+}
+
 struct enum_value_name
 {
   uint32_t value;
@@ -1318,6 +1436,8 @@ windows_init_abi_common (struct gdbarch_info info, struct gdbarch *gdbarch)
     = windows_solib_create_inferior_hook;
   set_gdbarch_so_ops (gdbarch, &windows_so_ops);
 
+  set_gdbarch_info_proc (gdbarch, windows_info_proc);
+  set_gdbarch_core_info_proc (gdbarch, windows_info_proc);
   set_gdbarch_get_siginfo_type (gdbarch, windows_get_siginfo_type);
 
   set_gdbarch_gdb_signal_from_target (gdbarch,
