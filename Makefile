@@ -68,6 +68,21 @@ LZMA_CONF=$(SOURCE_DIR_ABS)/$(LZMA_SRC_DIR)/configure \
 	  --build=$(MYBUILD) --host=$(MYTARGET) \
 	  --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
+GMP_VER=6.1.2
+GMP_SRC_DIR=gmp-$(GMP_VER)
+GMP_FILE=$(GMP_SRC_DIR).tar.xz
+GMP_CONF=$(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/configure \
+	 --build=$(MYBUILD) --host=$(MYTARGET) \
+	 --enable-static --disable-shared --prefix=$(GDB_LIBS)
+
+MPFR_VER=3.1.6
+MPFR_SRC_DIR=mpfr-$(MPFR_VER)
+MPFR_FILE=$(MPFR_SRC_DIR).tar.xz
+MPFR_CONF=$(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/configure \
+	 --build=$(MYBUILD) --host=$(MYTARGET) \
+	 --enable-static --disable-shared --prefix=$(GDB_LIBS) \
+	 --with-gmp-build=$(BUILD_DIR_ABS)/gmp
+
 GDB_VER=8.1.1
 GDB_SRC_DIR=gdb-$(GDB_VER)
 GDB_FILE=$(GDB_SRC_DIR).tar.xz
@@ -285,7 +300,11 @@ $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done: | $(SOURCE_DIR)/source-h
 	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p0 <patches/source-hightlight/console-colors.patch
 	@touch $@
 
-$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done $(BUILD_DIR)/boost-03-regex.done
+$(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done: | $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done
+	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p1 <patches/source-hightlight/Remove-throw-specifications.patch
+	@touch $@
+
+$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done $(BUILD_DIR)/boost-03-regex.done
 	@mkdir -p $(BUILD_DIR)/source-highlight
 	cd $(BUILD_DIR)/source-highlight && $(SOURCE_HIGHLIGHT_CONF)
 	@touch $@
@@ -319,9 +338,49 @@ $(BUILD_DIR)/lzma-05-make-install.done: | $(BUILD_DIR)/lzma-04-make.done
 	@touch $@
 
 
+# gmp
+
+$(SOURCE_DIR)/gmp-01-extract.done: | pkg/$(GMP_FILE) $(SOURCE_DIR)/lzma-01-extract.done
+	tar -C $(SOURCE_DIR) -xJf pkg/$(GMP_FILE)
+	@touch $@
+
+$(BUILD_DIR)/gmp-03-configure.done: | $(SOURCE_DIR)/gmp-01-extract.done
+	@mkdir -p $(BUILD_DIR)/gmp
+	cd $(BUILD_DIR)/gmp && $(GMP_CONF)
+	@touch $@
+
+$(BUILD_DIR)/gmp-04-make.done: | $(BUILD_DIR)/gmp-03-configure.done
+	$(MAKE) -C $(BUILD_DIR)/gmp
+	@touch $@
+
+$(BUILD_DIR)/gmp-05-make-install.done: | $(BUILD_DIR)/gmp-04-make.done
+	$(MAKE) -C $(BUILD_DIR)/gmp install
+	@touch $@
+
+
+# mpfr
+
+$(SOURCE_DIR)/mpfr-01-extract.done: | pkg/$(MPFR_FILE) $(SOURCE_DIR)/gmp-01-extract.done
+	tar -C $(SOURCE_DIR) -xJf pkg/$(MPFR_FILE)
+	@touch $@
+
+$(BUILD_DIR)/mpfr-03-configure.done: | $(SOURCE_DIR)/mpfr-01-extract.done $(BUILD_DIR)/gmp-04-make.done
+	@mkdir -p $(BUILD_DIR)/mpfr
+	cd $(BUILD_DIR)/mpfr && $(MPFR_CONF)
+	@touch $@
+
+$(BUILD_DIR)/mpfr-04-make.done: | $(BUILD_DIR)/mpfr-03-configure.done $(BUILD_DIR)/gmp-05-make-install.done
+	$(MAKE) -C $(BUILD_DIR)/mpfr
+	@touch $@
+
+$(BUILD_DIR)/mpfr-05-make-install.done: | $(BUILD_DIR)/mpfr-04-make.done
+	$(MAKE) -C $(BUILD_DIR)/mpfr install
+	@touch $@
+
+
 # gdb
 
-$(SOURCE_DIR)/gdb-01-extract.done: | pkg/$(GDB_FILE) $(SOURCE_DIR)/iconv-01-extract.done
+$(SOURCE_DIR)/gdb-01-extract.done: | pkg/$(GDB_FILE) $(SOURCE_DIR)/mpfr-01-extract.done
 	tar -C $(SOURCE_DIR) -xJf pkg/$(GDB_FILE)
 	@touch $@
 
@@ -459,7 +518,7 @@ $(BUILD_DIR)/gdb-python-04-python.done: | $(BUILD_DIR)/gdb-python-03-make-instal
 
 # gdb-git
 
-$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done
+$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git
 	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git
 	@touch $@
@@ -486,6 +545,10 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 	cp -p $(SOURCE_DIR_ABS)/$(BOOST_SRC_DIR)/LICENSE_1_0.txt $(GDB_DIR)-git/share/licenses/boost/
 	@mkdir -p $(GDB_DIR)-git/share/licenses/source-highlight
 	cp -p $(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/COPYING $(GDB_DIR)-git/share/licenses/source-highlight/
+	@mkdir -p $(GDB_DIR)-git/share/licenses/gmp
+	cp -p $(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/COPYING $(GDB_DIR)-git/share/licenses/gmp
+	@mkdir -p $(GDB_DIR)-git/share/licenses/mpfr
+	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git/share/licenses/mpfr
 	@mkdir -p $(GDB_DIR)-git/share/licenses/gdb
 	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git/share/licenses/gdb/
 	@touch $@
@@ -493,7 +556,7 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 
 # gdb-git-python
 
-$(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done
+$(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python
 	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
 	@touch $@
@@ -504,6 +567,7 @@ $(BUILD_DIR)/gdb-git-python-02-make.done: | $(BUILD_DIR)/gdb-git-python-01-confi
 
 $(BUILD_DIR)/gdb-git-python-03-make-install.done: | $(BUILD_DIR)/gdb-git-python-02-make.done
 	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python/gdb install-strip
+	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python/gdbserver install-strip
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python-04-python.done: | $(BUILD_DIR)/gdb-git-python-03-make-install.done
@@ -529,6 +593,10 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 	cp -p $(SOURCE_DIR_ABS)/$(BOOST_SRC_DIR)/LICENSE_1_0.txt $(GDB_DIR)-git-python/share/licenses/boost/
 	@mkdir -p $(GDB_DIR)-git-python/share/licenses/source-highlight
 	cp -p $(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/COPYING $(GDB_DIR)-git-python/share/licenses/source-highlight/
+	@mkdir -p $(GDB_DIR)-git-python/share/licenses/gmp
+	cp -p $(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/COPYING $(GDB_DIR)-git-python/share/licenses/gmp
+	@mkdir -p $(GDB_DIR)-git-python/share/licenses/mpfr
+	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git-python/share/licenses/mpfr
 	@mkdir -p $(GDB_DIR)-git-python/share/licenses/gdb
 	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git-python/share/licenses/gdb/
 	@touch $@
@@ -589,11 +657,13 @@ extract-all: | \
   $(SOURCE_DIR)/boost-01-extract.done \
   $(SOURCE_DIR)/source-highlight-01-extract.done \
   $(SOURCE_DIR)/lzma-01-extract.done \
+  $(SOURCE_DIR)/gmp-01-extract.done \
+  $(SOURCE_DIR)/mpfr-01-extract.done \
 
 
 patch-all: | \
   $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done \
-  $(SOURCE_DIR)/source-highlight-02-patch-01-colors.done \
+  $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done \
 
 
 build-expat: | $(BUILD_DIR)/expat-05-make-install.done
@@ -602,6 +672,8 @@ build-iconv: | $(BUILD_DIR)/iconv-05-make-install.done
 build-boost: | $(BUILD_DIR)/boost-03-regex.done
 build-source-highlight: | $(BUILD_DIR)/source-highlight-05-make-install.done
 build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
+build-gmp: | $(BUILD_DIR)/gmp-05-make-install.done
+build-mpfr: | $(BUILD_DIR)/mpfr-05-make-install.done
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
 build-gdb-python: | $(BUILD_DIR)/gdb-git-python-06-licenses.done
 build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done
