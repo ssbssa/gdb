@@ -84,6 +84,7 @@ struct tui_source_element
   struct tui_line_or_address line_or_addr;
   bool is_exec_point = false;
   int exec_column = 0;
+  int printed_columns = 0;
   tui_bp_flags break_mode = 0;
 };
 
