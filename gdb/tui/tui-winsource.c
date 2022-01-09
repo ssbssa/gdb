@@ -98,14 +98,12 @@ tui_copy_source_line (const char **ptr, int *length, int *exec_column)
 	break;
 
       ++lineptr;
-      ++column;
       ++raw_column;
 
       auto process_tab = [&] ()
 	{
 	  int max_tab_len = tui_tab_width;
 
-	  --column;
 	  for (int j = column % max_tab_len;
 	       j < max_tab_len;
 	       column++, j++)
@@ -128,16 +126,19 @@ tui_copy_source_line (const char **ptr, int *length, int *exec_column)
 	{
 	  result.push_back ('^');
 	  result.push_back (c + 0100);
-	  ++column;
+	  column += 2;
 	}
       else if (c == 0177)
 	{
 	  result.push_back ('^');
 	  result.push_back ('?');
-	  ++column;
+	  column += 2;
 	}
       else
-	result.push_back (c);
+	{
+	  result.push_back (c);
+	  ++column;
+	}
     }
   while (c != '\0' && c != '\n' && c != '\r');
 
