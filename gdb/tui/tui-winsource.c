@@ -341,7 +341,8 @@ tui_source_window_base::show_source_line (int lineno)
 
   wmove (m_pad.get (), lineno, 0);
   puts_to_pad_with_skip (line->line.c_str (), m_pad_offset,
-			 line->is_exec_point ? line->exec_column : 0);
+			 line->printed_columns > 1
+			 && line->is_exec_point ? line->exec_column : 0);
 
   if (line->is_exec_point)
     tui_set_reverse_mode (m_pad.get (), false);
