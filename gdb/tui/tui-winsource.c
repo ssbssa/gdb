@@ -261,6 +261,7 @@ tui_source_window_base::show_source_line (int lineno)
 
   wmove (m_pad.get (), lineno, 0);
   if (line->is_exec_point && line->line_or_addr.loa == LOA_LINE
+      && line->printed_columns > 1
       && line->line_or_addr.u.column_no > 0
       && line->line_or_addr.u.column_no < line->line.size ())
     {
