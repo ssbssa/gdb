@@ -1124,6 +1124,7 @@ tui_inject_newline_into_command_window ()
       px %= tui_cmd_win ()->width;
       wmove (w, py, px);
       tui_putc ('\n');
+      wrefresh (w);
     }
 }
 
