@@ -101,6 +101,7 @@ tui_source_window::set_contents (struct gdbarch *arch,
   while (cur_line < nlines)
     {
       struct tui_source_element *element = &m_content[cur_line];
+      element->printed_columns = 0;
 
       std::string text;
       if (*iter != '\0')
@@ -108,6 +109,7 @@ tui_source_window::set_contents (struct gdbarch *arch,
 	  int line_len;
 	  text = tui_copy_source_line (&iter, &line_len);
 	  m_max_length = std::max (m_max_length, line_len);
+	  element->printed_columns = line_len;
 	}
       else
 	{
