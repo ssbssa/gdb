@@ -74,16 +74,31 @@ prompt_hook = None
 sys.argv = [""]
 
 # Initial pretty printers.
-pretty_printers = []
+try:
+    pretty_printers
+except NameError:
+    pretty_printers = []
 
 # Initial type printers.
-type_printers = []
+try:
+    type_printers
+except NameError:
+    type_printers = []
 # Initial xmethod matchers.
-xmethods = []
+try:
+    xmethods
+except NameError:
+    xmethods = []
 # Initial frame filters.
-frame_filters = {}
+try:
+    frame_filters
+except NameError:
+    frame_filters = {}
 # Initial frame unwinders.
-frame_unwinders = []
+try:
+    frame_unwinders
+except NameError:
+    frame_unwinders = []
 
 
 def _execute_unwinders(pending_frame):
