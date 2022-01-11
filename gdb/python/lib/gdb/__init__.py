@@ -77,19 +77,37 @@ prompt_hook = None
 sys.argv = [""]
 
 # Initial pretty printers.
-pretty_printers = []
+try:
+    pretty_printers
+except NameError:
+    pretty_printers = []
 
 # Initial type printers.
-type_printers = []
+try:
+    type_printers
+except NameError:
+    type_printers = []
 # Initial xmethod matchers.
-xmethods = []
+try:
+    xmethods
+except NameError:
+    xmethods = []
 # Initial frame filters.
-frame_filters = {}
+try:
+    frame_filters
+except NameError:
+    frame_filters = {}
 # Initial frame unwinders.
-frame_unwinders = []
+try:
+    frame_unwinders
+except NameError:
+    frame_unwinders = []
 # The missing file handlers.  Each item is a tuple with the form
 # (TYPE, HANDLER) where TYPE is a string either 'debug' or 'objfile'.
-missing_file_handlers = []
+try:
+    missing_file_handlers
+except NameError:
+    missing_file_handlers = []
 
 
 def _execute_unwinders(pending_frame):
