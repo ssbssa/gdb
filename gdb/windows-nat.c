@@ -187,6 +187,8 @@ static int open_process_used = 0;
 #ifdef __x86_64__
 static void *wow64_dbgbreak;
 #endif
+static LPTHREAD_START_ROUTINE ctrl_routine;
+static LPTHREAD_START_ROUTINE dbg_ui_remote_breakin;
 
 /* User options.  */
 static bool new_console = true;
@@ -256,6 +258,9 @@ struct windows_nat_target final : public x86_nat_target<inf_child_target>
 
   bool attach_no_wait () override
   { return true; }
+
+  thread_control_capabilities get_thread_control_capabilities () override
+  { return tc_schedlock; }
 
   void detach (inferior *, int) override;
 
@@ -470,7 +475,8 @@ set_resume_debug_registers (windows_thread_info *th, Context &context,
    the main thread, false otherwise.  */
 
 static windows_thread_info *
-windows_add_thread (ptid_t ptid, HANDLE h, void *tlb, bool main_thread_p)
+windows_add_thread (ptid_t ptid, HANDLE h, void *tlb, bool main_thread_p,
+		    LPTHREAD_START_ROUTINE start_address)
 {
   windows_thread_info *th;
 
@@ -478,6 +484,13 @@ windows_add_thread (ptid_t ptid, HANDLE h, void *tlb, bool main_thread_p)
 
   if ((th = thread_rec (ptid, DONT_INVALIDATE_CONTEXT)))
     return th;
+
+  /* These threads need to override the desired_stop_thread_id, otherwise
+     user interruption would be impossible if scheduler-locking is enabled.  */
+  if ((start_address == ctrl_routine
+       || start_address == dbg_ui_remote_breakin)
+      && desired_stop_thread_id != -1)
+    desired_stop_thread_id = ptid.lwp ();
 
   CORE_ADDR base = (CORE_ADDR) (uintptr_t) tlb;
 #ifdef __x86_64__
@@ -1507,7 +1520,8 @@ fake_create_process (void)
 			      current_event.dwThreadId),
 		      current_event.u.CreateThread.hThread,
 		      current_event.u.CreateThread.lpThreadLocalBase,
-		      true /* main_thread_p */);
+		      true /* main_thread_p */,
+		      current_event.u.CreateThread.lpStartAddress);
   return current_event.dwThreadId;
 }
 
@@ -1516,6 +1530,17 @@ windows_nat_target::resume (ptid_t ptid, int step, enum gdb_signal sig)
 {
   windows_thread_info *th;
   DWORD continue_status = DBG_CONTINUE;
+
+  if (ctrl_routine == nullptr && windows_initialization_done)
+    {
+      CORE_ADDR addr;
+      if (!find_minimal_symbol_address ("KERNEL32!CtrlRoutine",
+					&addr, 0))
+	ctrl_routine = (LPTHREAD_START_ROUTINE) addr;
+      if (!find_minimal_symbol_address ("ntdll!DbgUiRemoteBreakin",
+					&addr, 0))
+	dbg_ui_remote_breakin = (LPTHREAD_START_ROUTINE) addr;
+    }
 
   /* A specific PTID means `step only this thread id'.  */
   int resume_all = ptid == minus_one_ptid;
@@ -1704,7 +1729,8 @@ windows_nat_target::get_windows_debug_event (int pid,
 	(ptid_t (current_event.dwProcessId, current_event.dwThreadId, 0),
 	 current_event.u.CreateThread.hThread,
 	 current_event.u.CreateThread.lpThreadLocalBase,
-	 false /* main_thread_p */);
+	 false /* main_thread_p */,
+	 current_event.u.CreateThread.lpStartAddress);
 
       break;
 
@@ -1735,7 +1761,8 @@ windows_nat_target::get_windows_debug_event (int pid,
 		 current_event.dwThreadId, 0),
 	 current_event.u.CreateProcessInfo.hThread,
 	 current_event.u.CreateProcessInfo.lpThreadLocalBase,
-	 true /* main_thread_p */);
+	 true /* main_thread_p */,
+	 current_event.u.CreateProcessInfo.lpStartAddress);
       thread_id = current_event.dwThreadId;
       break;
 
@@ -2003,6 +2030,9 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
 
   target_terminal::init ();
   target_terminal::inferior ();
+
+  ctrl_routine = nullptr;
+  dbg_ui_remote_breakin = nullptr;
 
   windows_initialization_done = 0;
 
