@@ -214,6 +214,7 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   struct type *tib_type, *seh_type, *tib_ptr_type, *seh_ptr_type;
   struct type *word_type, *wchar_type, *wchar_ptr_type;
   struct type *uni_str_type, *rupp_type, *rupp_ptr_type;
+  struct type *wchar_list_type;
 
   windows_gdbarch_data *windows_gdbarch_data
     = get_windows_gdbarch_data (gdbarch);
@@ -231,6 +232,9 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   void_ptr_type = lookup_pointer_type (builtin_type (gdbarch)->builtin_void);
   wchar_ptr_type = arch_pointer_type (gdbarch, gdbarch_ptr_bit (gdbarch),
 				      NULL, wchar_type);
+  wchar_list_type = arch_type (gdbarch, TYPE_CODE_TYPEDEF,
+			       gdbarch_ptr_bit (gdbarch), "gdb_wchar_t_list");
+  wchar_list_type->set_target_type (wchar_ptr_type);
 
   /* list entry */
 
@@ -306,7 +310,7 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   append_composite_type_field (rupp_type, "dll_path", uni_str_type);
   append_composite_type_field (rupp_type, "image_path_name", uni_str_type);
   append_composite_type_field (rupp_type, "command_line", uni_str_type);
-  append_composite_type_field (rupp_type, "environment", void_ptr_type);
+  append_composite_type_field (rupp_type, "environment", wchar_list_type);
   append_composite_type_field (rupp_type, "starting_x", dword32_type);
   append_composite_type_field (rupp_type, "starting_y", dword32_type);
   append_composite_type_field (rupp_type, "count_x", dword32_type);
