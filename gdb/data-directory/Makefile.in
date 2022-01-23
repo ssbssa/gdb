@@ -83,6 +83,7 @@ PYTHON_FILE_LIST = \
 	gdb/command/explore.py \
 	gdb/command/frame_filters.py \
 	gdb/command/pretty_printers.py \
+	gdb/command/print_dbl_null.py \
 	gdb/command/prompt.py \
 	gdb/command/tui_windows.py \
 	gdb/command/type_printers.py \
