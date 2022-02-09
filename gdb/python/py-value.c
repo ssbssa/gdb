@@ -1131,7 +1131,13 @@ valpy_getitem (PyObject *self, PyObject *key)
 	     type.  */
 	  struct value *idx = convert_value_from_python (key);
 
-	  if (idx != NULL)
+	  if (idx != NULL
+	      && binop_user_defined_p (BINOP_SUBSCRIPT, tmp, idx))
+	    {
+	      res_val = value_x_binop (tmp, idx, BINOP_SUBSCRIPT,
+				       OP_NULL, EVAL_NORMAL);
+	    }
+	  else if (idx != NULL)
 	    {
 	      /* Check the value's type is something that can be accessed via
 		 a subscript.  */
