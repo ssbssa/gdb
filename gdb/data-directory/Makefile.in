@@ -79,6 +79,7 @@ PYTHON_FILE_LIST = \
 	gdb/types.py \
 	gdb/unwinder.py \
 	gdb/xmethod.py \
+	gdb/xmethod_printer.py \
 	gdb/command/__init__.py \
 	gdb/command/explore.py \
 	gdb/command/frame_filters.py \
