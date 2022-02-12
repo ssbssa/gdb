@@ -83,6 +83,22 @@ MPFR_CONF=$(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/configure \
 	 --enable-static --disable-shared --prefix=$(GDB_LIBS) \
 	 --with-gmp-build=$(BUILD_DIR_ABS)/gmp
 
+FFI_VER=3.4.2
+FFI_SRC_DIR=libffi-$(FFI_VER)
+FFI_FILE=$(FFI_SRC_DIR).tar.gz
+FFI_CONF=$(SOURCE_DIR_ABS)/$(FFI_SRC_DIR)/configure \
+	 --build=$(MYBUILD) --host=$(MYTARGET) \
+	 --enable-static --disable-shared --prefix=$(GDB_LIBS)
+
+PYTHON3_GIT_DIR=c:/src/repos/cpython.git
+PYTHON3_GIT_CONF=$(PYTHON3_GIT_DIR)/configure \
+		 --build=$(MYTARGET) --host=$(MYTARGET) \
+		 --prefix=$(shell cygpath -m $(GDB_LIBS)/Python3) \
+		 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
+		 --disable-test-modules \
+		 --without-ensurepip --without-c-locale-coercion \
+		 --with-system-expat --with-system-ffi
+
 GDB_VER=8.1.1
 GDB_SRC_DIR=gdb-$(GDB_VER)
 GDB_FILE=$(GDB_SRC_DIR).tar.xz
@@ -378,6 +394,45 @@ $(BUILD_DIR)/mpfr-05-make-install.done: | $(BUILD_DIR)/mpfr-04-make.done
 	@touch $@
 
 
+# ffi
+
+$(SOURCE_DIR)/ffi-01-extract.done: | pkg/$(FFI_FILE) $(SOURCE_DIR)/mpfr-01-extract.done
+	tar -C $(SOURCE_DIR) -xzf pkg/$(FFI_FILE)
+	@touch $@
+
+$(BUILD_DIR)/ffi-03-configure.done: | $(SOURCE_DIR)/ffi-01-extract.done
+	@mkdir -p $(BUILD_DIR)/ffi
+	cd $(BUILD_DIR)/ffi && $(FFI_CONF)
+	@touch $@
+
+$(BUILD_DIR)/ffi-04-make.done: | $(BUILD_DIR)/ffi-03-configure.done
+	$(MAKE) -C $(BUILD_DIR)/ffi
+	@touch $@
+
+$(BUILD_DIR)/ffi-05-make-install.done: | $(BUILD_DIR)/ffi-04-make.done
+	$(MAKE) -C $(BUILD_DIR)/ffi install
+	@touch $@
+
+
+# python3
+
+$(BUILD_DIR)/python3-03-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done
+	@mkdir -p $(BUILD_DIR)/python3
+	cd $(BUILD_DIR)/python3 && $(PYTHON3_GIT_CONF)
+	@touch $@
+
+$(BUILD_DIR)/python3-04-make.done: | $(BUILD_DIR)/python3-03-configure.done
+	$(MAKE) -C $(BUILD_DIR)/python3
+	@touch $@
+
+$(BUILD_DIR)/python3-05-make-install.done: | $(BUILD_DIR)/python3-04-make.done
+	$(MAKE) -j1 -C $(BUILD_DIR)/python3 install
+	mv $(GDB_LIBS)/Python3/bin/python3.exe $(GDB_LIBS)/Python3/bin/python.exe
+	mv $(GDB_LIBS)/Python3/bin/python3-config $(GDB_LIBS)/Python3/bin/python-config
+	rm -f $(GDB_LIBS)/Python3/bin/python3*
+	@touch $@
+
+
 # gdb
 
 $(SOURCE_DIR)/gdb-01-extract.done: | pkg/$(GDB_FILE) $(SOURCE_DIR)/mpfr-01-extract.done
@@ -599,6 +654,23 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git-python/share/licenses/mpfr
 	@mkdir -p $(GDB_DIR)-git-python/share/licenses/gdb
 	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git-python/share/licenses/gdb/
+	@touch $@
+
+
+# gdb-git-python3
+
+$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done
+	@mkdir -p $(BUILD_DIR)/gdb-git-python3
+	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python --with-python-libdir=$(GDB_DIR)-git-python3/lib
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-configure.done
+	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git-python3
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-03-make-install.done: | $(BUILD_DIR)/gdb-git-python3-02-make.done
+	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdb install-strip
+	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdbserver install-strip
 	@touch $@
 
 
