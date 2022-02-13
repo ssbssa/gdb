@@ -35,6 +35,7 @@
 #include "tui/tui-file.h"
 #include "tui/tui-out.h"
 #include "tui/tui-cmd-history.h"
+#include "tui/tui-layout.h"
 #include "ui-out.h"
 #include "cli-out.h"
 #include <fcntl.h>
@@ -985,12 +986,112 @@ tui_initialize_io (void)
 
 #ifdef NCURSES_MOUSE_VERSION
 
+static bool resizing = false;
+static bool resize_vertical;
+static std::vector<tui_layout_base *> resize_before, resize_after;
+static int resize_coord, resize_min_coord, resize_max_coord;
+
+static int
+get_max_shrink (bool vertical, std::vector<tui_layout_base *> list)
+{
+  int max_shrink = -1;
+  for (tui_layout_base *tlb : list)
+    {
+      if (tlb->get_name () == nullptr
+	  || strcmp (tlb->get_name (), STATUS_NAME) == 0)
+	continue;
+
+      int min_value, max_value;
+      tlb->get_sizes (vertical, &min_value, &max_value);
+      int shrink = (vertical ? tlb->height : tlb->width) - min_value;
+      if (max_shrink < 0 || shrink < max_shrink)
+	max_shrink = shrink;
+    }
+  return std::max (max_shrink, 0);
+}
+
 static void
 tui_dispatch_mouse_event ()
 {
   MEVENT mev;
   if (getmouse (&mev) != OK)
     return;
+
+  if ((mev.bstate & BUTTON1_PRESSED) != 0)
+    {
+      resize_before.clear ();
+      resize_after.clear ();
+      resizing = tui_find_resize_windows (mev.x, mev.y, resize_vertical,
+					  resize_before, resize_after);
+      if (resizing)
+	{
+	  int max_shrink_before
+	    = get_max_shrink (resize_vertical, resize_before);
+	  int max_shrink_after
+	    = get_max_shrink (resize_vertical, resize_after);
+	  resize_coord = resize_vertical ? mev.y : mev.x;
+	  resize_min_coord = resize_coord - max_shrink_before;
+	  resize_max_coord = resize_coord + max_shrink_after;
+	  return;
+	}
+    }
+  else if ((mev.bstate & BUTTON1_RELEASED) != 0 && resizing)
+    {
+      resizing = false;
+
+      int diffx = 0;
+      int diffy = 0;
+      if (resize_vertical)
+	{
+	  if (mev.y < resize_min_coord)
+	    mev.y = resize_min_coord;
+	  else if (mev.y > resize_max_coord)
+	    mev.y = resize_max_coord;
+	  diffy = mev.y - resize_coord;
+	}
+      else
+	{
+	  if (mev.x < resize_min_coord)
+	    mev.x = resize_min_coord;
+	  else if (mev.x > resize_max_coord)
+	    mev.x = resize_max_coord;
+	  diffx = mev.x - resize_coord;
+	}
+      if (diffx == 0 && diffy == 0)
+	return;
+      for (tui_layout_base *tlb : resize_before)
+	{
+	  if (tlb->get_name () == nullptr)
+	    {
+	      tlb->width += diffx;
+	      tlb->height += diffy;
+	    }
+	  else if (strcmp (tlb->get_name (), STATUS_NAME) == 0)
+	    tlb->apply (tlb->x + diffx, tlb->y + diffy,
+			tlb->width, tlb->height, false);
+	  else
+	    tlb->apply (tlb->x, tlb->y,
+			tlb->width + diffx, tlb->height + diffy, false);
+	}
+      for (tui_layout_base *tlb : resize_after)
+	{
+	  if (tlb->get_name () == nullptr)
+	    {
+	      tlb->x += diffx;
+	      tlb->y += diffy;
+	      tlb->width -= diffx;
+	      tlb->height -= diffy;
+	    }
+	  else if (strcmp (tlb->get_name (), STATUS_NAME) == 0)
+	    tlb->apply (tlb->x + diffx, tlb->y + diffy,
+			tlb->width, tlb->height, false);
+	  else
+	    tlb->apply (tlb->x + diffx, tlb->y + diffy,
+			tlb->width - diffx, tlb->height - diffy, false);
+	}
+      tui_refresh_all_win ();
+      return;
+    }
 
   for (tui_win_info *wi : all_tui_windows ())
     if (mev.x > wi->x && mev.x < wi->x + wi->width - 1
