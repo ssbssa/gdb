@@ -435,6 +435,14 @@ tui_register_window (const char *name, window_factory &&factory)
 			       std::move (factory));
 }
 
+bool
+tui_find_resize_windows (int rx, int ry, bool &vertical,
+			 std::vector<tui_layout_base *> &before,
+			 std::vector<tui_layout_base *> &after)
+{
+  return applied_layout->find_resize_windows (rx, ry, vertical, before, after);
+}
+
 /* See tui-layout.h.  */
 
 std::unique_ptr<tui_layout_base>
@@ -536,6 +544,13 @@ tui_layout_window::layout_fingerprint () const
     return "C";
   else
     return "";
+}
+
+void
+tui_layout_window::add_resize_windows (std::vector<tui_layout_base *> &list,
+				       bool after, bool vertical)
+{
+  list.push_back (this);
 }
 
 /* See tui-layout.h.  */
@@ -1086,6 +1101,73 @@ tui_layout_split::layout_fingerprint () const
     }
 
   return "";
+}
+
+bool
+tui_layout_split::find_resize_windows (int rx, int ry, bool &vertical,
+				       std::vector<tui_layout_base *> &before,
+				       std::vector<tui_layout_base *> &after)
+{
+  if (rx <= x || ry <= y || rx >= x + width - 1 || ry >= y + height - 1)
+    return false;
+
+  for (int i = 0; i < m_splits.size (); ++i)
+    {
+      tui_layout_base *base = m_splits[i].layout.get ();
+
+      if (i + 1 < m_splits.size () && base->last_edge_has_border_p ()
+	  && ((m_vertical && ry == base->y + base->height - 1)
+	      || (!m_vertical && rx == base->x + base->width - 1)))
+	{
+	  tui_layout_base *next = m_splits[i + 1].layout.get ();
+	  if (next->get_name () != nullptr
+	      && strcmp (next->get_name (), STATUS_NAME) == 0)
+	    {
+	      if (i + 2 == m_splits.size ())
+		return false;
+	      next->add_resize_windows (after, true, m_vertical);
+	      next = m_splits[i + 2].layout.get ();
+	    }
+	  vertical = m_vertical;
+	  base->add_resize_windows (before, false, m_vertical);
+	  next->add_resize_windows (after, true, m_vertical);
+	  return true;
+	}
+      else if (base->get_name() == nullptr
+	       && ((m_vertical && ry > base->y
+		    && ry < base->y + base->height - 1)
+		   || (!m_vertical && rx > base->x
+		       && rx < base->x + base->width - 1)))
+	return base->find_resize_windows (rx, ry, vertical, before, after);
+    }
+
+  return false;
+}
+
+void
+tui_layout_split::add_resize_windows (std::vector<tui_layout_base *> &list,
+				      bool after, bool vertical)
+{
+  list.push_back (this);
+
+  if (m_vertical == vertical)
+    {
+      int start = after ? 0 : ((int) m_splits.size () - 1);
+      int add = after ? 1 : -1;
+      for (int i = start; i >= 0 && i < m_splits.size (); i += add)
+	{
+	  tui_layout_base *base = m_splits[i].layout.get ();
+	  base->add_resize_windows (list, after, vertical);
+	  if (base->get_name () == nullptr
+	      || strcmp(base->get_name (), STATUS_NAME) != 0)
+	    break;
+	}
+    }
+  else
+    {
+      for (int i = 0; i < m_splits.size (); ++i)
+	m_splits[i].layout->add_resize_windows (list, after, vertical);
+    }
 }
 
 /* Destroy the layout associated with SELF.  */
