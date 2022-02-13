@@ -39,6 +39,9 @@ enum tui_adjust_result
   HANDLED
 };
 
+class tui_layout_window;
+class tui_layout_split;
+
 /* The basic object in a TUI layout.  This represents a single piece
    of screen real estate.  Subclasses determine the exact
    behavior.  */
@@ -93,6 +96,16 @@ public:
 
   /* Add all windows to the WINDOWS vector.  */
   virtual void get_windows (std::vector<tui_win_info *> *windows) = 0;
+
+  virtual bool find_resize_windows (int rx, int ry, bool &vertical,
+				    std::vector<tui_layout_base *> &before,
+				    std::vector<tui_layout_base *> &after)
+  {
+    return false;
+  }
+
+  virtual void add_resize_windows (std::vector<tui_layout_base *> &list,
+				   bool after, bool vertical) = 0;
 
   /* The most recent space allocation.  */
   int x = 0;
@@ -149,6 +162,9 @@ public:
   {
     windows->push_back (m_window);
   }
+
+  virtual void add_resize_windows (std::vector<tui_layout_base *> &list,
+				   bool after, bool vertical) override;
 
 protected:
 
@@ -210,6 +226,13 @@ public:
     for (auto &item : m_splits)
       item.layout->get_windows (windows);
   }
+
+  bool find_resize_windows (int rx, int ry, bool &vertical,
+			    std::vector<tui_layout_base *> &before,
+			    std::vector<tui_layout_base *> &after) override;
+
+  virtual void add_resize_windows (std::vector<tui_layout_base *> &list,
+				   bool after, bool vertical) override;
 
 protected:
 
@@ -274,5 +297,9 @@ typedef std::function<tui_win_info * (const char *name)> window_factory;
    window.  */
 
 extern void tui_register_window (const char *name, window_factory &&factory);
+
+extern bool tui_find_resize_windows (int rx, int ry, bool &vertical,
+				     std::vector<tui_layout_base *> &before,
+				     std::vector<tui_layout_base *> &after);
 
 #endif /* TUI_TUI_LAYOUT_H */
