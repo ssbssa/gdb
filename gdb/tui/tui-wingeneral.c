@@ -108,9 +108,9 @@ box_win (struct tui_win_info *win_info,
 	 the left.  */
       int max_len = win_info->width - 2 - 2;
 
-      if (win_info->title ().size () <= max_len)
+      if (max_len >= 0 && win_info->title ().size () <= max_len)
 	mvwaddstr (win, 0, 2, win_info->title ().c_str ());
-      else
+      else if (max_len > 3)
 	{
 	  std::string truncated
 	    = "..." + win_info->title ().substr (win_info->title ().size ()
