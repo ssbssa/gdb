@@ -557,7 +557,9 @@ static line_header_up dwarf_decode_line_header (sect_offset sect_off,
 						const char *comp_dir);
 
 static struct symbol *new_symbol (struct die_info *, struct type *,
-				  struct dwarf2_cu *, struct symbol * = NULL);
+				  struct dwarf2_cu *, struct symbol * = NULL,
+				  const char * = NULL,
+				  struct die_info * = NULL);
 
 static void dwarf2_const_value (const struct attribute *, struct symbol *,
 				struct dwarf2_cu *);
@@ -7682,6 +7684,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 
 	  if (arg != NULL)
 	    template_args.push_back (arg);
+	}
+      else if (child_die->tag == DW_TAG_GNU_formal_parameter_pack)
+	{
+	  const char *child_name = dwarf2_name (child_die, cu);
+	  if (child_name == NULL)
+	    child_name = "__parameter_pack";
+	  struct die_info *pp_die = child_die->child;
+	  int pp_num = 0;
+	  while (pp_die && pp_die->tag == DW_TAG_formal_parameter)
+	    {
+	      std::string pp_name
+		= string_printf ("%s#%d", child_name, pp_num);
+	      new_symbol (pp_die, NULL, cu, NULL,
+			  objfile->intern (pp_name), child_die);
+	      pp_die = pp_die->next;
+	      pp_num++;
+	    }
 	}
       else
 	process_die (child_die, cu);
@@ -15268,18 +15287,19 @@ is_ada_import_or_export (dwarf2_cu *cu, const char *name,
 
 static void
 new_symbol_file_line (struct die_info *die, struct dwarf2_cu *cu,
-		      struct symbol *sym)
+		      struct symbol *sym, struct die_info *location_die)
 {
   bool inlined_func = (die->tag == DW_TAG_inlined_subroutine);
 
   /* Handle DW_AT_call_line / DW_AT_decl_line.  */
   struct attribute *attr
-    = dwarf2_attr (die, inlined_func ? DW_AT_call_line : DW_AT_decl_line,
+    = dwarf2_attr (location_die ? location_die : die,
+		   inlined_func ? DW_AT_call_line : DW_AT_decl_line,
 		   cu);
   if (attr != nullptr)
     sym->set_line (attr->unsigned_constant ().value_or (0));
 
-  attr = dwarf2_attr (die,
+  attr = dwarf2_attr (location_die ? location_die : die,
 		      inlined_func ? DW_AT_call_column : DW_AT_decl_column,
 		      cu);
   if (attr != nullptr)
@@ -15287,7 +15307,8 @@ new_symbol_file_line (struct die_info *die, struct dwarf2_cu *cu,
 
   /* Handle DW_AT_call_file / DW_AT_decl_file.  */
   struct dwarf2_cu *file_cu = cu;
-  attr = dwarf2_attr (die, inlined_func ? DW_AT_call_file : DW_AT_decl_file,
+  attr = dwarf2_attr (location_die ? location_die : die,
+		      inlined_func ? DW_AT_call_file : DW_AT_decl_file,
 		      &file_cu);
   if (attr == nullptr)
     return;
@@ -15763,12 +15784,14 @@ new_symbol (struct die_info *die, struct dwarf2_cu *cu, struct symbol *sym,
 
 static struct symbol *
 new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
-	    struct symbol *space)
+	    struct symbol *space, const char *name,
+	    struct die_info *location_die)
 {
   dwarf2_per_objfile *per_objfile = cu->per_objfile;
   struct objfile *objfile = per_objfile->objfile;
 
-  const char *name = dwarf2_name (die, cu);
+  if (name == nullptr)
+    name = dwarf2_name (die, cu);
   if (name == nullptr && (die->tag == DW_TAG_subprogram
 			  || die->tag == DW_TAG_inlined_subroutine
 			  || die->tag == DW_TAG_entry_point))
@@ -15814,7 +15837,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 		 : die_type (die, cu));
 
   /* Handle DW_AT_{call,decl}_{file,line}.  */
-  new_symbol_file_line (die, cu, sym);
+  new_symbol_file_line (die, cu, sym, location_die);
 
   /* Handle TAG-specific part.  */
   new_symbol (die, cu, sym, linkagename, physname);
