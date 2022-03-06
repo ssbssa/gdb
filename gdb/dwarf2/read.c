@@ -960,7 +960,9 @@ static void dwarf2_start_subfile (dwarf2_cu *cu, const file_entry &fe,
 				  const line_header &lh);
 
 static struct symbol *new_symbol (struct die_info *, struct type *,
-				  struct dwarf2_cu *, struct symbol * = NULL);
+				  struct dwarf2_cu *, struct symbol * = NULL,
+				  const char * = NULL,
+				  struct die_info * = NULL);
 
 static void dwarf2_const_value (const struct attribute *, struct symbol *,
 				struct dwarf2_cu *);
@@ -12145,6 +12147,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 	      if (arg != NULL)
 		template_args.push_back (arg);
 	    }
+	  else if (child_die->tag == DW_TAG_GNU_formal_parameter_pack)
+	    {
+	      const char *child_name = dwarf2_name (child_die, cu);
+	      if (child_name == NULL)
+		child_name = "__parameter_pack";
+	      struct die_info *pp_die = child_die->child;
+	      int pp_num = 0;
+	      while (pp_die && pp_die->tag == DW_TAG_formal_parameter)
+		{
+		  std::string pp_name
+		    = string_printf ("%s#%d", child_name, pp_num);
+		  new_symbol (pp_die, NULL, cu, NULL,
+			      objfile->intern (pp_name), child_die);
+		  pp_die = pp_die->sibling;
+		  pp_num++;
+		}
+	    }
 	  else
 	    process_die (child_die, cu);
 	  child_die = child_die->sibling;
@@ -20783,13 +20802,13 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
 
 static struct symbol *
 new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
-	    struct symbol *space)
+	    struct symbol *space, const char *name,
+	    struct die_info *location_die)
 {
   dwarf2_per_objfile *per_objfile = cu->per_objfile;
   struct objfile *objfile = per_objfile->objfile;
   struct gdbarch *gdbarch = objfile->arch ();
   struct symbol *sym = NULL;
-  const char *name;
   struct attribute *attr = NULL;
   struct attribute *attr2 = NULL;
   CORE_ADDR baseaddr;
@@ -20799,7 +20818,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 
   baseaddr = objfile->text_section_offset ();
 
-  name = dwarf2_name (die, cu);
+  if (name == nullptr)
+    name = dwarf2_name (die, cu);
   if (name == nullptr && (die->tag == DW_TAG_subprogram
                           || die->tag == DW_TAG_inlined_subroutine
                           || die->tag == DW_TAG_entry_point))
@@ -20846,19 +20866,19 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	sym->set_type (type);
       else
 	sym->set_type (die_type (die, cu));
-      attr = dwarf2_attr (die,
+      attr = dwarf2_attr (location_die ? location_die : die,
 			  inlined_func ? DW_AT_call_line : DW_AT_decl_line,
 			  cu);
       if (attr != nullptr)
 	sym->set_line (attr->constant_value (0));
 
-      attr = dwarf2_attr (die,
+      attr = dwarf2_attr (location_die ? location_die : die,
 			  inlined_func ? DW_AT_call_column : DW_AT_decl_column,
 			  cu);
       if (attr != nullptr)
 	sym->set_column (attr->constant_value (0));
 
-      attr = dwarf2_attr (die,
+      attr = dwarf2_attr (location_die ? location_die : die,
 			  inlined_func ? DW_AT_call_file : DW_AT_decl_file,
 			  cu);
       if (attr != nullptr && attr->is_nonnegative ())
