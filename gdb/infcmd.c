@@ -1881,7 +1881,11 @@ finish_command (const char *arg, int from_tty)
 	  printf_filtered (_("Run till exit from "));
 	}
 
+      struct frame_id frame_id = get_frame_id (frame);
+
       print_stack_frame (get_selected_frame (NULL), 1, LOCATION, 0);
+
+      frame = frame_find_by_id (frame_id);
     }
 
   if (execution_direction == EXEC_REVERSE)
