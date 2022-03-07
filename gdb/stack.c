@@ -1128,7 +1128,13 @@ print_frame_info (const frame_print_options &fp_opts,
 		    || print_what == LOC_AND_ADDRESS
 		    || print_what == SHORT_LOCATION);
   if (location_print || !sal.symtab)
-    print_frame (fp_opts, frame, print_level, print_what, print_args, sal);
+    {
+      frame.prepare_reinflate ();
+
+      print_frame (fp_opts, frame, print_level, print_what, print_args, sal);
+
+      frame.reinflate ();
+    }
 
   source_print = (print_what == SRC_LINE || print_what == SRC_AND_LOC);
 
@@ -1408,6 +1414,8 @@ print_frame (const frame_print_options &fp_opts,
 	  numargs = -1;
     
 	{
+	  frame.prepare_reinflate ();
+
 	  ui_out_emit_list list_emitter (uiout, "args");
 	  try
 	    {
@@ -1416,6 +1424,8 @@ print_frame (const frame_print_options &fp_opts,
 	  catch (const gdb_exception_error &e)
 	    {
 	    }
+
+	  frame.reinflate ();
 
 	    /* FIXME: ARGS must be a list.  If one argument is a string it
 	       will have " that will not be properly escaped.  */
@@ -2098,6 +2108,9 @@ backtrace_command_1 (const frame_print_options &fp_opts,
 	     the frame->prev field gets set to NULL in that case).  */
 
 	  print_frame_info (fp_opts, fi, 1, LOCATION, 1, 0);
+
+	  fi.reinflate ();
+
 	  if ((flags & PRINT_LOCALS) != 0)
 	    print_frame_local_vars (fi, false, NULL, NULL, 1, gdb_stdout);
 
@@ -3031,7 +3044,13 @@ frame_apply_command_count (const char *which_command,
 	  if (!flags.silent || cmd_result.length () > 0)
 	    {
 	      if (!flags.quiet)
-		print_stack_frame (fi, 1, LOCATION, 0);
+		{
+		  fi.prepare_reinflate ();
+
+		  print_stack_frame (fi, 1, LOCATION, 0);
+
+		  fi.reinflate ();
+		}
 	      gdb_printf ("%s", cmd_result.c_str ());
 	    }
 	}
