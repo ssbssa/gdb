@@ -364,9 +364,14 @@ print_stack_frame (struct frame_info *frame, int print_level,
 
   try
     {
+      struct frame_id frame_id = get_frame_id (frame);
+
       print_frame_info (user_frame_print_options,
 			frame, print_level, print_what, 1 /* print_args */,
 			set_current_sal);
+
+      frame = frame_find_by_id (frame_id);
+
       if (set_current_sal)
 	set_current_sal_from_frame (frame);
     }
@@ -888,7 +893,13 @@ print_frame_args (const frame_print_options &fp_opts,
 	    read_frame_arg (fp_opts, sym, frame, &arg, &entryarg);
 
 	  if (arg.entry_kind != print_entry_values_only)
-	    print_frame_arg (fp_opts, &arg);
+	    {
+	      struct frame_id frame_id = get_frame_id (frame);
+
+	      print_frame_arg (fp_opts, &arg);
+
+	      frame = frame_find_by_id (frame_id);
+	    }
 
 	  if (entryarg.entry_kind != print_entry_values_no)
 	    {
@@ -1119,7 +1130,13 @@ print_frame_info (const frame_print_options &fp_opts,
 		    || print_what == LOC_AND_ADDRESS
 		    || print_what == SHORT_LOCATION);
   if (location_print || !sal.symtab)
-    print_frame (fp_opts, frame, print_level, print_what, print_args, sal);
+    {
+      struct frame_id frame_id = get_frame_id (frame);
+
+      print_frame (fp_opts, frame, print_level, print_what, print_args, sal);
+
+      frame = frame_find_by_id (frame_id);
+    }
 
   source_print = (print_what == SRC_LINE || print_what == SRC_AND_LOC);
 
@@ -1398,6 +1415,8 @@ print_frame (const frame_print_options &fp_opts,
 	  numargs = -1;
     
 	{
+	  struct frame_id frame_id = get_frame_id (frame);
+
 	  ui_out_emit_list list_emitter (uiout, "args");
 	  try
 	    {
@@ -1406,6 +1425,8 @@ print_frame (const frame_print_options &fp_opts,
 	  catch (const gdb_exception_error &e)
 	    {
 	    }
+
+	  frame = frame_find_by_id (frame_id);
 
 	    /* FIXME: ARGS must be a list.  If one argument is a string it
 	       will have " that will not be properly escaped.  */
@@ -2081,21 +2102,22 @@ backtrace_command_1 (const frame_print_options &fp_opts,
 	     hand, perhaps the code does or could be fixed to make sure
 	     the frame->prev field gets set to NULL in that case).  */
 
+	  struct frame_id frame_id = get_frame_id (fi);
+
 	  print_frame_info (fp_opts, fi, 1, LOCATION, 1, 0);
+
+	  fi = frame_find_by_id (frame_id);
+
 	  if ((flags & PRINT_LOCALS) != 0)
+	    print_frame_local_vars (fi, false, NULL, NULL, 1, gdb_stdout);
+
+	  /* print_frame_local_vars invalidates FI.  */
+	  fi = frame_find_by_id (frame_id);
+	  if (fi == NULL)
 	    {
-	      struct frame_id frame_id = get_frame_id (fi);
-
-	      print_frame_local_vars (fi, false, NULL, NULL, 1, gdb_stdout);
-
-	      /* print_frame_local_vars invalidates FI.  */
-	      fi = frame_find_by_id (frame_id);
-	      if (fi == NULL)
-		{
-		  trailing = NULL;
-		  warning (_("Unable to restore previously selected frame."));
-		  break;
-		}
+	      trailing = NULL;
+	      warning (_("Unable to restore previously selected frame."));
+	      break;
 	    }
 
 	  /* Save the last frame to check for error conditions.  */
@@ -3045,7 +3067,13 @@ frame_apply_command_count (const char *which_command,
 	  if (!flags.silent || cmd_result.length () > 0)
 	    {
 	      if (!flags.quiet)
-		print_stack_frame (fi, 1, LOCATION, 0);
+		{
+		  struct frame_id frame_id = get_frame_id (fi);
+
+		  print_stack_frame (fi, 1, LOCATION, 0);
+
+		  fi = frame_find_by_id (frame_id);
+		}
 	      printf_filtered ("%s", cmd_result.c_str ());
 	    }
 	}
