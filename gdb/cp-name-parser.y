@@ -265,6 +265,7 @@ static void yyerror (cpname_state *, const char *);
 /* C++ */
 %token TRUEKEYWORD
 %token FALSEKEYWORD
+%token ABI_TAG
 
 /* Non-C++ things we get from the demangler.  */
 %token <lval> DEMANGLER_SPECIAL
@@ -767,6 +768,8 @@ typespec_2	:	builtin_type qualifiers
 			{ $$ = state->d_qualify ($3, $1 | $4, 0); }
 		|	qualifiers COLONCOLON name
 			{ $$ = state->d_qualify ($3, $1, 0); }
+		|	typespec_2 ABI_TAG NAME ']'
+			{ $$ = state->fill_comp (DEMANGLE_COMPONENT_TAGGED_NAME, $1, $3); }
 		;
 
 abstract_declarator
@@ -1806,6 +1809,13 @@ yylex (YYSTYPE *lvalp, cpname_state *state)
       return c;
 
     case '[':
+      if (startswith (tokstart, "[abi:"))
+	{
+	  state->lexptr += 5;
+	  return ABI_TAG;
+	}
+	[[fallthrough]];
+
     case ']':
     case '?':
     case '@':
