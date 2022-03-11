@@ -563,6 +563,7 @@ replace_typedefs (struct demangle_parse_info *info,
 	case DEMANGLE_COMPONENT_POINTER:
 	case DEMANGLE_COMPONENT_REFERENCE:
 	case DEMANGLE_COMPONENT_RVALUE_REFERENCE:
+	case DEMANGLE_COMPONENT_TAGGED_NAME:
 	  replace_typedefs (info, d_left (ret_comp), finder, data);
 	  break;
 
@@ -809,6 +810,7 @@ unqualified_name_from_comp (struct demangle_component *comp)
 	ret_comp = d_right (ret_comp);
 	break;
       case DEMANGLE_COMPONENT_TYPED_NAME:
+      case DEMANGLE_COMPONENT_TAGGED_NAME:
 	ret_comp = d_left (ret_comp);
 	break;
       case DEMANGLE_COMPONENT_TEMPLATE:
@@ -939,7 +941,12 @@ cp_remove_params_1 (const char *demangled_name, bool require_params)
 
   /* What we have now should be a function.  Return its name.  */
   if (ret_comp->type == DEMANGLE_COMPONENT_TYPED_NAME)
-    ret = cp_comp_to_string (d_left (ret_comp), 10);
+    {
+      ret_comp = d_left (ret_comp);
+      while (ret_comp->type == DEMANGLE_COMPONENT_TAGGED_NAME)
+	ret_comp = d_left (ret_comp);
+      ret = cp_comp_to_string (ret_comp, 10);
+    }
   else if (!require_params
 	   && (ret_comp->type == DEMANGLE_COMPONENT_NAME
 	       || ret_comp->type == DEMANGLE_COMPONENT_QUAL_NAME
