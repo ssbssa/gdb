@@ -348,7 +348,8 @@ decode_debug_loc_dwo_addresses (dwarf2_per_cu_data *per_cu,
 
 const gdb_byte *
 dwarf2_find_location_expression (struct dwarf2_loclist_baton *baton,
-				 size_t *locexpr_length, CORE_ADDR pc)
+				 size_t *locexpr_length, CORE_ADDR pc,
+				 bool at_entry)
 {
   dwarf2_per_objfile *per_objfile = baton->per_objfile;
   struct objfile *objfile = per_objfile->objfile;
@@ -442,7 +443,7 @@ dwarf2_find_location_expression (struct dwarf2_loclist_baton *baton,
 	  loc_ptr += bytes_read;
 	}
 
-      if (low == high && pc == low)
+      if (low == high && pc == low && at_entry)
 	{
 	  /* This is entry PC record present only at entry point
 	     of a function.  Verify it is really the function entry point.  */
@@ -3907,7 +3908,7 @@ loclist_read_variable_at_entry (struct symbol *symbol, frame_info_ptr frame)
   if (frame == NULL || !get_frame_func_if_available (frame, &pc))
     return allocate_optimized_out_value (symbol->type ());
 
-  data = dwarf2_find_location_expression (dlbaton, &size, pc);
+  data = dwarf2_find_location_expression (dlbaton, &size, pc, true);
   if (data == NULL)
     return allocate_optimized_out_value (symbol->type ());
 
