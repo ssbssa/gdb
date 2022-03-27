@@ -368,6 +368,27 @@ class ArrayViewPrettyPrinter:
         return "array"
 
 
+class StructDieInfoPrettyPrinter:
+    """Pretty-print an object of type struct die_info"""
+
+    def __init__(self, val):
+        self.val = val
+
+    def children(self):
+        for f in self.val.type.fields():
+            name = f.name
+            val = self.val[f]
+            if name == "attrs" and self.val["num_attrs"] > 1:
+                val = (
+                    val[0]
+                    .address.cast(
+                        val.type.target().array(self.val["num_attrs"] - 1).pointer()
+                    )
+                    .dereference()
+                )
+            yield name, val
+
+
 def type_lookup_function(val):
     """A routine that returns the correct pretty printer for VAL
     if appropriate.  Returns None otherwise.
@@ -386,6 +407,8 @@ def type_lookup_function(val):
         return IntrusiveListPrinter(val)
     elif tag is not None and tag.startswith("gdb::array_view<"):
         return ArrayViewPrettyPrinter(val)
+    elif val.type.tag == "die_info":
+        return StructDieInfoPrettyPrinter(val)
     return None
 
 
