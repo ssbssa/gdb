@@ -858,7 +858,7 @@ value_dynamic_cast (struct type *type, struct value *arg)
 
   /* If the classes are the same, just return the argument.  */
   if (class_types_same_p (class_type, arg_type))
-    return value_cast (type, arg);
+    return value_cast (type, original_arg);
 
   /* If the target type is a unique base class of the argument's
      declared type, just cast it.  */
@@ -890,14 +890,15 @@ value_dynamic_cast (struct type *type, struct value *arg)
       && resolved_type->target_type ()->code () == TYPE_CODE_VOID)
     return value_at_lazy (type, addr);
 
-  tem = value_at (type, addr);
-  type = tem->type ();
+  tem = value_at (resolved_type->target_type (), addr);
 
   /* The first dynamic check specified in 5.2.7.  */
   if (is_public_ancestor (arg_type, resolved_type->target_type ()))
     {
       if (class_types_same_p (rtti_type, resolved_type->target_type ()))
-	return tem;
+	return (is_ref
+		? value_ref (tem, resolved_type->code ())
+		: value_addr (tem));
       result = NULL;
       if (dynamic_cast_check_1 (resolved_type->target_type (),
 				tem->contents_for_printing ().data (),
