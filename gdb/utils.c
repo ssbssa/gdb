@@ -1642,11 +1642,9 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
   if (linebuffer == 0)
     return;
 
-  /* Don't do any filtering if it is disabled.  */
+  /* Don't do any filtering or wrapping if both are disabled.  */
   if (!stream->can_page ()
       || stream != gdb_stdout
-      || !pagination_enabled
-      || pagination_disabled_for_command
       || batch_flag
       || (lines_per_page == UINT_MAX && chars_per_line == UINT_MAX)
       || top_level_interpreter () == NULL
@@ -1675,8 +1673,9 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
       /* Possible new page.  Note that PAGINATION_DISABLED_FOR_COMMAND
 	 might be set during this loop, so we must continue to check
 	 it here.  */
-      if (filter && (lines_printed >= lines_per_page - 1)
-	  && !pagination_disabled_for_command)
+      if (pagination_enabled && filter
+	  && !pagination_disabled_for_command
+	  && lines_printed >= lines_per_page - 1)
 	prompt_for_continue ();
 
       while (*lineptr && *lineptr != '\n')
@@ -1757,9 +1756,9 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
 	      /* Possible new page.  Note that
 		 PAGINATION_DISABLED_FOR_COMMAND might be set during
 		 this loop, so we must continue to check it here.  */
-	      if (filter
-		  && lines_printed >= lines_per_page - 1
-		  && !pagination_disabled_for_command)
+	      if (pagination_enabled && filter
+		  && !pagination_disabled_for_command
+		  && lines_printed >= lines_per_page - 1)
 		{
 		  prompt_for_continue ();
 		  did_paginate = true;
