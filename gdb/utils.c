@@ -1663,6 +1663,12 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
 			 wrap_indent = 0;
 		       });
 
+  /* If the user does "set height 1" then the pager will exhibit weird
+     behavior.  This is pathological, though, so don't allow it.  */
+  const unsigned int lines_allowed = (lines_per_page > 1
+				      ? lines_per_page - 1
+				      : 1);
+
   /* Go through and output each character.  Show line extension
      when this is necessary; prompt user for new page when this is
      necessary.  */
@@ -1675,7 +1681,7 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
 	 it here.  */
       if (pagination_enabled && filter
 	  && !pagination_disabled_for_command
-	  && lines_printed >= lines_per_page - 1)
+	  && lines_printed >= lines_allowed)
 	prompt_for_continue ();
 
       while (*lineptr && *lineptr != '\n')
@@ -1758,7 +1764,7 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
 		 this loop, so we must continue to check it here.  */
 	      if (pagination_enabled && filter
 		  && !pagination_disabled_for_command
-		  && lines_printed >= lines_per_page - 1)
+		  && lines_printed >= lines_allowed)
 		{
 		  prompt_for_continue ();
 		  did_paginate = true;
