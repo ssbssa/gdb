@@ -79,6 +79,7 @@
 # include "tui/tui.h"
 # include "tui/tui-io.h"
 # include "tui/tui-cmd-history.h"
+# include "tui/tui-io.h"
 #endif
 
 #ifndef O_NOCTTY
