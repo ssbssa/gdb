@@ -25,7 +25,7 @@ try:
         # Don't want any errors.
         try:
             lexer = lexers.get_lexer_for_filename(filename, stripnl=False)
-            formatter = formatters.TerminalFormatter()
+            formatter = formatters.TerminalFormatter(bg="dark")
             return highlight(contents, lexer, formatter).encode(
                 gdb.host_charset(), "backslashreplace"
             )
@@ -36,7 +36,7 @@ try:
         # Don't want any errors.
         try:
             lexer = lexers.get_lexer_by_name("asm")
-            formatter = formatters.TerminalFormatter()
+            formatter = formatters.TerminalFormatter(bg="dark")
             return highlight(content, lexer, formatter).rstrip().encode()
         except:
             return None
