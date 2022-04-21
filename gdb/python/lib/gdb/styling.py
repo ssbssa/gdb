@@ -28,7 +28,7 @@ try:
     def get_formatter():
         global _formatter
         if _formatter is None:
-            _formatter = formatters.TerminalFormatter()
+            _formatter = formatters.TerminalFormatter(bg="dark")
         return _formatter
 
     def colorize(filename, contents):
