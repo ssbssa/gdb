@@ -507,7 +507,7 @@ gdbpy_ref<> symbol_to_symbol_object (struct symbol *sym);
 gdbpy_ref<> block_to_block_object (const struct block *block,
 				   struct objfile *objfile);
 gdbpy_ref<> value_to_value_object (struct value *v);
-gdbpy_ref<> type_to_type_object (struct type *);
+gdbpy_ref<> type_to_type_object (struct type *, bool = false);
 gdbpy_ref<> frame_info_to_frame_object (const frame_info_ptr &frame);
 gdbpy_ref<> symtab_to_linetable_object (PyObject *symtab);
 gdbpy_ref<> pspace_to_pspace_object (struct program_space *);

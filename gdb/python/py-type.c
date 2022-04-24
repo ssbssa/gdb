@@ -285,7 +285,7 @@ typy_fields_items (PyObject *self, enum gdbpy_iter_kind kind)
   gdbpy_ref<> type_holder;
   if (checked_type != type)
     {
-      type_holder = type_to_type_object (checked_type);
+      type_holder = type_to_type_object (checked_type, true);
       if (type_holder == nullptr)
 	return nullptr;
       py_type = type_holder.get ();
@@ -491,7 +491,7 @@ typy_strip_typedefs (PyObject *self, PyObject *args)
       return gdbpy_handle_gdb_exception (nullptr, except);
     }
 
-  return type_to_type_object (type).release ();
+  return type_to_type_object (type, true).release ();
 }
 
 /* Strip typedefs and pointers/reference from a type.  Then check that
@@ -1486,21 +1486,23 @@ typy_iterator_dealloc (PyObject *obj)
 
 /* Create a new Type referring to TYPE.  */
 gdbpy_ref<>
-type_to_type_object (struct type *type)
+type_to_type_object (struct type *type, bool typedef_stripped)
 {
-  try
+  if (!typedef_stripped && type->is_stub ())
     {
-      /* Try not to let stub types leak out to Python.  */
-      if (type->is_stub ())
-	type = check_typedef (type);
-    }
-  catch (const gdb_exception_error &)
-    {
-      /* Just ignore failures in check_typedef.  */
-    }
-  catch (const gdb_exception &except)
-    {
-      return gdbpy_handle_gdb_exception (nullptr, except);
+      try
+	{
+	  /* Try not to let stub types leak out to Python.  */
+	  type = check_typedef (type);
+	}
+      catch (const gdb_exception_error &)
+	{
+	  /* Just ignore failures in check_typedef.  */
+	}
+      catch (const gdb_exception &except)
+	{
+	  return gdbpy_handle_gdb_exception (nullptr, except);
+	}
     }
 
   /* Look if there's already a gdb.Type object for given TYPE
