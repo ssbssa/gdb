@@ -43,6 +43,18 @@ textual_name (const char *name)
 	  || !strcmp (name, "char32_t"));
 }
 
+static struct type *
+type_no_typedef (struct type *type)
+{
+  while (type->code () == TYPE_CODE_TYPEDEF)
+    {
+      if (!type->target_type () || type->length () == 0)
+	return check_typedef (type);
+      type = type->target_type ();
+    }
+  return type;
+}
+
 /* Apply a heuristic to decide whether an array of TYPE or a pointer
    to TYPE should be printed as a textual string.  Return non-zero if
    it should, or zero if it should be treated as an array of integers
@@ -64,7 +76,7 @@ c_textual_element_type (struct type *type, char format)
 
   /* We also rely on this for its side effect of setting up all the
      typedef pointers.  */
-  true_type = check_typedef (type);
+  true_type = type_no_typedef (type);
 
   /* TYPE_CODE_CHAR is always textual.  */
   if (true_type->code () == TYPE_CODE_CHAR)
@@ -349,7 +361,7 @@ c_value_print_ptr (struct value *val, struct ui_file *stream, int recurse,
   else
     {
       struct type *unresolved_elttype = type->target_type ();
-      struct type *elttype = check_typedef (unresolved_elttype);
+      struct type *elttype = type_no_typedef (unresolved_elttype);
       CORE_ADDR addr = unpack_pointer (type, valaddr);
 
       print_unpacked_pointer (type, elttype, unresolved_elttype, valaddr,
