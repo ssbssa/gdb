@@ -453,7 +453,7 @@ PyObject *block_to_block_object (const struct block *block,
 				 struct objfile *objfile);
 PyObject *value_to_value_object (struct value *v);
 PyObject *value_to_value_object_no_release (struct value *v);
-PyObject *type_to_type_object (struct type *);
+PyObject *type_to_type_object (struct type *, bool = false);
 PyObject *frame_info_to_frame_object (struct frame_info *frame);
 PyObject *symtab_to_linetable_object (PyObject *symtab);
 gdbpy_ref<> pspace_to_pspace_object (struct program_space *);
