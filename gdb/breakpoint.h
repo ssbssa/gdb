@@ -821,15 +821,19 @@ struct breakpoint
      in.  */
   int condition_not_parsed = 0;
 
+#ifdef HAVE_PYTHON
   /* With a Python scripting enabled GDB, store a reference to the
      Python object that has been associated with this breakpoint.
      This is always NULL for a GDB that is not script enabled.  It can
      sometimes be NULL for enabled GDBs as not all breakpoint types
      are tracked by the scripting language API.  */
   gdbpy_breakpoint_object *py_bp_object = NULL;
+#endif
 
+#ifdef HAVE_GUILE
   /* Same as py_bp_object, but for Scheme.  */
   gdbscm_breakpoint_object *scm_bp_object = NULL;
+#endif
 
 protected:
 
