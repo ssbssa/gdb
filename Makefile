@@ -422,14 +422,16 @@ $(BUILD_DIR)/python3-03-configure.done: | $(BUILD_DIR)/expat-05-make-install.don
 	@touch $@
 
 $(BUILD_DIR)/python3-04-make.done: | $(BUILD_DIR)/python3-03-configure.done
+	$(MAKE) -C $(BUILD_DIR)/python3 python.exe
+	$(MAKE) -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe gdb.exe
 	$(MAKE) -C $(BUILD_DIR)/python3
 	@touch $@
 
 $(BUILD_DIR)/python3-05-make-install.done: | $(BUILD_DIR)/python3-04-make.done
-	$(MAKE) -j1 -C $(BUILD_DIR)/python3 install
-	mv $(GDB_LIBS)/Python3/bin/python3.exe $(GDB_LIBS)/Python3/bin/python.exe
-	mv $(GDB_LIBS)/Python3/bin/python3-config $(GDB_LIBS)/Python3/bin/python-config
-	rm -f $(GDB_LIBS)/Python3/bin/python3*
+	$(MAKE) -j1 -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe install
+	#mv $(GDB_LIBS)/Python3/bin/python3.exe $(GDB_LIBS)/Python3/bin/python.exe
+	#mv $(GDB_LIBS)/Python3/bin/python3-config $(GDB_LIBS)/Python3/bin/python-config
+	#rm -f $(GDB_LIBS)/Python3/bin/python3*
 	@touch $@
 
 
@@ -661,7 +663,7 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 
 $(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python3
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python --with-python-libdir=$(GDB_DIR)-git-python3/lib
+	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-configure.done
@@ -671,6 +673,36 @@ $(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-con
 $(BUILD_DIR)/gdb-git-python3-03-make-install.done: | $(BUILD_DIR)/gdb-git-python3-02-make.done
 	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdb install-strip
 	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdbserver install-strip
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-04-python.done: | $(BUILD_DIR)/gdb-git-python3-03-make-install.done
+	$(MAKE) -j1 -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe prefix=$(shell cygpath -m $(GDB_DIR)-git-python3) libinstall sharedinstall
+	rm -f $(GDB_DIR)-git-python3/bin/{2to3-3.10,idle3.10,pydoc3.10}
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-05-source-highlight.done: | $(BUILD_DIR)/gdb-git-python3-04-python.done
+	cp -R $(GDB_LIBS)/share/source-highlight $(GDB_DIR)-git-python3/share/source-highlight
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-06-licenses.done: | $(BUILD_DIR)/gdb-git-python3-05-source-highlight.done
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/expat
+	cp -p $(SOURCE_DIR_ABS)/$(EXPAT_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/expat/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/libiconv
+	cp -p $(SOURCE_DIR_ABS)/$(ICONV_SRC_DIR)/COPYING.LIB $(GDB_DIR)-git-python3/share/licenses/libiconv/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/libffi
+	cp -p $(SOURCE_DIR_ABS)/$(FFI_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/libffi/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/python
+	cp -p $(GDB_LIBS)/$(PYTHON_DIR)/LICENSE.txt $(GDB_DIR)-git-python3/share/licenses/python/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/boost
+	cp -p $(SOURCE_DIR_ABS)/$(BOOST_SRC_DIR)/LICENSE_1_0.txt $(GDB_DIR)-git-python3/share/licenses/boost/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/source-highlight
+	cp -p $(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/source-highlight/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/gmp
+	cp -p $(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/gmp
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/mpfr
+	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git-python3/share/licenses/mpfr
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/gdb
+	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git-python3/share/licenses/gdb/
 	@touch $@
 
 
@@ -747,7 +779,7 @@ build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
 build-gmp: | $(BUILD_DIR)/gmp-05-make-install.done
 build-mpfr: | $(BUILD_DIR)/mpfr-05-make-install.done
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
-build-gdb-python: | $(BUILD_DIR)/gdb-git-python-06-licenses.done
+build-gdb-python: | $(BUILD_DIR)/gdb-git-python3-06-licenses.done
 build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done
 
 
@@ -757,7 +789,8 @@ gdb$(BUILD_BITS).7z: | build-gdb
 
 gdb$(BUILD_BITS)-python.7z: | build-gdb-python
 	@rm -f $@
-	cd $(GDB_DIR)-git-python && 7z a -mx=9 ../$@ *
+	find $(GDB_DIR)-git-python3 -type d -name __pycache__ -print0 |xargs -0 rm -rf
+	cd $(GDB_DIR)-git-python3 && 7z a -mx=9 ../$@ *
 
 
 package-gdb: gdb$(BUILD_BITS).7z
