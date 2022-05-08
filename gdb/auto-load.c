@@ -1052,7 +1052,7 @@ source_section_scripts (struct objfile *objfile, const char *section_name,
   auto_load_pspace_info *pspace_info
     = get_auto_load_pspace_data_for_loading (objfile->pspace);
 
-  for (const char *p = start; p < end; ++p)
+  for (const char *p = start; p < end;)
     {
       const char *entry;
       const struct extension_language_defn *language;
@@ -1095,7 +1095,7 @@ source_section_scripts (struct objfile *objfile, const char *section_name,
 	    {
 	      warning (_("Empty entry in %s at offset %u"),
 		       section_name, offset);
-	      continue;
+	      break;
 	    }
 	  source_script_file (pspace_info, objfile, language,
 			      section_name, offset, entry);
@@ -1106,6 +1106,9 @@ source_section_scripts (struct objfile *objfile, const char *section_name,
 				   section_name, offset, entry);
 	  break;
 	}
+
+      while (p < end && *p == '\0')
+	++p;
     }
 }
 
