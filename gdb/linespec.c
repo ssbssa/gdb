@@ -4303,13 +4303,15 @@ search_minsyms_for_name (struct collect_info *info,
     }
 
   /* Return true if TYPE is a static symbol.  */
-  auto msymbol_type_is_static = [] (enum minimal_symbol_type type)
+  auto msymbol_type_is_static_or_trampoline
+    = [] (enum minimal_symbol_type type)
     {
       switch (type)
 	{
 	case mst_file_text:
 	case mst_file_data:
 	case mst_file_bss:
+	case mst_solib_trampoline:
 	return true;
 	default:
 	return false;
@@ -4332,7 +4334,8 @@ search_minsyms_for_name (struct collect_info *info,
 
 	      /* Trampoline symbols can only jump to exported
 		 symbols.  */
-	      if (msymbol_type_is_static (item2.minsym->type ()))
+	      if (msymbol_type_is_static_or_trampoline
+		  (item2.minsym->type ()))
 		continue;
 
 	      if (strcmp (item.minsym->linkage_name (),
