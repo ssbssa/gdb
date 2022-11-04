@@ -594,6 +594,8 @@ show_debug_breakpoint (struct ui_file *file, int from_tty,
   gdb_printf (file, _("Breakpoint location debugging is %s.\n"), value);
 }
 
+static bool stop_on_watchpoint_delete = true;
+
 /* See breakpoint.h.  */
 
 int
@@ -5463,7 +5465,7 @@ bpstat_check_watchpoint (bpstat *bs)
 	case WP_DELETED:
 	  /* We've already printed what needs to be printed.  */
 	  bs->print_it = print_it_done;
-	  /* Stop.  */
+	  bs->stop = stop_on_watchpoint_delete;
 	  break;
 	case WP_IGNORE:
 	  bs->print_it = print_it_noop;
@@ -15208,6 +15210,17 @@ be set to \"host\"."),
 			   &show_condition_evaluation_mode,
 			   &breakpoint_set_cmdlist,
 			   &breakpoint_show_cmdlist);
+
+  add_setshow_boolean_cmd ("stop-on-watchpoint-delete", class_breakpoint,
+			   &stop_on_watchpoint_delete, _("\
+Set whether the inferior stops when a watchpoint is automatically deleted."), _("\
+Show whether the inferior stops when a watchpoint is automatically deleted."), _("\
+If off, then the inferior will not stop when a watchpoint was deleted\n\
+because the program left the block in which the expression is valid."),
+				NULL,
+				NULL,
+				&breakpoint_set_cmdlist,
+				&breakpoint_show_cmdlist);
 
   add_com ("break-range", class_breakpoint, break_range_command, _("\
 Set a breakpoint for an address range.\n\
