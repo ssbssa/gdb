@@ -1373,7 +1373,9 @@ record_full_wait_1 (struct target_ops *ops,
 
 		      /* check breakpoint */
 		      tmp_pc = regcache_read_pc (regcache);
-		      if (record_check_stopped_by_breakpoint
+		      if (record_full_stop_reason
+			  != TARGET_STOPPED_BY_WATCHPOINT
+			  && record_check_stopped_by_breakpoint
 			  (aspace, tmp_pc, &record_full_stop_reason))
 			{
 			  if (record_debug)
