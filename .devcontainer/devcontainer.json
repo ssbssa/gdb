@@ -1,0 +1,3 @@
+{
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install texinfo help2man flex libsource-highlight-dev libbabeltrace-dev libmpfr-dev libxxhash-dev && pip install gdb-tools"
+}
