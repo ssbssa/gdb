@@ -57,7 +57,7 @@
 #include "inferior.h"		/* for signed_pointer_to_address */
 
 #include "gdb_curses.h"
-#if defined (HAVE_NCURSESW_NCURSES_H)
+#ifdef USE_RELATIVE_TERMINFO
 #include <tic.h>
 #endif
 
@@ -1194,7 +1194,7 @@ static ui_file_style wrap_style;
 void
 init_page_info (void)
 {
-#if defined (HAVE_NCURSESW_NCURSES_H)
+#ifdef USE_RELATIVE_TERMINFO
   static bool init_terminfo_dir = false;
   if (!init_terminfo_dir)
     {
