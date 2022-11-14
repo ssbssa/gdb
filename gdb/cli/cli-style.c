@@ -368,10 +368,14 @@ If enabled, output to the terminal is styled."),
 			   set_style_enabled, show_style_enabled,
 			   &style_set_list, &style_show_list);
 
+#ifdef USE_RELATIVE_SRC_HIGHLIGHT
   std::string esc_style = gdb_datadir;
   esc_style += "/../source-highlight/esc.style";
   struct stat st;
-  if (stat (esc_style.c_str (), &st) == 0)
+  if (stat (esc_style.c_str (), &st) != 0)
+    source_styling = 0;
+  else
+#endif
     {
       add_setshow_boolean_cmd ("sources", no_class, &source_styling, _("\
 Set whether source code styling is enabled."), _("\
@@ -388,8 +392,6 @@ available if the appropriate extension is available at runtime."
 			       ), set_style_enabled, show_style_sources,
 			       &style_set_list, &style_show_list);
     }
-  else
-    source_styling = 0;
 
   add_setshow_prefix_cmd ("disassembler", no_class,
 			  _("\
