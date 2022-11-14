@@ -3325,7 +3325,7 @@ linux_nat_wait_1 (ptid_t ptid, struct target_waitstatus *ourstatus,
 	  linux_nat_debug_printf ("exit (quit flag)");
 
 	  /* If we got a SIGCHLD, need to end up here again. */
-	  async_file_mark ();
+	  linux_nat_target::async_file_mark_if_open ();
 
 	  ourstatus->set_ignore ();
 
