@@ -1595,7 +1595,7 @@ print_return_value_1 (struct ui_out *uiout, struct return_value_info *rv)
    RV points at an object representing the captured return value/type
    and its position in the value history.  */
 
-void
+static void
 print_return_value (struct ui_out *uiout, struct return_value_info *rv)
 {
   if (rv->type == nullptr
@@ -1643,7 +1643,7 @@ struct finish_command_fsm : public thread_fsm
 
   bool should_stop (struct thread_info *thread) override;
   void clean_up (struct thread_info *thread) override;
-  struct return_value_info *return_value () override;
+  void print_return_values (struct ui_out *uiout) override;
   enum async_reply_reason do_async_reply_reason () override;
 };
 
@@ -1704,13 +1704,13 @@ finish_command_fsm::clean_up (struct thread_info *thread)
   delete_longjmp_breakpoint (thread->global_num);
 }
 
-/* Implementation of the 'return_value' FSM method for the finish
+/* Implementation of the 'print_return_values' FSM method for the finish
    commands.  */
 
-struct return_value_info *
-finish_command_fsm::return_value ()
+void
+finish_command_fsm::print_return_values (struct ui_out *uiout)
 {
-  return &return_value_info;
+  print_return_value (uiout, &return_value_info);
 }
 
 /* Implementation of the 'async_reply_reason' FSM method for the
