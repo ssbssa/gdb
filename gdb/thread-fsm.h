@@ -84,6 +84,11 @@ struct thread_fsm
     return nullptr;
   }
 
+  /* Print return values saved by this FSM.  */
+  virtual void print_return_values (struct ui_out *uiout)
+  {
+  }
+
   enum async_reply_reason async_reply_reason ()
   {
     /* If we didn't finish, then the stop reason must come from
