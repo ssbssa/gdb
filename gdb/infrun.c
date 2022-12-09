@@ -8509,15 +8509,8 @@ print_stop_event (struct ui_out *uiout, bool displays)
   }
 
   tp = inferior_thread ();
-  if (tp->thread_fsm () != nullptr
-      && tp->thread_fsm ()->finished_p ())
-    {
-      struct return_value_info *rv;
-
-      rv = tp->thread_fsm ()->return_value ();
-      if (rv != nullptr)
-	print_return_value (uiout, rv);
-    }
+  if (tp->thread_fsm () != nullptr)
+    tp->thread_fsm ()->print_return_values (uiout);
 }
 
 /* See infrun.h.  */
