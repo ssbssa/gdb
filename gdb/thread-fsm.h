@@ -58,11 +58,9 @@ struct thread_fsm
      function's return value here.  */
   virtual bool should_stop (struct thread_info *thread) = 0;
 
-  /* If this FSM saved a function's return value, you can use this
-     method to retrieve it.  Otherwise, this returns NULL.  */
-  virtual struct return_value_info *return_value ()
+  /* Print return values saved by this FSM.  */
+  virtual void print_return_values (struct ui_out *uiout)
   {
-    return nullptr;
   }
 
   enum async_reply_reason async_reply_reason ()
