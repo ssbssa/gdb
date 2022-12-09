@@ -240,13 +240,6 @@ extern void print_exited_reason (struct ui_out *uiout, int exitstatus);
    inferior has stopped.  */
 extern void print_no_history_reason (struct ui_out *uiout);
 
-/* Print the result of a function at the end of a 'finish' command.
-   RV points at an object representing the captured return value/type
-   and its position in the value history.  */
-
-extern void print_return_value (struct ui_out *uiout,
-				struct return_value_info *rv);
-
 /* Print current location without a level number, if we have changed
    functions or hit a breakpoint.  Print source line if we have one.
    If the execution command captured a return value, print it.  If
