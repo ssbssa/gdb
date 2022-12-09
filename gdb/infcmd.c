@@ -87,6 +87,10 @@ int stopped_by_random_signal;
 
 static bool finish_print = true;
 
+/* Whether "next" should print return values of stepped-over functions.  */
+
+static bool step_return_value_print = false;
+
 
 
 /* Store the new value passed to 'set inferior-tty'.  */
@@ -894,6 +898,8 @@ struct step_command_fsm : public thread_fsm
   /* If true, this is a steps/nexts, otherwise a step/next.  */
   int step_column;
 
+  std::vector<return_value_info> return_values;
+
   explicit step_command_fsm (struct interp *cmd_interp)
     : thread_fsm (cmd_interp)
   {
@@ -901,6 +907,9 @@ struct step_command_fsm : public thread_fsm
 
   void clean_up (struct thread_info *thread) override;
   bool should_stop (struct thread_info *thread) override;
+  void print_return_values (struct ui_out *uiout) override;
+  void add_callee_info (frame_info_ptr frame) override;
+  void capture_return_value () override;
   enum async_reply_reason do_async_reply_reason () override;
 };
 
@@ -998,6 +1007,67 @@ step_command_fsm::should_stop (struct thread_info *tp)
     }
 
   return true;
+}
+
+/* Implementation of the 'print_return_values' FSM method for stepping
+   commands.  */
+
+void
+step_command_fsm::print_return_values (struct ui_out *uiout)
+{
+  for (return_value_info &rv : return_values)
+    {
+      if (rv.value == nullptr)
+	continue;
+
+      try
+	{
+	  uiout->field_string ("return-from", rv.function->print_name (),
+			       function_name_style.style ());
+	  uiout->text (" returned ");
+	  uiout->field_fmt ("gdb-result-var", "$%d",
+			    rv.value_history_index);
+	  uiout->text (" = ");
+
+	  struct value_print_options opts;
+	  get_user_print_options (&opts);
+
+	  string_file stb;
+	  value_print (rv.value, &stb, &opts);
+	  uiout->field_stream ("return-value", stb);
+
+	  uiout->text ("\n");
+	}
+      catch (const gdb_exception &ex)
+	{
+	  exception_print (gdb_stdout, ex);
+	}
+    }
+}
+
+/* Implementation of the 'add_callee_info' FSM method for stepping
+   commands.  */
+
+void
+step_command_fsm::add_callee_info (frame_info_ptr frame)
+{
+  if (!step_return_value_print)
+    return;
+
+  return_value_info rv {};
+  get_callee_info (&rv, frame);
+  if (rv.function != nullptr)
+    return_values.push_back (rv);
+}
+
+/* Implementation of the 'capture_return_value' FSM method for stepping
+   commands.  */
+
+void
+step_command_fsm::capture_return_value ()
+{
+  if (!return_values.empty () && return_values.back ().value == nullptr)
+    get_return_value_info (&return_values.back ());
 }
 
 /* Implementation of the 'clean_up' FSM method for stepping commands.  */
@@ -3178,6 +3248,18 @@ Printing of return value after `finish' is %s.\n"),
 	      value);
 }
 
+/* Implement `show print step-return-value'.  */
+
+static void
+show_print_step_return_value (struct ui_file *file, int from_tty,
+			      struct cmd_list_element *c,
+			      const char *value)
+{
+  gdb_printf (file, _("\
+Printing of return values of stepped-over functions is %s.\n"),
+	      value);
+}
+
 
 /* This help string is used for the run, start, and starti commands.
    It is defined as a macro to prevent duplication.  */
@@ -3530,5 +3612,14 @@ Set whether `finish' prints the return value."), _("\
 Show whether `finish' prints the return value."), nullptr,
 			   nullptr,
 			   show_print_finish,
+			   &setprintlist, &showprintlist);
+
+  add_setshow_boolean_cmd ("step-return-value", class_support,
+			   &step_return_value_print, _("\
+Set whether `next' prints the return value of stepped-over function."), _("\
+Show whether `next' prints the return value of stepped-over function."),
+			   nullptr,
+			   nullptr,
+			   show_print_step_return_value,
 			   &setprintlist, &showprintlist);
 }
