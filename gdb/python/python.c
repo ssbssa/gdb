@@ -1830,7 +1830,7 @@ python_command (const char *arg, int from_tty)
 /* When this is turned on before Python is initialised then Python will
    ignore any environment variables related to Python.  This is equivalent
    to passing `-E' to the python program.  */
-static bool python_ignore_environment = false;
+static bool python_ignore_environment = true;
 
 /* Implement 'show python ignore-environment'.  */
 
