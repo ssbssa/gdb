@@ -63,6 +63,17 @@ struct thread_fsm
   {
   }
 
+  /* Add callee information (function symbol) for later use for
+     return values.  */
+  virtual void add_callee_info (frame_info_ptr frame)
+  {
+  }
+
+  /* Capture return value of callee which just returned.  */
+  virtual void capture_return_value ()
+  {
+  }
+
   enum async_reply_reason async_reply_reason ()
   {
     /* If we didn't finish, then the stop reason must come from
