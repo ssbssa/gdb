@@ -6750,6 +6750,9 @@ process_event_stop_test (struct execution_control_state *ecs)
     case BPSTAT_WHAT_STEP_RESUME:
       infrun_debug_printf ("BPSTAT_WHAT_STEP_RESUME");
 
+      if (ecs->event_thread->thread_fsm () != nullptr)
+	ecs->event_thread->thread_fsm ()->capture_return_value ();
+
       delete_step_resume_breakpoint (ecs->event_thread);
       if (ecs->event_thread->control.proceed_to_finish
 	  && execution_direction == EXEC_REVERSE)
@@ -7115,7 +7118,12 @@ process_event_stop_test (struct execution_control_state *ecs)
 		}
 	    }
 	  else
-	    insert_step_resume_breakpoint_at_caller (frame);
+	    {
+	      insert_step_resume_breakpoint_at_caller (frame);
+
+	      if (ecs->event_thread->thread_fsm () != nullptr)
+		ecs->event_thread->thread_fsm ()->add_callee_info (frame);
+	    }
 
 	  keep_going (ecs);
 	  return;
