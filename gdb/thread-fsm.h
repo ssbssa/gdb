@@ -31,6 +31,15 @@ struct value;
 
 struct return_value_info
 {
+  /* The function that we're stepping out of.  */
+  struct symbol *function;
+
+  /* If the current function uses the "struct return convention",
+     this holds the address at which the value being returned will
+     be stored, or zero if that address could not be determined or
+     the "struct return convention" is not being used.  */
+  CORE_ADDR return_buf;
+
   /* The captured return value.  May be NULL if we weren't able to
      retrieve it.  See get_return_value.  */
   struct value *value;
