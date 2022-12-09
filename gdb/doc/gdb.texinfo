@@ -6514,6 +6514,17 @@ debug information.  This is the default.
 Show whether @value{GDBN} will stop in or step over functions without
 source line debug information.
 
+@kindex set print step-return-value
+@kindex show print step-return-value
+@item set print step-return-value @r{[}on|off@r{]}
+@itemx show print step-return-value
+Control whether @value{GDBN} will show the return values of functions
+that were stepped over with @code{next}.
+
+If @code{on}, it will print the return values, and enter them into the
+value history (@pxref{Value History}).  If @code{off}, the return values
+are not shown, and not entered into the value history.
+
 @kindex finish
 @kindex fin @r{(@code{finish})}
 @item finish
