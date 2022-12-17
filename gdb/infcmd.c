@@ -832,7 +832,17 @@ struct return_value_info
 static void
 get_callee_info (return_value_info *rv, frame_info_ptr frame)
 {
-  rv->function = find_pc_function (get_frame_pc (frame));
+  CORE_ADDR pc = get_frame_pc (frame);
+  rv->function = find_pc_function (pc);
+
+  if (rv->function == nullptr)
+    {
+      pc = skip_language_trampoline (frame, pc);
+      if (pc == 0)
+	pc = gdbarch_skip_trampoline_code (get_frame_arch (frame), frame, pc);
+      if (pc != 0)
+	rv->function = find_pc_function (pc);
+    }
 
   /* Determine the return convention.  If it is RETURN_VALUE_STRUCT_CONVENTION,
      attempt to determine the address of the return buffer.  */
