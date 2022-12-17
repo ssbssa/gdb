@@ -248,6 +248,21 @@ show_non_stop (struct ui_file *file, int from_tty,
 	      value);
 }
 
+/* Print return values before the stop location.  */
+
+static bool return_values_before_stop_location = false;
+
+static void
+show_print_return_values_before_stop_location (struct ui_file *file,
+					       int from_tty,
+					       struct cmd_list_element *c,
+					       const char *value)
+{
+  gdb_printf (file, _("\
+Printing the return values before the stop location is %s.\n"),
+	      value);
+}
+
 /* "Observer mode" is somewhat like a more extreme version of
    non-stop, in which all GDB operations that might affect the
    target's execution have been disabled.  */
@@ -8812,6 +8827,13 @@ print_stop_event (struct ui_out *uiout, bool displays)
 
   get_last_target_status (nullptr, nullptr, &last);
 
+  if (return_values_before_stop_location)
+    {
+      tp = inferior_thread ();
+      if (tp->thread_fsm () != nullptr)
+	tp->thread_fsm ()->print_return_values (uiout);
+    }
+
   {
     scoped_restore save_uiout = make_scoped_restore (&current_uiout, uiout);
 
@@ -8822,9 +8844,12 @@ print_stop_event (struct ui_out *uiout, bool displays)
       do_displays ();
   }
 
-  tp = inferior_thread ();
-  if (tp->thread_fsm () != nullptr)
-    tp->thread_fsm ()->print_return_values (uiout);
+  if (!return_values_before_stop_location)
+    {
+      tp = inferior_thread ();
+      if (tp->thread_fsm () != nullptr)
+	tp->thread_fsm ()->print_return_values (uiout);
+    }
 }
 
 /* See infrun.h.  */
@@ -10332,6 +10357,15 @@ enabled by default on some platforms."),
 			   &set_disable_randomization,
 			   &show_disable_randomization,
 			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("return-values-before-stop-location", class_support,
+			   &return_values_before_stop_location, _("\
+Set whether return values are printed before the stop location."), _("\
+Show whether return values are printed before the stop location."),
+			   nullptr,
+			   nullptr,
+			   show_print_return_values_before_stop_location,
+			   &setprintlist, &showprintlist);
 
   /* ptid initializations */
   inferior_ptid = null_ptid;
