@@ -89,7 +89,7 @@ static bool finish_print = true;
 
 /* Whether "next" should print return values of stepped-over functions.  */
 
-static bool step_return_value_print = false;
+static bool step_return_value_print = true;
 
 
 
