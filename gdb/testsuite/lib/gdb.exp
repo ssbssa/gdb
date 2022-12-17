@@ -280,6 +280,7 @@ if ![info exists INTERNAL_GDBFLAGS] {
 if [ishost "*-*-mingw*"] {
     append INTERNAL_GDBFLAGS " -iex {set new-console off}"
 }
+append INTERNAL_GDBFLAGS " -iex {set print step-return-value off}"
 
 # The variable gdb_prompt is a regexp which matches the gdb prompt.
 # Set it if it is not already set.  This is also set by default_gdb_init
