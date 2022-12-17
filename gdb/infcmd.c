@@ -1042,7 +1042,7 @@ step_command_fsm::print_return_values (struct ui_out *uiout)
 	  struct value_print_options opts;
 	  get_user_print_options (&opts);
 
-	  string_file stb;
+	  string_file stb (uiout->can_emit_style_escape ());
 	  value_print (rv.value, &stb, &opts);
 	  uiout->field_stream ("return-value", stb);
 
@@ -1707,7 +1707,7 @@ print_return_value_1 (struct ui_out *uiout, struct return_value_info *rv)
 	  struct value_print_options opts;
 	  get_user_print_options (&opts);
 
-	  string_file stb;
+	  string_file stb (uiout->can_emit_style_escape ());
 	  value_print (rv->value, &stb, &opts);
 	  uiout->field_stream ("return-value", stb);
 	}
