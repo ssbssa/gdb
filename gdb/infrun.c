@@ -237,7 +237,7 @@ show_non_stop (struct ui_file *file, int from_tty,
 
 /* Print return values before the stop location.  */
 
-static bool return_values_before_stop_location = false;
+static bool return_values_before_stop_location = true;
 
 static void
 show_print_return_values_before_stop_location (struct ui_file *file,
