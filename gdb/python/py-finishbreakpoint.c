@@ -212,7 +212,7 @@ bpfinishpy_init (PyObject *self, PyObject *args, PyObject *kwargs)
 				 "be set on a dummy frame."));
 	    }
 	  else
-	    frame_id = get_frame_id (prev_frame);
+	    frame_id = frame_unwind_caller_id (frame);
 	}
     }
   catch (const gdb_exception &except)
