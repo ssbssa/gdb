@@ -18,6 +18,8 @@ import gdb
 import sys
 import re
 import locale
+import os
+from gdb import styling
 
 PY3 = sys.version_info[0] == 3
 
@@ -1259,6 +1261,65 @@ class CreateCustomCommandWindow(gdb.Command):
 
 
 CreateCustomCommandWindow()
+
+
+class SourceWindow(TextWindow):
+    def __init__(self, win):
+        super(SourceWindow, self).__init__(win)
+        self.filename = None
+        self.highlight = 0
+        self.source = []
+
+    def refill(self):
+        self.lines = []
+
+        filename, lineno, highlight = self.location()
+        if filename != self.filename:
+            self.filename = filename
+            self.highlight = 0
+            self.source = []
+
+            if filename is not None:
+                try:
+                    f = open(os.fsencode(filename), "r")
+                except:
+                    return
+                with f:
+                    source = f.read()
+                    source_styled = styling.colorize(filename, source)
+                    if source_styled:
+                        self.source = source_styled.decode(
+                            gdb.host_charset()
+                        ).splitlines()
+                    else:
+                        self.source = source.splitlines()
+
+            if lineno is None or lineno == 0:
+                lineno = 1
+            if highlight is None:
+                highlight = 0
+
+        if highlight is not None:
+            self.highlight = highlight
+
+        if self.filename is None:
+            self.win.title = "(no source available)"
+            return
+
+        self.win.title = self.filename
+
+        for l, line in enumerate(self.source, 1):
+            marker = " "
+            num_str = "%6d  " % l
+            line_col_s, line_col_e = "", ""
+            if l == self.highlight:
+                marker = ">"
+                line_col_s, line_col_e = "\033[7m", "\033[27m"
+                line = col_esc_seq_re.sub("", line)
+            self.lines.append(marker + num_str + line_col_s + line + line_col_e)
+        if lineno > 0 and lineno <= len(self.lines):
+            if self.line_ofs >= lineno or self.line_ofs + self.win.height < lineno:
+                self.line_ofs = max(lineno - 1 - self.win.height // 2, 0)
 
 
 def refresh_tui_windows(event=None):
