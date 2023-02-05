@@ -597,6 +597,13 @@ cp_print_static_field (struct type *type,
 			sizeof (CORE_ADDR));
 	}
 
+      if (!options->raw)
+	{
+	  if (apply_ext_lang_val_pretty_printer (val, stream, recurse,
+						 options, current_language))
+	    return;
+	}
+
       cp_print_value_fields (val, stream, recurse, options, NULL, 1);
       return;
     }
