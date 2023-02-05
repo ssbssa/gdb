@@ -586,28 +586,32 @@ cp_print_static_field (struct type *type,
   struct type *real_type = check_typedef (type);
   if (real_type->code () == TYPE_CODE_STRUCT)
     {
-      CORE_ADDR *first_dont_print;
-      CORE_ADDR addr = val->address ();
-      int i;
-
-      first_dont_print
-	= (CORE_ADDR *) obstack_base (&dont_print_statmem_obstack);
-      i = obstack_object_size (&dont_print_statmem_obstack)
-	/ sizeof (CORE_ADDR);
-
-      while (--i >= 0)
+      if (val->lval () == lval_memory)
 	{
-	  if (addr == first_dont_print[i])
+	  CORE_ADDR *first_dont_print;
+	  CORE_ADDR addr = val->address ();
+	  int i;
+
+	  first_dont_print
+	    = (CORE_ADDR *) obstack_base (&dont_print_statmem_obstack);
+	  i = obstack_object_size (&dont_print_statmem_obstack)
+	    / sizeof (CORE_ADDR);
+
+	  while (--i >= 0)
 	    {
-	      fputs_styled (_("<same as static member of an already"
-			      " seen type>"),
-			    metadata_style.style (), stream);
-	      return;
+	      if (addr == first_dont_print[i])
+		{
+		  fputs_styled (_("<same as static member of an already"
+				  " seen type>"),
+				metadata_style.style (), stream);
+		  return;
+		}
 	    }
+
+	  obstack_grow (&dont_print_statmem_obstack, (char *) &addr,
+			sizeof (CORE_ADDR));
 	}
 
-      obstack_grow (&dont_print_statmem_obstack, (char *) &addr,
-		    sizeof (CORE_ADDR));
       cp_print_value_fields_pp (val, stream, recurse, options, nullptr, 1);
       return;
     }
