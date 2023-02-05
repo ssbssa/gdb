@@ -44,6 +44,17 @@
  
  include "function.lang"
  
+--- src/cpp.lang	2019-06-02 01:18:53.000000000 +0200
++++ src/cpp.lang	2022-10-04 11:00:28.000000000 +0200
+@@ -39,7 +39,7 @@
+ 
+ include "symbols.lang"
+ 
+-cbracket = "{|}"
++cbracket = "{|}|(|)|[|]"
+ 
+ include "function.lang"
+ 
 --- src/symbols.lang	2010-05-06 10:32:55.000000000 +0200
 +++ src/symbols.lang	2019-03-18 18:27:01.691796400 +0100
 @@ -1,2 +1,2 @@

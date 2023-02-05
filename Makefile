@@ -83,6 +83,19 @@ MPFR_CONF=$(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/configure \
 	 --enable-static --disable-shared --prefix=$(GDB_LIBS) \
 	 --with-gmp-build=$(BUILD_DIR_ABS)/gmp
 
+XXHASH_VER_MAJOR=0
+XXHASH_VER_MINOR=8
+XXHASH_VER_PATCH=1
+XXHASH_VER=$(XXHASH_VER_MAJOR).$(XXHASH_VER_MINOR).$(XXHASH_VER_PATCH)
+XXHASH_SRC_DIR=xxHash-$(XXHASH_VER)
+XXHASH_FILE=$(XXHASH_SRC_DIR).tar.gz
+
+ARPEGGIO_VER=2.0.0
+ARPEGGIO_SRC_DIR=Arpeggio-$(ARPEGGIO_VER)
+ARPEGGIO_FILE=$(ARPEGGIO_SRC_DIR).tar.gz
+
+GDB_TOOLS_GIT_DIR=/c/src/repos/gdb-tools.git
+
 FFI_VER=3.4.2
 FFI_SRC_DIR=libffi-$(FFI_VER)
 FFI_FILE=$(FFI_SRC_DIR).tar.gz
@@ -110,22 +123,26 @@ GDB_CONF=$(SOURCE_DIR_ABS)/$(GDB_SRC_DIR)/configure \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
 	 --disable-install-libbfd --disable-install-libiberty \
 	 --with-pkgversion=$(MYPKG)
-SET_PKG_PATH=export PKG_CONFIG_PATH="$(GDB_LIBS)/lib/pkgconfig";
+GDB_ENV=export \
+	PKG_CONFIG_PATH="$(GDB_LIBS)/lib/pkgconfig" \
+	CPPFLAGS="-I$(GDB_LIBS)/include -DUSE_RELATIVE_SRC_HIGHLIGHT" \
+	LDFLAGS="-L$(GDB_LIBS)/lib" \
+	;
 GDB_GIT_DIR=/c/src/repos/binutils-gdb.git
 GDB_GIT_CONF=$(GDB_GIT_DIR)/configure \
 	 --build=$(MYBUILD) --host=$(MYTARGET) --target=$(MYTARGET) \
+	 --enable-static --disable-shared \
 	 --disable-nls \
-	 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
 	 --enable-curses --enable-tui \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
 	 --with-liblzma-prefix=$(GDB_LIBS) \
+	 --with-xxhash \
 	 --disable-install-libbfd --disable-install-libiberty \
 	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
 	 --with-pkgversion=$(MYPKG)
 GDB_TEST_CONF=/c/src/repos/gdb-testsuite/configure \
 	 --build=$(MYBUILD) --host=$(MYTARGET) --target=$(MYTARGET) \
 	 --disable-nls \
-	 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
 	 --enable-curses --enable-tui \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
 	 --with-liblzma-prefix=$(GDB_LIBS) \
@@ -249,7 +266,11 @@ $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done: | $(SOURCE_DIR)/pdcur
 	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0013-ncurses-mouse-api.patch
 	@touch $@
 
-$(BUILD_DIR)/pdcurses-03-make.done: | $(BUILD_DIR)/expat-05-make-install.done $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done
+$(SOURCE_DIR)/pdcurses-02-patch-14-resize-console.done: | $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done
+	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0014-resize-console.patch
+	@touch $@
+
+$(BUILD_DIR)/pdcurses-03-make.done: | $(BUILD_DIR)/expat-05-make-install.done $(SOURCE_DIR)/pdcurses-02-patch-14-resize-console.done
 	@mkdir -p $(BUILD_DIR)/pdcurses
 	$(MAKE) -C $(BUILD_DIR)/pdcurses -f $(SOURCE_DIR_ABS)/$(PDCURSES_SRC_DIR)/win32/gccwin32.mak $(CROSS_CONF) PDCURSES_SRCDIR=$(SOURCE_DIR_ABS)/$(PDCURSES_SRC_DIR) pdcurses.a
 	@touch $@
@@ -435,6 +456,32 @@ $(BUILD_DIR)/python3-05-make-install.done: | $(BUILD_DIR)/python3-04-make.done
 	@touch $@
 
 
+# xxHash
+
+$(SOURCE_DIR)/xxHash-01-extract.done: | pkg/$(XXHASH_FILE) $(SOURCE_DIR)/ffi-01-extract.done
+	tar -C $(SOURCE_DIR) -xzf pkg/$(XXHASH_FILE)
+	@touch $@
+
+$(BUILD_DIR)/xxHash-04-make.done: | $(SOURCE_DIR)/xxHash-01-extract.done
+	@mkdir -p $(BUILD_DIR)/xxHash
+	#$(MAKE) -C $(BUILD_DIR)/xxHash -f $(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR)/Makefile VPATH=$(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR) UNAME=GNU CC=$(MYTARGET)-gcc LIBVER_MAJOR_SCRIPT=$(XXHASH_VER_MAJOR) LIBVER_MINOR_SCRIPT=$(XXHASH_VER_MINOR) LIBVER_PATCH_SCRIPT=$(XXHASH_VER_PATCH) libxxhash.a libxxhash.pc
+	$(MAKE) -C $(BUILD_DIR)/xxHash -f $(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR)/Makefile VPATH=$(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR) CC=$(MYTARGET)-gcc AR=$(MYTARGET)-ar LIBVER_MAJOR_SCRIPT=$(XXHASH_VER_MAJOR) LIBVER_MINOR_SCRIPT=$(XXHASH_VER_MINOR) LIBVER_PATCH_SCRIPT=$(XXHASH_VER_PATCH) libxxhash.a
+	@touch $@
+
+$(BUILD_DIR)/xxHash-05-install.done: | $(BUILD_DIR)/xxHash-04-make.done
+	@mkdir -p $(GDB_LIBS)/include $(GDB_LIBS)/lib
+	cp $(SOURCE_DIR)/$(XXHASH_SRC_DIR)/xxhash.h $(GDB_LIBS)/include
+	cp $(BUILD_DIR)/xxHash/libxxhash.a $(GDB_LIBS)/lib/
+	@touch $@
+
+
+# Arpeggio
+
+$(SOURCE_DIR)/arpeggio-01-extract.done: | pkg/$(ARPEGGIO_FILE) $(SOURCE_DIR)/xxHash-01-extract.done
+	tar -C $(SOURCE_DIR) -xzf pkg/$(ARPEGGIO_FILE)
+	@touch $@
+
+
 # gdb
 
 $(SOURCE_DIR)/gdb-01-extract.done: | pkg/$(GDB_FILE) $(SOURCE_DIR)/mpfr-01-extract.done
@@ -575,18 +622,18 @@ $(BUILD_DIR)/gdb-python-04-python.done: | $(BUILD_DIR)/gdb-python-03-make-instal
 
 # gdb-git
 
-$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done
+$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-02-make.done: | $(BUILD_DIR)/gdb-git-01-configure.done
-	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git
+	$(GDB_ENV) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-03-make-install.done: | $(BUILD_DIR)/gdb-git-02-make.done
-	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git/gdb install-strip
-	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git/gdbserver install-strip
+	$(GDB_ENV) $(MAKE) -C $(BUILD_DIR)/gdb-git/gdb install-strip
+	$(GDB_ENV) $(MAKE) -C $(BUILD_DIR)/gdb-git/gdbserver install-strip
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-04-source-highlight.done: | $(BUILD_DIR)/gdb-git-03-make-install.done
@@ -606,6 +653,8 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 	cp -p $(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/COPYING $(GDB_DIR)-git/share/licenses/gmp
 	@mkdir -p $(GDB_DIR)-git/share/licenses/mpfr
 	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git/share/licenses/mpfr
+	@mkdir -p $(GDB_DIR)-git/share/licenses/xxHash
+	cp -p $(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR)/LICENSE $(GDB_DIR)-git/share/licenses/xxHash
 	@mkdir -p $(GDB_DIR)-git/share/licenses/gdb
 	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git/share/licenses/gdb/
 	@touch $@
@@ -615,16 +664,16 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 
 $(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python-02-make.done: | $(BUILD_DIR)/gdb-git-python-01-configure.done
-	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git-python
+	$(GDB_ENV) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git-python
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python-03-make-install.done: | $(BUILD_DIR)/gdb-git-python-02-make.done
-	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python/gdb install-strip
-	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python/gdbserver install-strip
+	$(GDB_ENV) $(MAKE) -C $(BUILD_DIR)/gdb-git-python/gdb install-strip
+	$(GDB_ENV) $(MAKE) -C $(BUILD_DIR)/gdb-git-python/gdbserver install-strip
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python-04-python.done: | $(BUILD_DIR)/gdb-git-python-03-make-install.done
@@ -661,18 +710,18 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 
 # gdb-git-python3
 
-$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done
+$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python3
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-configure.done
-	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git-python3
+	$(GDB_ENV) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-git-python3
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-03-make-install.done: | $(BUILD_DIR)/gdb-git-python3-02-make.done
-	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdb install-strip
-	$(SET_PKG_PATH) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdbserver install-strip
+	$(GDB_ENV) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdb install-strip
+	$(GDB_ENV) $(MAKE) -C $(BUILD_DIR)/gdb-git-python3/gdbserver install-strip
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-04-python.done: | $(BUILD_DIR)/gdb-git-python3-03-make-install.done
@@ -684,7 +733,16 @@ $(BUILD_DIR)/gdb-git-python3-05-source-highlight.done: | $(BUILD_DIR)/gdb-git-py
 	cp -R $(GDB_LIBS)/share/source-highlight $(GDB_DIR)-git-python3/share/source-highlight
 	@touch $@
 
-$(BUILD_DIR)/gdb-git-python3-06-licenses.done: | $(BUILD_DIR)/gdb-git-python3-05-source-highlight.done
+$(BUILD_DIR)/gdb-git-python3-06-arpeggio.done: | $(BUILD_DIR)/gdb-git-python3-05-source-highlight.done
+	cp -R $(SOURCE_DIR_ABS)/$(ARPEGGIO_SRC_DIR)/arpeggio $(GDB_DIR)-git-python3/share/gdb/python/
+	rm -rf $(GDB_DIR)-git-python3/share/gdb/python/arpeggio/tests
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-07-duel.done: | $(BUILD_DIR)/gdb-git-python3-06-arpeggio.done
+	cp -R $(GDB_TOOLS_GIT_DIR)/duel $(GDB_DIR)-git-python3/share/gdb/python/
+	@touch $@
+
+$(BUILD_DIR)/gdb-git-python3-08-licenses.done: | $(BUILD_DIR)/gdb-git-python3-07-duel.done
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/expat
 	cp -p $(SOURCE_DIR_ABS)/$(EXPAT_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/expat/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/libiconv
@@ -698,9 +756,15 @@ $(BUILD_DIR)/gdb-git-python3-06-licenses.done: | $(BUILD_DIR)/gdb-git-python3-05
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/source-highlight
 	cp -p $(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/source-highlight/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/gmp
-	cp -p $(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/gmp
+	cp -p $(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/COPYING $(GDB_DIR)-git-python3/share/licenses/gmp/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/mpfr
-	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git-python3/share/licenses/mpfr
+	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git-python3/share/licenses/mpfr/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/xxHash
+	cp -p $(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/xxHash/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/Arpeggio
+	cp -p $(SOURCE_DIR_ABS)/$(ARPEGGIO_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/Arpeggio/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/gdb-tools
+	cp -p $(GDB_TOOLS_GIT_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/gdb-tools/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/gdb
 	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git-python3/share/licenses/gdb/
 	@touch $@
@@ -722,11 +786,11 @@ $(BUILD_DIR)/binutils-git-02-make.done: | $(BUILD_DIR)/binutils-git-01-configure
 
 $(BUILD_DIR)/gdb-test-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-test
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
 	@touch $@
 
 $(BUILD_DIR)/gdb-test-02-make.done: | $(BUILD_DIR)/gdb-test-01-configure.done
-	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-test
+	$(GDB_ENV) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-test
 	@touch $@
 
 
@@ -734,11 +798,11 @@ $(BUILD_DIR)/gdb-test-02-make.done: | $(BUILD_DIR)/gdb-test-01-configure.done
 
 $(BUILD_DIR)/gdb-redhat64-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-redhat64
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-redhat64 && $(GDB_REDHAT64_CONF) --prefix=$(GDB_DIR)-redhat64
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-redhat64 && $(GDB_REDHAT64_CONF) --prefix=$(GDB_DIR)-redhat64
 	@touch $@
 
 $(BUILD_DIR)/gdb-redhat64-02-make.done: | $(BUILD_DIR)/gdb-redhat64-01-configure.done
-	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-redhat64
+	$(GDB_ENV) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-redhat64
 	@touch $@
 
 
@@ -746,11 +810,11 @@ $(BUILD_DIR)/gdb-redhat64-02-make.done: | $(BUILD_DIR)/gdb-redhat64-01-configure
 
 $(BUILD_DIR)/gdb-redhat32-host-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-redhat32-host
-	$(SET_PKG_PATH) cd $(BUILD_DIR)/gdb-redhat32-host && $(GDB_REDHAT32_HOST_CONF) --prefix=$(GDB_DIR)-redhat32-host
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-redhat32-host && $(GDB_REDHAT32_HOST_CONF) --prefix=$(GDB_DIR)-redhat32-host
 	@touch $@
 
 $(BUILD_DIR)/gdb-redhat32-host-02-make.done: | $(BUILD_DIR)/gdb-redhat32-host-01-configure.done
-	$(SET_PKG_PATH) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-redhat32-host
+	$(GDB_ENV) $(MAKE) CC_FOR_BUILD=$(MYBUILD)-gcc -C $(BUILD_DIR)/gdb-redhat32-host
 	@touch $@
 
 
@@ -763,10 +827,13 @@ extract-all: | \
   $(SOURCE_DIR)/lzma-01-extract.done \
   $(SOURCE_DIR)/gmp-01-extract.done \
   $(SOURCE_DIR)/mpfr-01-extract.done \
+  $(SOURCE_DIR)/ffi-01-extract.done \
+  $(SOURCE_DIR)/xxHash-01-extract.done \
+  $(SOURCE_DIR)/arpeggio-01-extract.done \
 
 
 patch-all: | \
-  $(SOURCE_DIR)/pdcurses-02-patch-13-ncurses-mouse-api.done \
+  $(SOURCE_DIR)/pdcurses-02-patch-14-resize-console.done \
   $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done \
 
 
@@ -778,19 +845,20 @@ build-source-highlight: | $(BUILD_DIR)/source-highlight-05-make-install.done
 build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
 build-gmp: | $(BUILD_DIR)/gmp-05-make-install.done
 build-mpfr: | $(BUILD_DIR)/mpfr-05-make-install.done
+build-xxhash: | $(BUILD_DIR)/xxHash-05-install.done
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
-build-gdb-python: | $(BUILD_DIR)/gdb-git-python3-06-licenses.done
+build-gdb-python: | $(BUILD_DIR)/gdb-git-python3-08-licenses.done
 build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done
 
 
 gdb$(BUILD_BITS).7z: | build-gdb
 	@rm -f $@
-	cd $(GDB_DIR)-git && 7z a -mx=9 ../$@ *
+	cd $(GDB_DIR)-git && 7z a -mx=9 -myx ../$@ *
 
 gdb$(BUILD_BITS)-python.7z: | build-gdb-python
 	@rm -f $@
 	find $(GDB_DIR)-git-python3 -type d -name __pycache__ -print0 |xargs -0 rm -rf
-	cd $(GDB_DIR)-git-python3 && 7z a -mx=9 ../$@ *
+	cd $(GDB_DIR)-git-python3 && 7z a -mx=9 -myx ../$@ *
 
 
 package-gdb: gdb$(BUILD_BITS).7z

@@ -1,0 +1,126 @@
+--- a/win32/pdcscrn.c	2021-04-25 17:17:14.374459400 +0200
++++ b/win32/pdcscrn.c	2023-02-05 15:31:13.611666400 +0100
+@@ -360,40 +360,42 @@
+     return OK;
+ }
+ 
+- /* Calls SetConsoleWindowInfo with the given parameters, but fits them 
+-    if a scoll bar shrinks the maximum possible value. The rectangle 
+-    must at least fit in a half-sized window. */
+-
+-static BOOL _fit_console_window(HANDLE con_out, CONST SMALL_RECT *rect)
++static void resize_console_buffer(HANDLE con_out, COORD console_size, COORD buffer_ofs, COORD buffer_size)
+ {
+-    SMALL_RECT run;
+-    SHORT mx, my;
+-
+-    if (SetConsoleWindowInfo(con_out, TRUE, rect))
+-        return TRUE;
+-
+-    run = *rect;
+-    run.Right /= 2;
+-    run.Bottom /= 2;
++    CONSOLE_SCREEN_BUFFER_INFO csbi;
++    SMALL_RECT sr;
+ 
+-    mx = run.Right;
+-    my = run.Bottom;
++    GetConsoleScreenBufferInfo (con_out, &csbi);
+ 
+-    if (!SetConsoleWindowInfo(con_out, TRUE, &run))
+-        return FALSE;
++    if (buffer_size.X > csbi.dwSize.X || buffer_size.Y > csbi.dwSize.Y)
++    {
++        if (buffer_size.X > csbi.dwSize.X)
++            csbi.dwSize.X = buffer_size.X;
++        if (buffer_size.Y > csbi.dwSize.Y)
++            csbi.dwSize.Y = buffer_size.Y;
++        SetConsoleScreenBufferSize (con_out, csbi.dwSize);
++    }
+ 
+-    for (run.Right = rect->Right; run.Right >= mx; run.Right--)
+-        if (SetConsoleWindowInfo(con_out, TRUE, &run))
+-            break;
++    sr.Right = buffer_ofs.X + console_size.X - 1;
++    if (sr.Right >= buffer_size.X)
++        sr.Right = buffer_size.X - 1;
++    sr.Left = sr.Right - (console_size.X - 1);
++
++    sr.Bottom = buffer_ofs.Y + console_size.Y - 1;
++    if (sr.Bottom >= buffer_size.Y)
++        sr.Bottom = buffer_size.Y - 1;
++    sr.Top = sr.Bottom - (console_size.Y - 1);
+ 
+-    if (run.Right < mx)
+-        return FALSE;
++    SetConsoleWindowInfo (con_out, TRUE, &sr);
+ 
+-    for (run.Bottom = rect->Bottom; run.Bottom >= my; run.Bottom--)
+-        if (SetConsoleWindowInfo(con_out, TRUE, &run))
+-            return TRUE;
++    if (buffer_size.X < csbi.dwSize.X || buffer_size.Y < csbi.dwSize.Y)
++        SetConsoleScreenBufferSize (con_out, buffer_size);
++}
+ 
+-    return FALSE;
++static void resize_console(HANDLE con_out, COORD console_size)
++{
++    COORD buffer_ofs = { 0, 0 };
++    resize_console_buffer(con_out, console_size, buffer_ofs, console_size);
+ }
+ 
+ /* the core of resize_term() */
+@@ -422,11 +424,7 @@
+     size.X = rect.Right + 1;
+     size.Y = rect.Bottom + 1;
+ 
+-    _fit_console_window(pdc_con_out, &rect);
+-    SetConsoleScreenBufferSize(pdc_con_out, size);
+-    _fit_console_window(pdc_con_out, &rect);
+-    SetConsoleScreenBufferSize(pdc_con_out, size);
+-    SetConsoleActiveScreenBuffer(pdc_con_out);
++    resize_console(pdc_con_out, size);
+ 
+     return OK;
+ }
+@@ -438,19 +436,11 @@
+     if (is_nt)
+     {
+         COORD bufsize;
+-        SMALL_RECT rect;
+ 
+         bufsize.X = orig_scr.srWindow.Right - orig_scr.srWindow.Left + 1;
+         bufsize.Y = orig_scr.srWindow.Bottom - orig_scr.srWindow.Top + 1;
+ 
+-        rect.Top = rect.Left = 0;
+-        rect.Bottom = bufsize.Y - 1;
+-        rect.Right = bufsize.X - 1;
+-
+-        SetConsoleScreenBufferSize(pdc_con_out, bufsize);
+-        SetConsoleWindowInfo(pdc_con_out, TRUE, &rect);
+-        SetConsoleScreenBufferSize(pdc_con_out, bufsize);
+-        SetConsoleActiveScreenBuffer(pdc_con_out);
++        resize_console(pdc_con_out, bufsize);
+     }
+ 
+     PDC_mouse_set();
+@@ -462,11 +452,14 @@
+ 
+     if (is_nt)
+     {
+-        SetConsoleScreenBufferSize(pdc_con_out, orig_scr.dwSize);
+-        SetConsoleWindowInfo(pdc_con_out, TRUE, &orig_scr.srWindow);
+-        SetConsoleScreenBufferSize(pdc_con_out, orig_scr.dwSize);
+-        SetConsoleWindowInfo(pdc_con_out, TRUE, &orig_scr.srWindow);
+-        SetConsoleActiveScreenBuffer(pdc_con_out);
++        COORD console_size, buffer_ofs;
++
++        console_size.X = orig_scr.srWindow.Right - orig_scr.srWindow.Left + 1;
++        console_size.Y = orig_scr.srWindow.Bottom - orig_scr.srWindow.Top + 1;
++        buffer_ofs.X = orig_scr.srWindow.Left;
++        buffer_ofs.Y = orig_scr.srWindow.Top;
++
++        resize_console_buffer(pdc_con_out, console_size, buffer_ofs, orig_scr.dwSize);
+     }
+ 
+     SetConsoleMode(pdc_con_in, old_console_mode);
