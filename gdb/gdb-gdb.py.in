@@ -389,6 +389,83 @@ class StructDieInfoPrettyPrinter:
             yield name, val
 
 
+class HtabPrettyPrinter:
+    """Pretty-print an object of type struct htab"""
+
+    def __init__(self, val):
+        self.val = val
+
+    def children(self):
+        function_map = {
+            # bfd
+            "hash_file_ptr": "struct ar_cache",
+            "hash_abbrev": "struct abbrev_offset_entry",
+            "hash_asymbol": "asymbol",
+            # gdb/dwarf2
+            "abbrev_cache::hash_table(void const*)": "abbrev_table",
+            "hash_abbrev(void const*)": "abbrev_info",
+            # hash_name_ptr is a lambda
+            "cooked_index::do_finalize()": "cooked_index_entry",
+            "hash_entry(void const*)": "cooked_index_entry",
+            "cache_hash(void const*)": "tailcall_cache",
+            "hash_file_name_entry(void const*)": "quick_file_names",
+            "hash_signatured_type(void const*)": "signatured_type",
+            "hash_type_unit_group(void const*)": "type_unit_group",
+            "cooked_index_storage::hash_cutu_reader(void const*)": "cutu_reader",
+            "line_header_hash_voidp(void const*)": "line_header",
+            "hash_dwo_file(void const*)": "dwo_file",
+            "hash_dwo_unit(void const*)": "dwo_unit",
+            "hash_dwp_loaded_cutus(void const*)": "dwo_unit",
+            "per_cu_offset_and_type_hash(void const*)": "dwarf2_per_cu_offset_and_type",
+            # gdb
+            "hash_symname(void const*)": "symbol",
+            "hash_type_map_instance(void const*)": "type_map_instance",
+            "hash_symbol_error(void const*)": "symbol_error",
+            # entry_hash_func is a lambda
+            "completion_tracker::discard_completions()": "completion_tracker::completion_hash_entry",
+            "tid_and_type_hash(void const*)": "ctf_tid_and_type",
+            "hash_dis_line_entry(void const*)": "dis_line_entry",
+            "elf_gnu_ifunc_cache_hash(void const*)": "elf_gnu_ifunc_cache",
+            "type_pair_hash(void const*)": "type_pair",
+            "hash_bfd(void const*)": "bfd",
+            "hash_value_and_voffset(void const*)": "value_and_voffset",
+            "hash_address_entry(void const*)": "address_entry",
+            "static_link_htab_entry_hash(void const*)": "static_link_htab_entry",
+            "bfcache_hash(void const*)": "btrace_frame_cache",
+            "hash_probe_and_action(void const*)": "probe_and_action",
+            "hash_demangled_name_entry(void const*)": "demangled_name_entry",
+            "hash_typedef_field(void const*)": "decl_field",
+            "hash_varobj(void const*)": "varobj",
+            # libiberty
+            "htab_hash_string": "char",
+            "filename_hash": "char",
+        }
+        name = None
+        block = gdb.current_progspace().block_for_pc(self.val["hash_f"])
+        if block.function is not None:
+            name = block.function.name
+        cast_type = None
+        if name in function_map:
+            cast_type = gdb.lookup_type(function_map[name]).pointer()
+        else:
+            block = block.superblock
+            # hash_f maybe points to a lambda, so check the enclosing functions as well
+            while block is not None:
+                if block.function is not None and block.function.name in function_map:
+                    name = block.function.name
+                    cast_type = gdb.lookup_type(function_map[name]).pointer()
+                    break
+                block = block.superblock
+        entries = self.val["entries"]
+        for i in range(int(self.val["size"])):
+            v = entries[i]
+            if int(v) != 0 and int(v) != 1:
+                if cast_type:
+                    yield "[%d]" % i, v.cast(cast_type)
+                else:
+                    yield "[%d]" % i, v
+
+
 def type_lookup_function(val):
     """A routine that returns the correct pretty printer for VAL
     if appropriate.  Returns None otherwise.
@@ -409,6 +486,8 @@ def type_lookup_function(val):
         return ArrayViewPrettyPrinter(val)
     elif tag == "die_info":
         return StructDieInfoPrettyPrinter(val)
+    elif tag == "htab":
+        return HtabPrettyPrinter(val)
     return None
 
 
