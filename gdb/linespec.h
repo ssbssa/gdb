@@ -32,7 +32,11 @@ enum decode_line_flags
     /* Set this flag if you want "list mode".  In this mode, a
        FILE:LINE linespec will always return a result, and such
        linespecs will not be expanded to all matches.  */
-    DECODE_LINE_LIST_MODE = 2
+    DECODE_LINE_LIST_MODE = 2,
+
+    /* Set this flag if multiple ranges in the same block should not
+       be filtered out.  */
+    DECODE_LINE_MULTIPLE_RANGES_IN_BLOCK = 4,
   };
 
 /* decode_line_full returns a vector of these.  */
