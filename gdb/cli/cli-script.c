@@ -602,7 +602,7 @@ execute_control_command_1 (struct command_line *cmd, int from_tty)
 	  }
 
 	/* Reset RET so that we don't recurse the break all the way down.  */
-	if (ret == break_control)
+	if (ret == break_control || ret == continue_control)
 	  ret = simple_control;
 
 	break;
