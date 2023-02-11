@@ -492,6 +492,8 @@ static bool disconnected_dprintf = true;
 
 static bool plt_breakpoints = false;
 
+static bool multiple_ranges_in_block = false;
+
 struct command_line *
 breakpoint_commands (struct breakpoint *b)
 {
@@ -8917,7 +8919,10 @@ parse_breakpoint_sals (location_spec *locspec,
 	      && strchr ("+-", spec[0]) != NULL
 	      && spec[1] != '['))
 	{
-	  decode_line_full (locspec, DECODE_LINE_FUNFIRSTLINE, NULL,
+	  decode_line_full (locspec, DECODE_LINE_FUNFIRSTLINE
+			    | (multiple_ranges_in_block
+			       ? DECODE_LINE_MULTIPLE_RANGES_IN_BLOCK : 0),
+			    NULL,
 			    get_last_displayed_symtab (),
 			    get_last_displayed_line (),
 			    canonical, NULL, NULL);
@@ -8925,7 +8930,10 @@ parse_breakpoint_sals (location_spec *locspec,
 	}
     }
 
-  decode_line_full (locspec, DECODE_LINE_FUNFIRSTLINE, NULL,
+  decode_line_full (locspec, DECODE_LINE_FUNFIRSTLINE
+		    | (multiple_ranges_in_block
+		       ? DECODE_LINE_MULTIPLE_RANGES_IN_BLOCK : 0),
+		    NULL,
 		    cursal.symtab, cursal.line, canonical, NULL, NULL);
 }
 
@@ -12188,7 +12196,10 @@ code_breakpoint::decode_location_spec (location_spec *locspec,
 
   struct linespec_result canonical;
 
-  decode_line_full (locspec, DECODE_LINE_FUNFIRSTLINE, search_pspace,
+  decode_line_full (locspec, DECODE_LINE_FUNFIRSTLINE
+		    | (multiple_ranges_in_block
+		       ? DECODE_LINE_MULTIPLE_RANGES_IN_BLOCK : 0),
+		    search_pspace,
 		    NULL, 0, &canonical, multiple_symbols_all,
 		    filter.get ());
 
@@ -15293,6 +15304,15 @@ This is useful for formatted output in user-defined commands."));
 Set whether breakpoints are created for plt functions."), _("\
 Show whether breakpoints are created for plt functions."), _("\
 If set, breakpoints are created for plt functions as well."),
+			   NULL,
+			   NULL,
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("multiple-ranges-in-block", no_class,
+			   &multiple_ranges_in_block, _("\
+Set whether multiple ranges are not filtered out for breakpoints."), _("\
+Show whether multiple ranges are not filtered out for breakpoints."), _("\
+If set, all ranges that are found for a source line are used."),
 			   NULL,
 			   NULL,
 			   &setlist, &showlist);
