@@ -163,6 +163,8 @@ struct linespec_state
   /* Nonzero if we are running in 'list' mode; see decode_line_list.  */
   int list_mode;
 
+  bool multiple_ranges_in_block;
+
   /* The 'canonical' value passed to decode_line_full, or NULL.  */
   struct linespec_result *canonical;
 
@@ -2133,17 +2135,20 @@ create_sals_line_offset (struct linespec_state *self,
 					 intermediate_results[i].section);
 	}
 
-      for (i = 0; i < intermediate_results.size (); ++i)
+      if (!self->multiple_ranges_in_block)
 	{
-	  if (blocks[i] != NULL)
-	    for (j = i + 1; j < intermediate_results.size (); ++j)
-	      {
-		if (blocks[j] == blocks[i])
+	  for (i = 0; i < intermediate_results.size (); ++i)
+	    {
+	      if (blocks[i] != NULL)
+		for (j = i + 1; j < intermediate_results.size (); ++j)
 		  {
-		    filter[j] = 0;
-		    break;
+		    if (blocks[j] == blocks[i])
+		      {
+			filter[j] = 0;
+			break;
+		      }
 		  }
-	      }
+	    }
 	}
 
       for (i = 0; i < intermediate_results.size (); ++i)
@@ -2681,6 +2686,8 @@ linespec_state_constructor (struct linespec_state *self,
   self->language = language;
   self->funfirstline = (flags & DECODE_LINE_FUNFIRSTLINE) ? 1 : 0;
   self->list_mode = (flags & DECODE_LINE_LIST_MODE) ? 1 : 0;
+  self->multiple_ranges_in_block
+    = (flags & DECODE_LINE_MULTIPLE_RANGES_IN_BLOCK) != 0;
   self->search_pspace = search_pspace;
   self->default_symtab = default_symtab;
   self->default_line = default_line;
