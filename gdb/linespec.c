@@ -141,6 +141,7 @@ struct linespec_state
       default_line (default_line),
       funfirstline ((flags & DECODE_LINE_FUNFIRSTLINE) != 0),
       list_mode ((flags & DECODE_LINE_LIST_MODE) != 0),
+      multiple_ranges_in_block ((flags & DECODE_LINE_MULTIPLE_RANGES_IN_BLOCK) != 0),
       canonical (canonical)
   {
   }
@@ -181,6 +182,8 @@ struct linespec_state
 
   /* True if we are running in 'list' mode; see decode_line_list.  */
   bool list_mode;
+
+  bool multiple_ranges_in_block;
 
   /* The 'canonical' value passed to decode_line_full, or NULL.  */
   struct linespec_result *canonical;
@@ -2105,17 +2108,20 @@ create_sals_line_offset (struct linespec_state *self,
 					 intermediate_results[i].section);
 	}
 
-      for (i = 0; i < intermediate_results.size (); ++i)
+      if (!self->multiple_ranges_in_block)
 	{
-	  if (blocks[i] != NULL)
-	    for (j = i + 1; j < intermediate_results.size (); ++j)
-	      {
-		if (blocks[j] == blocks[i])
+	  for (i = 0; i < intermediate_results.size (); ++i)
+	    {
+	      if (blocks[i] != NULL)
+		for (j = i + 1; j < intermediate_results.size (); ++j)
 		  {
-		    filter[j] = 0;
-		    break;
+		    if (blocks[j] == blocks[i])
+		      {
+			filter[j] = 0;
+			break;
+		      }
 		  }
-	      }
+	    }
 	}
 
       for (i = 0; i < intermediate_results.size (); ++i)
