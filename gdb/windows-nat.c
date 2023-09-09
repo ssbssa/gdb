@@ -34,6 +34,8 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <winsock2.h>
+#include <ws2ipdef.h>
 #include <windows.h>
 #include <imagehlp.h>
 #ifdef __CYGWIN__
@@ -370,6 +372,8 @@ struct windows_nat_target final : public x86_nat_target<inf_child_target>
   {
     return serial_event_fd (m_wait_event);
   }
+
+  bool info_proc (const char *, enum info_proc_what) override;
 
 private:
 
@@ -2262,6 +2266,333 @@ windows_nat_target::dumpcore (const char *filename)
 
   FreeLibrary (dbghelp);
   CloseHandle (file);
+}
+
+typedef struct
+{
+  USHORT Length;
+  USHORT MaximumLength;
+  PWSTR Buffer;
+}
+UNICODE_STRING;
+
+typedef struct
+{
+  UNICODE_STRING Name;
+  WCHAR NameBuffer[0xffff];
+}
+OBJECT_NAME_INFORMATION;
+
+typedef struct
+{
+  UNICODE_STRING TypeName;
+  ULONG TotalNumberOfObjects;
+  ULONG TotalNumberOfHandles;
+  ULONG TotalPagedPoolUsage;
+  ULONG TotalNonPagedPoolUsage;
+  ULONG TotalNamePoolUsage;
+  ULONG TotalHandleTableUsage;
+  ULONG HighWaterNumberOfObjects;
+  ULONG HighWaterNumberOfHandles;
+  ULONG HighWaterPagedPoolUsage;
+  ULONG HighWaterNonPagedPoolUsage;
+  ULONG HighWaterNamePoolUsage;
+  ULONG HighWaterHandleTableUsage;
+  ULONG InvalidAttributes;
+  GENERIC_MAPPING GenericMapping;
+  ULONG ValidAccessMask;
+  BOOLEAN SecurityRequired;
+  BOOLEAN MaintainHandleCount;
+  UCHAR TypeIndex;
+  CHAR Reserved;
+  ULONG PoolType;
+  ULONG DefaultPagedPoolCharge;
+  ULONG DefaultNonPagedPoolCharge;
+  WCHAR NameBuffer[0xffff];
+}
+OBJECT_TYPE_INFORMATION;
+
+typedef struct
+{
+  PVOID Reserved1;
+  PVOID PebBaseAddress;
+  PVOID Reserved2[2];
+  ULONG_PTR UniqueProcessId;
+  PVOID Reserved3;
+}
+PROCESS_BASIC_INFORMATION;
+
+typedef struct
+{
+  PVOID UniqueProcess;
+  PVOID UniqueThread;
+}
+CLIENT_ID;
+
+typedef DWORD KPRIORITY;
+
+typedef struct
+{
+  LONG ExitStatus;
+  PVOID TebBaseAddress;
+  CLIENT_ID ClientId;
+  KAFFINITY AffinityMask;
+  KPRIORITY Priority;
+  KPRIORITY BasePriority;
+}
+THREAD_BASIC_INFORMATION;
+
+typedef enum
+{
+  ObjectNameInformation=1,
+  ObjectTypeInformation=2,
+}
+OBJECT_INFORMATION_CLASS;
+
+typedef enum
+{
+  ProcessBasicInformation=0,
+}
+PROCESSINFOCLASS;
+
+typedef enum
+{
+  ThreadBasicInformation,
+}
+THREADINFOCLASS;
+
+typedef struct
+{
+  union
+    {
+      NTSTATUS Status;
+      PVOID Pointer;
+    };
+  ULONG_PTR Information;
+}
+IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+
+#define IOCTL_AFD_GET_SOCK_NAME 0x1202f
+#define IOCTL_AFD_GET_PEER_NAME 0x1203f
+
+typedef LONG NTAPI func_NtQueryObject
+(HANDLE, OBJECT_INFORMATION_CLASS, PVOID, ULONG, PULONG);
+typedef LONG NTAPI func_NtQueryInformationProcess
+(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
+typedef LONG NTAPI func_NtQueryInformationThread
+(HANDLE, THREADINFOCLASS, PVOID, ULONG, PULONG);
+typedef LONG NTAPI func_NtDeviceIoControlFile
+(HANDLE, HANDLE, PVOID, PVOID, PIO_STATUS_BLOCK, DWORD,
+ PVOID, DWORD, PVOID, DWORD);
+
+static gdb::unique_xmalloc_ptr<char>
+convert_unicode_string (const UNICODE_STRING *us)
+{
+  if (us->Length == 0)
+    return nullptr;
+
+  us->Buffer[us->Length / 2] = 0;
+
+  int needed = WideCharToMultiByte (CP_ACP, 0, us->Buffer, -1, nullptr, 0,
+				    nullptr, nullptr);
+  if (needed == 0)
+    return nullptr;
+
+  BOOL used_default = FALSE;
+  gdb::unique_xmalloc_ptr<char> mb ((char *) xmalloc (needed));
+  if (WideCharToMultiByte (CP_ACP, 0, us->Buffer, -1,
+			   mb.get (), needed,
+			   nullptr, &used_default) != needed)
+    return nullptr;
+
+  return mb;
+}
+
+static gdb::unique_xmalloc_ptr<char>
+get_socket_info (HANDLE h, func_NtDeviceIoControlFile *fNtDeviceIoControlFile,
+		 DWORD controlCode)
+{
+  union full_sockaddr
+    {
+      struct sockaddr_in sa;
+      struct sockaddr_in6 sa6;
+    };
+  full_sockaddr fsa;
+  fsa.sa.sin_family = 0;
+  HANDLE ev = CreateEvent (NULL, TRUE, FALSE, NULL);
+  IO_STATUS_BLOCK IoStatusBlock;
+  NTSTATUS ret = fNtDeviceIoControlFile
+    (h, ev, NULL, NULL, &IoStatusBlock,
+     controlCode, NULL, 0, &fsa, sizeof(fsa));
+  if(ret == STATUS_PENDING)
+    {
+      WaitForSingleObject (ev, INFINITE);
+      ret = IoStatusBlock.Status;
+    }
+  if (ev)
+    CloseHandle(ev);
+  if (ret == 0)
+    {
+      if (fsa.sa.sin_family == AF_INET)
+	return xstrprintf
+	  ("%d.%d.%d.%d:%d",
+	   fsa.sa.sin_addr.S_un.S_un_b.s_b1, fsa.sa.sin_addr.S_un.S_un_b.s_b2,
+	   fsa.sa.sin_addr.S_un.S_un_b.s_b3, fsa.sa.sin_addr.S_un.S_un_b.s_b4,
+	   (fsa.sa.sin_port >> 8) | ((fsa.sa.sin_port & 0xff) << 8));
+      else if (fsa.sa.sin_family == AF_INET6)
+	return xstrprintf
+	  ("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:"
+	   "%02x%02x:%02x%02x:%02x%02x:%02x%02x]:%d",
+	   fsa.sa6.sin6_addr.s6_addr[0], fsa.sa6.sin6_addr.s6_addr[1],
+	   fsa.sa6.sin6_addr.s6_addr[2], fsa.sa6.sin6_addr.s6_addr[3],
+	   fsa.sa6.sin6_addr.s6_addr[4], fsa.sa6.sin6_addr.s6_addr[5],
+	   fsa.sa6.sin6_addr.s6_addr[6], fsa.sa6.sin6_addr.s6_addr[7],
+	   fsa.sa6.sin6_addr.s6_addr[8], fsa.sa6.sin6_addr.s6_addr[9],
+	   fsa.sa6.sin6_addr.s6_addr[10], fsa.sa6.sin6_addr.s6_addr[11],
+	   fsa.sa6.sin6_addr.s6_addr[12], fsa.sa6.sin6_addr.s6_addr[13],
+	   fsa.sa6.sin6_addr.s6_addr[14], fsa.sa6.sin6_addr.s6_addr[15],
+	   (fsa.sa6.sin6_port >> 8) | ((fsa.sa6.sin6_port & 0xff) << 8));
+    }
+
+  return NULL;
+}
+
+bool
+windows_nat_target::info_proc (const char *args, enum info_proc_what what)
+{
+  if (args && args[0])
+    return false;
+  if (inferior_ptid == null_ptid)
+    return false;
+
+  if (what != IP_FILES)
+    return false;
+
+  DWORD handle_count = 0;
+  if (!GetProcessHandleCount (windows_process.handle, &handle_count))
+    return false;
+
+  HMODULE ntdll = GetModuleHandle ("ntdll.dll");
+  if (!ntdll)
+    return false;
+
+  func_NtQueryObject *fNtQueryObject =
+    (func_NtQueryObject *) GetProcAddress (ntdll, "NtQueryObject");
+  if (!fNtQueryObject)
+    return false;
+
+  func_NtQueryInformationProcess *fNtQueryInformationProcess =
+    (func_NtQueryInformationProcess *) GetProcAddress
+    (ntdll, "NtQueryInformationProcess");
+  func_NtQueryInformationThread *fNtQueryInformationThread =
+    (func_NtQueryInformationThread *) GetProcAddress
+    (ntdll, "NtQueryInformationThread");
+  func_NtDeviceIoControlFile *fNtDeviceIoControlFile =
+    (func_NtDeviceIoControlFile *) GetProcAddress
+    (ntdll, "NtDeviceIoControlFile");
+
+  PROCESS_BASIC_INFORMATION pbi;
+  THREAD_BASIC_INFORMATION tbi;
+
+  std::unique_ptr<OBJECT_NAME_INFORMATION> oni (new OBJECT_NAME_INFORMATION);
+  std::unique_ptr<OBJECT_TYPE_INFORMATION> oti (new OBJECT_TYPE_INFORMATION);
+
+  unsigned found = 0;
+  for (unsigned i = 0; found < handle_count && i < 100000; i++)
+    {
+      HANDLE dup;
+      unsigned val = (i + 1) * 4;
+      if (DuplicateHandle (windows_process.handle, (HANDLE) (uintptr_t) val,
+			   GetCurrentProcess(), &dup, 0, FALSE,
+			   DUPLICATE_SAME_ACCESS))
+	{
+	  found++;
+
+	  ULONG len;
+	  gdb::unique_xmalloc_ptr<char> object_type_name, object_name;
+	  if(!fNtQueryObject (dup, ObjectTypeInformation, oti.get (),
+			      sizeof(OBJECT_TYPE_INFORMATION), &len))
+	    object_type_name = convert_unicode_string (&oti->TypeName);
+	  if (!fNtQueryObject (dup, ObjectNameInformation, oni.get (),
+			       sizeof(OBJECT_NAME_INFORMATION), &len))
+	    object_name = convert_unicode_string (&oni->Name);
+
+	  if (fNtDeviceIoControlFile && object_type_name && object_name
+	      && !strcmp (object_type_name.get (), "File")
+	      && !strcmp (object_name.get (), "\\Device\\Afd"))
+	    {
+	      gdb::unique_xmalloc_ptr<char> local = get_socket_info
+		(dup, fNtDeviceIoControlFile, IOCTL_AFD_GET_SOCK_NAME);
+	      gdb::unique_xmalloc_ptr<char> remote = get_socket_info
+		(dup, fNtDeviceIoControlFile, IOCTL_AFD_GET_PEER_NAME);
+	      if (local && remote)
+		object_name = xstrprintf ("socket: local=%s, remote=%s",
+					  local.get (), remote.get ());
+	      else if (local)
+		object_name = xstrprintf ("socket: local=%s", local.get ());
+	      else if (remote)
+		object_name = xstrprintf ("socket: remote=%s", remote.get ());
+	    }
+
+	  CloseHandle(dup);
+
+	  if (object_type_name)
+	    {
+	      if (!object_name)
+		{
+		  if (fNtQueryInformationProcess
+		      && !strcmp (object_type_name.get (), "Process"))
+		    {
+		      if (DuplicateHandle (windows_process.handle,
+					   (HANDLE) (uintptr_t) val,
+					   GetCurrentProcess(), &dup,
+					   PROCESS_QUERY_INFORMATION, FALSE,
+					   0))
+			{
+			  if (!fNtQueryInformationProcess
+			      (dup, ProcessBasicInformation,
+			       &pbi, sizeof(pbi), &len))
+			    object_name = xstrprintf
+			      ("%d", (int) pbi.UniqueProcessId);
+			  CloseHandle(dup);
+			}
+		    }
+		  else if (fNtQueryInformationThread
+			   && !strcmp (object_type_name.get (), "Thread"))
+		    {
+		      if (DuplicateHandle (windows_process.handle,
+					   (HANDLE) (uintptr_t) val,
+					   GetCurrentProcess(), &dup,
+					   THREAD_QUERY_INFORMATION, FALSE,
+					   0))
+			{
+			  if (!fNtQueryInformationThread
+			      (dup, ThreadBasicInformation,
+			       &tbi, sizeof(tbi), &len))
+			    object_name = xstrprintf
+			      ("%d/%d",
+			       (int) (uintptr_t) tbi.ClientId.UniqueThread,
+			       (int) (uintptr_t) tbi.ClientId.UniqueProcess);
+			  CloseHandle(dup);
+			}
+		    }
+		}
+
+	      gdb_printf ("  %5u %16s", val, object_type_name.get ());
+	      if (object_name)
+		gdb_printf (" %s", object_name.get ());
+	      gdb_printf ("\n");
+	    }
+	}
+      else if (GetLastError () != ERROR_INVALID_HANDLE)
+	{
+	  /* The handle can't be duplicated, but it does exist, so it's part
+	     of handle_count.  */
+	  found++;
+	}
+    }
+
+  return true;
 }
 
 /* Try to set or remove a user privilege to the current process.  Return -1
