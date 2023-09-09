@@ -252,6 +252,10 @@ struct windows_nat_target : public inf_child_target
 
   void debug_registers_changed_all_threads ();
 
+#ifndef __CYGWIN__
+  bool info_proc (const char *, enum info_proc_what) override;
+#endif
+
 protected:
 
   /* Initialize arch-specific data for a new inferior (debug registers,
