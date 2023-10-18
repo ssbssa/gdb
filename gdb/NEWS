@@ -353,6 +353,9 @@ show tui mouse-events
   ** New method gdb.Frame.static_link that returns the outer frame
      of a nested function frame.
 
+  ** New read/write attribute gdb.Value.bytes that contains a bytes
+     object holding the contents of this value.
+
 *** Changes in GDB 13
 
 * MI version 1 is deprecated, and will be removed in GDB 14.
