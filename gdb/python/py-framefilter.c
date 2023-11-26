@@ -1144,7 +1144,7 @@ gdbpy_apply_frame_filter (const struct extension_language_defn *extlang,
   struct gdbarch *gdbarch = NULL;
   enum ext_lang_bt_status success = EXT_LANG_BT_ERROR;
 
-  if (!gdb_python_initialized)
+  if (gdb_python_module == NULL)
     return EXT_LANG_BT_NO_FILTERS;
 
   try

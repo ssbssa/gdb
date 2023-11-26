@@ -799,6 +799,9 @@ pyuw_sniffer (const struct frame_unwind *self, frame_info_ptr this_frame,
 {
   PYUW_SCOPED_DEBUG_ENTER_EXIT;
 
+  if (gdb_python_module == NULL)
+    return 0;
+
   struct gdbarch *gdbarch = (struct gdbarch *) (self->unwind_data);
   cached_frame_info *cached_frame;
 

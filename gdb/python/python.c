@@ -2511,7 +2511,10 @@ static void
 gdbpy_initialize (const struct extension_language_defn *extlang)
 {
   if (!do_start_initialization () && PyErr_Occurred ())
-    gdbpy_print_stack ();
+    {
+      gdbpy_print_stack ();
+      return;
+    }
 
   gdbpy_enter enter_py;
 
