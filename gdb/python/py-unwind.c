@@ -852,6 +852,9 @@ frame_unwind_python::sniff (const frame_info_ptr &this_frame,
 {
   PYUW_SCOPED_DEBUG_ENTER_EXIT;
 
+  if (gdb_python_module == NULL)
+    return 0;
+
   struct gdbarch *gdbarch = (struct gdbarch *) (this->unwind_data ());
   cached_frame_info *cached_frame;
 
