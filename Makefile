@@ -138,7 +138,7 @@ GDB_GIT_CONF=$(GDB_GIT_DIR)/configure \
 	 --with-liblzma-prefix=$(GDB_LIBS) \
 	 --with-xxhash \
 	 --disable-install-libbfd --disable-install-libiberty \
-	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
+	 --disable-binutils --disable-gas --disable-gprof --disable-ld --disable-sim \
 	 --with-pkgversion=$(MYPKG)
 GDB_TEST_CONF=/c/src/repos/gdb-testsuite/configure \
 	 --build=$(MYBUILD) --host=$(MYTARGET) --target=$(MYTARGET) \
@@ -341,7 +341,11 @@ $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done: | $(SOURCE_DIR)/so
 	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p1 <patches/source-hightlight/Remove-throw-specifications.patch
 	@touch $@
 
-$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done $(BUILD_DIR)/boost-03-regex.done
+$(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done: | $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done
+	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p1 <patches/source-hightlight/Add-heuristic-to-handle-long-lines-better.patch
+	@touch $@
+
+$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done $(BUILD_DIR)/boost-03-regex.done
 	@mkdir -p $(BUILD_DIR)/source-highlight
 	cd $(BUILD_DIR)/source-highlight && $(SOURCE_HIGHLIGHT_CONF)
 	@touch $@
@@ -712,7 +716,7 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 
 $(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python3
-	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib --enable-targets=all
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-configure.done
@@ -834,7 +838,7 @@ extract-all: | \
 
 patch-all: | \
   $(SOURCE_DIR)/pdcurses-02-patch-14-resize-console.done \
-  $(SOURCE_DIR)/source-highlight-02-patch-02-remove-throw.done \
+  $(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done \
 
 
 build-expat: | $(BUILD_DIR)/expat-05-make-install.done

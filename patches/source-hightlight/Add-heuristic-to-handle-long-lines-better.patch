@@ -1,0 +1,277 @@
+From 7d53bc7510824d36d10457a96d31a35e8c35aafd Mon Sep 17 00:00:00 2001
+From: Tom de Vries <tdevries@suse.de>
+Date: Tue, 10 Oct 2023 10:17:02 +0200
+Subject: [PATCH] Add heuristic to handle long lines better
+
+PR64747 describes a case where long lines in a c++ source file make
+source-highlight run longer than 2m13s.
+
+The problem is that some regexps are unanchored, and consequently run to the
+end of the long lines.
+
+Fix this by adding a heuristic that does the rule matching in two phases:
+- anchored: add a "\\A[[:blank:]]*" prefix to the regexp.  If the rule
+  matching yields a best-possible result, the next phase case be skipped.
+- unanchored: use the regexp as is, be that anchored or unanchored.
+
+This brings executing time down to 3s.
+
+Written on top of commit e4cf32d ("Modernize configure.ac") due to PR64764
+( https://savannah.gnu.org/bugs/?64764 ).
+
+I've also added lines to all the touched files to specify file local variable
+values for emacs to make editing less painful.
+
+Tested on x86_64-linux.  Tested using:
+- make check, and
+- comparing output for the test-case with and without the patch.
+
+Bug: https://savannah.gnu.org/bugs/?64747
+---
+ lib/srchilite/highlightrule.cpp      |  5 +-
+ lib/srchilite/highlightrule.h        |  5 +-
+ lib/srchilite/highlightstate.cpp     | 75 +++++++++++++++++++++-------
+ lib/srchilite/regexhighlightrule.cpp | 22 +++++---
+ lib/srchilite/regexhighlightrule.h   |  4 +-
+ 5 files changed, 81 insertions(+), 30 deletions(-)
+
+diff --git a/lib/srchilite/highlightrule.cpp b/lib/srchilite/highlightrule.cpp
+index b582a4c..c73622b 100644
+--- a/lib/srchilite/highlightrule.cpp
++++ b/lib/srchilite/highlightrule.cpp
+@@ -1,3 +1,4 @@
++// -*- tab-width:4 indent-tabs-mode:nil c-basic-offset:4 -*-
+ //
+ // Author: Lorenzo Bettini <http://www.lorenzobettini.it>, (C) 2004-2008
+ //
+@@ -32,8 +33,8 @@ void HighlightRule::addElem(const std::string &name) {
+ }
+ 
+ bool HighlightRule::tryToMatch(const std::string &s, HighlightToken &token,
+-        const MatchingParameters &params) {
+-    return tryToMatch(s.begin(), s.end(), token, params);
++        const MatchingParameters &params, bool anchored) {
++    return tryToMatch(s.begin(), s.end(), token, params, anchored);
+ }
+ 
+ }
+diff --git a/lib/srchilite/highlightrule.h b/lib/srchilite/highlightrule.h
+index a99e493..9e1a30a 100644
+--- a/lib/srchilite/highlightrule.h
++++ b/lib/srchilite/highlightrule.h
+@@ -1,3 +1,4 @@
++// -*- tab-width:4 indent-tabs-mode:nil c-basic-offset:4 -*-
+ //
+ // Author: Lorenzo Bettini <http://www.lorenzobettini.it>, (C) 2004-2008
+ //
+@@ -72,7 +73,7 @@ public:
+      * @return the result of this matching
+      */
+     virtual bool tryToMatch(const std::string &s, HighlightToken &token,
+-            const MatchingParameters &params);
++            const MatchingParameters &params, bool anchored = false);
+ 
+     /**
+      * Try to match this rule against the passed string
+@@ -85,7 +86,7 @@ public:
+      */
+     virtual bool tryToMatch(std::string::const_iterator start,
+             std::string::const_iterator end, HighlightToken &token,
+-            const MatchingParameters &params) = 0;
++            const MatchingParameters &params, bool anchored = false) = 0;
+ 
+     virtual const std::string toString() const = 0;
+ 
+diff --git a/lib/srchilite/highlightstate.cpp b/lib/srchilite/highlightstate.cpp
+index ec9148f..c86d52e 100644
+--- a/lib/srchilite/highlightstate.cpp
++++ b/lib/srchilite/highlightstate.cpp
+@@ -1,3 +1,4 @@
++// -*- tab-width:4 indent-tabs-mode:nil c-basic-offset:4 -*-
+ //
+ // Author: Lorenzo Bettini <http://www.lorenzobettini.it>, (C) 2004-2008
+ //
+@@ -53,27 +54,65 @@ bool HighlightState::findBestMatch(std::string::const_iterator start,
+     const HighlightRule *bestMatchingRule = 0;
+     HighlightRule *currentRule = 0;
+     bool first = true;
+-
+-    for (RuleList::const_iterator it = ruleList.begin(); it != ruleList.end(); ++it) {
+-        currentRule = (*it).get();
+-        tempToken.clearMatched();
+-
+-        if (currentRule->tryToMatch(start, end, tempToken, params)) {
+-            if (first || betterThan(tempToken, bestToken)) {
+-                // the first one, it's always the best
+-                if (first) {
+-                    first = false;
+-                }
+-                bestToken.copyFrom(tempToken);
+-                bestMatchingRule = currentRule;
+-
+-                // if we matched something with no prefix (or only spaces)...
+-                if (tempToken.prefixOnlySpaces) {
+-                    // ...don't try any other rule
+-                    break;
++    bool foundBestPossible = false;
++
++    // The strategy used by source-highlight is to select the first matching
++    // rule:
++    // - with empty prefix (or prefix containing only space characters, i.e.,
++    //   spaces or tabs), or
++    // - with the smallest prefix.
++    //
++    // The simplest implementation of this is to try rules in order, keeping
++    // track of the best-match-sofar, and stopping iteration once the
++    // best-match-possible is reached.
++    //
++    // The regexps of the rules can be unanchored though, and for long lines
++    // this can become very slow.
++    //
++    // So, we use a heuristic to avoid unanchored search, if we can, by
++    // searching in two phases:
++    // - anchored == true: we force an anchored search by prefixing the regexp
++    //   with "\\A[[:blank:]]*".  The "\\A" matches the start of the buffer, the
++    //   "[[:blank:]]" matches the spaces or tabs part.  If a match is found
++    //   with no prefix, then then the next phase can be skipped.
++    // - anchored == false: we search with the unmodified regexp, which may or
++    //   may not be anchored.
++
++    for (bool anchored : { true, false }) {
++        for (RuleList::const_iterator it = ruleList.begin(); it != ruleList.end(); ++it) {
++            currentRule = (*it).get();
++            tempToken.clearMatched();
++
++            if (currentRule->tryToMatch(start, end, tempToken, params, anchored)) {
++                if (first || betterThan(tempToken, bestToken)) {
++                    // the first one, it's always the best
++                    if (first) {
++                        first = false;
++                    }
++                    bestToken.copyFrom(tempToken);
++                    bestMatchingRule = currentRule;
++
++                    // if we matched something with no prefix (or only spaces)...
++                    if (tempToken.prefixOnlySpaces) {
++                        // ...don't try any other rule
++                        foundBestPossible = true;
++                        break;
++                    }
+                 }
+             }
+         }
++
++        if (anchored && foundBestPossible) {
++            // We found the best possible match using the anchored regexp, so
++            // we're done, no need to try the unanchored case.
++            break;
++        }
++
++        if (anchored) {
++            // We reset the bestToken sofar, to make sure the the order
++            // between rules is respected.
++            first = true;
++        }
+     }
+ 
+     if (!first) {
+diff --git a/lib/srchilite/regexhighlightrule.cpp b/lib/srchilite/regexhighlightrule.cpp
+index 458e63f..1f4ff83 100644
+--- a/lib/srchilite/regexhighlightrule.cpp
++++ b/lib/srchilite/regexhighlightrule.cpp
+@@ -1,3 +1,4 @@
++// -*-  tab-width:4 indent-tabs-mode:nil c-basic-offset:4 -*-
+ //
+ // Author: Lorenzo Bettini <http://www.lorenzobettini.it>, (C) 2004-2008
+ //
+@@ -18,15 +19,14 @@ namespace srchilite {
+ /// the only spaces regular expression
+ static boost::regex onlySpaces("[[:blank:]]*");
+ 
+-RegexHighlightRule::RegexHighlightRule(const std::string &s) :
+-    regExp(s) {
+-
++RegexHighlightRule::RegexHighlightRule(const std::string &s) {
++    setRegExp(s);
+ }
+ 
+ RegexHighlightRule::RegexHighlightRule(const std::string &name,
+         const std::string &s) :
+-    HighlightRule(name), regExp(s) {
+-
++    HighlightRule(name) {
++    setRegExp(s);
+ }
+ 
+ RegexHighlightRule::~RegexHighlightRule() {
+@@ -34,7 +34,7 @@ RegexHighlightRule::~RegexHighlightRule() {
+ 
+ bool RegexHighlightRule::tryToMatch(std::string::const_iterator start,
+         std::string::const_iterator end, HighlightToken &token,
+-        const MatchingParameters &params) {
++        const MatchingParameters &params, bool anchored) {
+     boost::smatch match;
+     boost::match_flag_type flags = boost::match_default;
+ 
+@@ -46,7 +46,13 @@ bool RegexHighlightRule::tryToMatch(std::string::const_iterator start,
+         flags |= boost::match_not_bol;
+     }
+ 
+-    if (boost::regex_search(start, end, match, regExp, flags)) {
++    bool found = boost::regex_search(start, end, match, anchored ? anchoredRegExp : regExp, flags);
++    if (found && anchored) {
++        // Search again using the unanchored regexp to get the prefix right.
++        found = boost::regex_search(start, end, match, regExp, flags);
++    }
++
++    if (found) {
+         token.prefix = match.prefix();
+         token.suffix = match.suffix();
+ 
+@@ -82,6 +88,7 @@ const std::string RegexHighlightRule::toString() const {
+ 
+ void RegexHighlightRule::replaceReferences(const ReplacementList &rep) {
+     regExp.assign(RegexPreProcessor::replace_references(regExp.str(), rep));
++    anchoredRegExp.assign(RegexPreProcessor::replace_references(anchoredRegExp.str(), rep));
+ }
+ 
+ HighlightRule *RegexHighlightRule::clone() {
+@@ -90,6 +97,7 @@ HighlightRule *RegexHighlightRule::clone() {
+ 
+ void RegexHighlightRule::setRegExp(const std::string &s) {
+     regExp.assign(s);
++    anchoredRegExp.assign ("\\A[[:blank:]]*" + s);
+ }
+ 
+ }
+diff --git a/lib/srchilite/regexhighlightrule.h b/lib/srchilite/regexhighlightrule.h
+index d39614b..f3a8a2e 100644
+--- a/lib/srchilite/regexhighlightrule.h
++++ b/lib/srchilite/regexhighlightrule.h
+@@ -1,3 +1,4 @@
++// -*- tab-width:4 indent-tabs-mode:nil c-basic-offset:4 -*-
+ //
+ // Author: Lorenzo Bettini <http://www.lorenzobettini.it>, (C) 2004-2008
+ //
+@@ -19,6 +20,7 @@ namespace srchilite {
+ class RegexHighlightRule : public HighlightRule {
+     /// the regular expression for the rule
+     boost::regex regExp;
++    boost::regex anchoredRegExp;
+ public:
+     /**
+      * @param s the string representing the regular expression
+@@ -34,7 +36,7 @@ public:
+ 
+     virtual bool tryToMatch(std::string::const_iterator start,
+             std::string::const_iterator end, HighlightToken &token,
+-            const MatchingParameters &params);
++            const MatchingParameters &params, bool anchored = false);
+ 
+     virtual const std::string toString() const;
+ 
+
+base-commit: e4cf32db1ce3f0a7edb32caf131b2f45753cdf58
+-- 
+2.35.3
+
