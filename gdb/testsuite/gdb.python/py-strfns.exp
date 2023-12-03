@@ -44,6 +44,20 @@ proc test_all_strfns { } {
     gdb_test {p $_regex (str1, "Help")} " = 0"
     gdb_test {p $_regex (str1, "^Hello")} " = 1"
     gdb_test {p $_regex (str1, "^Hello.$")} " = 1"
+
+    foreach_with_prefix charset {CP1252 UTF-8 ASCII} {
+	gdb_test_no_output "set target-charset $charset"
+
+	gdb_test "p \$_strlen (str4)" " = 3"
+	gdb_test "p \$_strlen (str5)" " = 1"
+
+	gdb_test {p $_streq (str1, str4)} " = 0"
+	gdb_test {p $_streq (str5, "test")} " = 0"
+	gdb_test {p $_streq (str5, "\xff")} " = 1"
+	gdb_test {p $_streq (str1, "\xff")} " = 0"
+
+	gdb_test {p $_regex (str4, ".\x95")} " = 1"
+    }
 }
 
 test_all_strfns
