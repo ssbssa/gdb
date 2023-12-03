@@ -18,6 +18,8 @@
 const char str1[] = "Hello.";
 const char str2[] = "Hello.";
 const char str3[] = "Goodbye.";
+const char str4[] = "\xed\x95\x9c";
+const char str5[] = "\xff";
 
 const char buf1[] = { 0, 1, 2, 3 };
 const char buf2[] = { 0, 1, 2, 3 };
