@@ -44,6 +44,17 @@ class _MemEq(gdb.Function):
         return a_ptr.dereference() == b_ptr.dereference()
 
 
+def char_as_ascii_string(a):
+    t = a.type.strip_typedefs()
+    if (
+        t.code in [gdb.TYPE_CODE_ARRAY, gdb.TYPE_CODE_PTR]
+        and t.target().strip_typedefs().name == "char"
+    ):
+        return a.string(encoding="ascii", errors="surrogateescape")
+    else:
+        return a.string(errors="surrogateescape")
+
+
 class _StrLen(gdb.Function):
     """$_strlen - compute string length.
 
@@ -56,7 +67,7 @@ class _StrLen(gdb.Function):
         super(_StrLen, self).__init__("_strlen")
 
     def invoke(self, a):
-        s = a.string()
+        s = char_as_ascii_string(a)
         return len(s)
 
 
@@ -76,7 +87,7 @@ class _StrEq(gdb.Function):
         super(_StrEq, self).__init__("_streq")
 
     def invoke(self, a, b):
-        return a.string() == b.string()
+        return char_as_ascii_string(a) == char_as_ascii_string(b)
 
 
 class _RegEx(gdb.Function):
@@ -92,8 +103,8 @@ class _RegEx(gdb.Function):
         super(_RegEx, self).__init__("_regex")
 
     def invoke(self, string, regex):
-        s = string.string()
-        r = re.compile(regex.string())
+        s = char_as_ascii_string(string)
+        r = re.compile(char_as_ascii_string(regex))
         return bool(r.match(s))
 
 
