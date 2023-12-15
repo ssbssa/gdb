@@ -53,7 +53,7 @@ proc_with_prefix test_data_directory { } {
     gdb_test_multiple "show data-directory" \
 	"find the initial data-directory value" {
 	    -re -wrap "GDB's data directory is \"(\[^\r\n\]+)\"\\." {
-		set dd $expect_out(1,string)
+		set dd [string_to_regexp $expect_out(1,string)]
 		pass $gdb_test_name
 	    }
 	}
