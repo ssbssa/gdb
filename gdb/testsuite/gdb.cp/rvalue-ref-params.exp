@@ -42,6 +42,7 @@ gdb_test "print f1(static_cast<Child&&>(Q))" ".* = 40.*" $t
 
 gdb_test "print f3(static_cast<int&&> (global_int))" " = 8"
 gdb_test "print f4(static_cast<float&&> (global_float))" " = 3"
+gdb_test "print f3(10)" " = 11"
 
 gdb_test "print static_cast<int&> (global_int)" " = \\(int &\\) @$hex: 7"
 gdb_test "print static_cast<int&&> (global_int)" " = \\(int &&\\) @$hex: 7"
