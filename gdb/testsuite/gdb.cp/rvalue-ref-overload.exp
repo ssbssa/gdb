@@ -64,7 +64,6 @@ gdb_test "print f (i)" "1" "lvalue reference overload"
 
 gdb_test "print f (ci)" "2" "lvalue reference to const overload"
 
-setup_kfail "c++/15372" "*-*-*"
 gdb_test "print f (3)" "3" "rvalue reference overload"
 
 gdb_test "print g (i)" \
