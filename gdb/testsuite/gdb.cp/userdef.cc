@@ -68,6 +68,9 @@ A1 operator++(int);
 A1 operator--(); 
 A1 operator--(int);
 
+int operator()();
+int operator()(int);
+
 };
 
 
@@ -293,6 +296,16 @@ ostream& operator<<(ostream& outs, A1 one)
  return (outs << endl << "x = " << one.x << endl << "y = " << one.y << endl << "-------" << endl); 
 }
 
+int A1::operator()()
+{
+  return x + y;
+}
+
+int A1::operator()(int value)
+{
+  return value * (x + y);
+}
+
 class A2 {
   public:
 A2 operator+();
@@ -403,6 +416,11 @@ int main (void)
  cout << "predec " << three;
  ++three;
  cout << "preinc " << three;
+
+ val = two();
+ cout << "funcall " << val << endl;
+ val = two(10);
+ cout << "funcall 2 " << val << endl;
 
  (*c).z = 1;
 

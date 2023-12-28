@@ -703,6 +703,18 @@ var_value_operation::evaluate_funcall (struct type *expect_type,
   value *callee = evaluate_var_value (noside, std::get<0> (m_storage).block,
 				      symp);
 
+  /* If the callee is a struct, there might be a user-defined function call
+     operator that should be used instead.  */
+  if (check_typedef (callee->type ())->code () == TYPE_CODE_STRUCT)
+    {
+      argvec.insert (argvec.begin(), value_addr (callee));
+      int static_memfuncp;
+      find_overload_match (argvec, "operator()", METHOD, &argvec[0], nullptr,
+			   &callee, nullptr, &static_memfuncp, 0, noside);
+      if (static_memfuncp)
+	argvec.erase (argvec.begin ());
+    }
+
   return evaluate_subexp_do_call (exp, noside, callee, argvec,
 				  nullptr, expect_type);
 }

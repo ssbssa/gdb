@@ -119,6 +119,9 @@ gdb_test "print one += 7" "\\\$\[0-9\]* = {x = 9, y = 10}"
 
 gdb_test "print two = one" "\\\$\[0-9\]* = {x = 9, y = 10}"
 
+gdb_test "print two()" " = 19"
+gdb_test "print two(10)" " = 190"
+
 # Check that GDB tolerates whitespace in operator names.
 gdb_test "break A2::operator+" ".*Breakpoint $decimal at.*"
 gdb_test "break A2::operator +" ".*Breakpoint $decimal at.*"
