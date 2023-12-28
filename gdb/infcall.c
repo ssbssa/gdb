@@ -209,10 +209,21 @@ value_arg_coerce (struct gdbarch *gdbarch, struct value *arg,
 	  return value_cast_pointers (type, arg, 0);
 
 	/* Cast the value to the reference's target type, and then
-	   convert it back to a reference.  This will issue an error
-	   if the value was not previously in memory - in some cases
-	   we should clearly be allowing this, but how?  */
+	   convert it back to a reference.  */
 	new_value = value_cast (type->target_type (), arg);
+
+	/* If the value is still not in memory, cast it to an array of 1
+	   element, since only strings and arrays are coerced to target
+	   memory.  */
+	if (arg->lval () == not_lval)
+	  {
+	    struct type *array_type
+	      = lookup_array_range_type (arg->type (), 0, 0);
+	    new_value = value_cast (array_type, new_value);
+	    new_value = value_coerce_to_target (new_value);
+	    new_value = value_ind (new_value);
+	  }
+
 	new_value = value_ref (new_value, type->code ());
 	return new_value;
       }
