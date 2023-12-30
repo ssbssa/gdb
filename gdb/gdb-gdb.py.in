@@ -252,6 +252,56 @@ class StructFieldPrettyPrinter:
             yield "m_loc", "???"
 
 
+class CplusStructTypePrettyPrinter:
+    """Pretty-print an object of type struct cplus_struct_type"""
+
+    def __init__(self, val):
+        self.val = val
+
+    def children(self):
+        for f in self.val.type.fields():
+            name = f.name
+            val = self.val[f]
+            if name == "fn_fieldlists" and self.val["nfn_fields"] > 1:
+                val = (
+                    val[0]
+                    .address.cast(
+                        val.type.target().array(self.val["nfn_fields"] - 1).pointer()
+                    )
+                    .dereference()
+                )
+            elif name == "template_arguments" and self.val["n_template_arguments"] > 1:
+                val = (
+                    val[0]
+                    .address.cast(
+                        val.type.target().array(self.val["n_template_arguments"] - 1).pointer()
+                    )
+                    .dereference()
+                )
+            yield name, val
+
+
+class StructFnFieldlistPrettyPrinter:
+    """Pretty-print an object of type struct fn_fieldlist"""
+
+    def __init__(self, val):
+        self.val = val
+
+    def children(self):
+        for f in self.val.type.fields():
+            name = f.name
+            val = self.val[f]
+            if name == "fn_fields" and self.val["length"] > 1:
+                val = (
+                    val[0]
+                    .address.cast(
+                        val.type.target().array(self.val["length"] - 1).pointer()
+                    )
+                    .dereference()
+                )
+            yield name, val
+
+
 class CoreAddrPrettyPrinter:
     """Print CORE_ADDR values as hex."""
 
@@ -430,6 +480,10 @@ def type_lookup_function(val):
         return StructMainTypePrettyPrinter(val)
     elif tag == "field":
         return StructFieldPrettyPrinter(val)
+    elif tag == "cplus_struct_type":
+        return CplusStructTypePrettyPrinter(val)
+    elif tag == "fn_fieldlist":
+        return StructFnFieldlistPrettyPrinter(val)
     elif name == "CORE_ADDR":
         return CoreAddrPrettyPrinter(val)
     elif tag is not None and tag.startswith("intrusive_list<"):
