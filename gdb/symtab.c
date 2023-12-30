@@ -5599,7 +5599,7 @@ rbreak_command (const char *regexp, int from_tty)
     }
 
   global_symbol_searcher spec (SEARCH_FUNCTION_DOMAIN, regexp);
-  if (file_name != nullptr)
+  if (file_name != nullptr && *file_name != 0)
     spec.filenames.push_back (file_name);
   std::vector<symbol_search> symbols = spec.search ();
 
