@@ -2679,7 +2679,7 @@ windows_nat_target::attach (const char *args, int from_tty)
       if (!ok)
 	err = (unsigned) GetLastError ();
 
-      return true;
+      return ok;
     });
 
   if (err.has_value ())
@@ -3282,7 +3282,10 @@ windows_nat_target::create_inferior (const char *exec_file,
 			   inferior_cwd != nullptr ? infcwd : nullptr,
 			   disable_randomization,
 			   &si, &pi))
-	ret = (unsigned) GetLastError ();
+	{
+	  ret = (unsigned) GetLastError ();
+	  return false;
+	}
       return true;
     });
 
@@ -3412,7 +3415,10 @@ windows_nat_target::create_inferior (const char *exec_file,
 			   disable_randomization,
 			   &si,
 			   &pi))
-	ret = (unsigned) GetLastError ();
+	{
+	  ret = (unsigned) GetLastError ();
+	  return false;
+	}
       return true;
     });
   if (tty != INVALID_HANDLE_VALUE)
