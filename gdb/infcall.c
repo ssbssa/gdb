@@ -723,7 +723,8 @@ run_inferior_call (std::unique_ptr<call_thread_fsm> sm,
      needs to be done here.  */
   if (current_ui->prompt_state == PROMPT_BLOCKED)
     {
-      if (call_thread->thread_fsm ()->finished_p ())
+      if (call_thread->thread_fsm ()
+	  && call_thread->thread_fsm ()->finished_p ())
 	async_disable_stdin ();
       else
 	async_enable_stdin ();
