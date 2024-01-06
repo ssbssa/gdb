@@ -2454,6 +2454,8 @@ rs6000_builtin_type_vec128 (struct gdbarch *gdbarch)
       append_composite_type_field (t, "uint128", bt->builtin_uint128);
       append_composite_type_field (t, "v2_double",
 				   init_vector_type (bt->builtin_double, 2));
+      append_composite_type_field (t, "v2_int64",
+				   init_vector_type (bt->builtin_int64, 2));
       append_composite_type_field (t, "v4_float",
 				   init_vector_type (bt->builtin_float, 4));
       append_composite_type_field (t, "v4_int32",
