@@ -754,6 +754,11 @@ captured_main_1 (struct captured_main_args *context)
      the application.  */
   interpreter_p = context->interpreter_p;
 
+#ifdef __MINGW32__
+  bool save_cli_styling = cli_styling;
+  cli_styling = false;
+#endif
+
   /* Parse arguments and options.  */
   {
     int c;
@@ -1035,6 +1040,9 @@ captured_main_1 (struct captured_main_args *context)
 
 	/* Disable all output styling when running in batch mode.  */
 	cli_styling = 0;
+#ifdef __MINGW32__
+	save_cli_styling = false;
+#endif
       }
   }
 
@@ -1045,6 +1053,11 @@ captured_main_1 (struct captured_main_args *context)
 
   /* Initialize all files.  */
   gdb_init ();
+
+#ifdef __MINGW32__
+  /* Output styling on Windows is only possible after gdb_init.  */
+  cli_styling = save_cli_styling;
+#endif
 
   /* Process early init files and early init options from the command line.  */
   if (!inhibit_gdbinit)
