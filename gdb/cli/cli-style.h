@@ -171,6 +171,8 @@ extern void disable_styling_from_environment ();
    styling should be turned off.  */
 extern void disable_cli_styling ();
 
+extern void enable_cli_styling ();
+
 /* Return true styled output is currently enabled.  */
 extern bool term_cli_styling ();
 
