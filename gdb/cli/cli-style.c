@@ -110,6 +110,12 @@ disable_cli_styling ()
   cli_styling = false;
 }
 
+void
+enable_cli_styling ()
+{
+  cli_styling = true;
+}
+
 /* See cli/cli-style.h.  */
 
 bool
