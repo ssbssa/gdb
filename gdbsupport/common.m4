@@ -229,6 +229,11 @@ AC_CHECK_HEADERS([ \
       AC_CHECK_MEMBERS([struct pt_event.variant.ptwrite], [], [],
 		       [#include <intel-pt.h>])
       LIBS=$save_LIBS
+
+      AC_LIB_HAVE_LINKFLAGS([winipt], [], [
+#include <windows.h>
+#include <libipt.h>
+      ], [GetIptBufferVersion (0);])
     fi
   fi
 
