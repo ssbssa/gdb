@@ -68,6 +68,7 @@
 #include "gdbsupport/pathstuff.h"
 #include "gdbsupport/symbol.h"
 #include "inf-loop.h"
+#include "nat/windows-btrace.h"
 
 #include "readline/readline.h"
 #ifdef TUI
@@ -2220,6 +2221,10 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
 
   windows_process->windows_initialization_done = 0;
 
+#ifdef HAVE_LIBWINIPT
+  windows_process->ipt_threads = 0;
+#endif
+
   ptid_t last_ptid;
 
   /* Keep fetching events until we see the initial breakpoint (which
@@ -2276,6 +2281,68 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
   windows_process->windows_initialization_done = 1;
   return;
 }
+
+#ifdef HAVE_LIBWINIPT
+/* Enable branch tracing.  */
+
+struct btrace_target_info *
+windows_nat_target::enable_btrace (thread_info *tp,
+				   const struct btrace_config *conf)
+{
+  struct btrace_target_info *tinfo = nullptr;
+  ptid_t ptid = tp->ptid;
+  try
+    {
+      tinfo = windows_enable_btrace (ptid, conf, windows_process->ipt_threads);
+    }
+  catch (const gdb_exception_error &exception)
+    {
+      error (_("Could not enable branch tracing for %s: %s"),
+	     target_pid_to_str (ptid).c_str (), exception.what ());
+    }
+
+  return tinfo;
+}
+
+/* Disable branch tracing.  */
+
+void
+windows_nat_target::disable_btrace (struct btrace_target_info *tinfo)
+{
+  bool ret = windows_disable_btrace (tinfo, windows_process->ipt_threads);
+  delete tinfo;
+
+  if (!ret)
+    error (_("Could not disable branch tracing."));
+}
+
+/* Teardown branch tracing.  */
+
+void
+windows_nat_target::teardown_btrace (struct btrace_target_info *tinfo)
+{
+  windows_disable_btrace (tinfo, windows_process->ipt_threads);
+  delete tinfo;
+}
+
+/* Read branch trace data.  */
+
+enum btrace_error
+windows_nat_target::read_btrace (struct btrace_data *data,
+				 struct btrace_target_info *btinfo,
+				 enum btrace_read_type type)
+{
+  return windows_read_btrace (data, btinfo, type);
+}
+
+/* Get the branch trace configuration.  */
+
+const struct btrace_config *
+windows_nat_target::btrace_conf (const struct btrace_target_info *btinfo)
+{
+  return windows_btrace_conf (btinfo);
+}
+#endif
 
 /* Implement the "supports_dumpcore" target_ops method.  */
 

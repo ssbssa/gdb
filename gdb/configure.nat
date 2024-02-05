@@ -373,7 +373,7 @@ case ${gdb_host} in
 	case ${gdb_host_cpu} in
 	    i386)
 		NATDEPFILES="${NATDEPFILES} i386-windows-nat.o \
-		x86-windows-nat.o"
+		x86-windows-nat.o nat/windows-btrace.o"
 		;;
 	esac
 	;;
@@ -381,7 +381,7 @@ case ${gdb_host} in
 	case ${gdb_host_cpu} in
 	    i386)
 		NATDEPFILES="${NATDEPFILES} i386-windows-nat.o \
-		amd64-windows-nat.o x86-windows-nat.o"
+		amd64-windows-nat.o x86-windows-nat.o nat/windows-btrace.o"
 		;;
 	esac
 	;;

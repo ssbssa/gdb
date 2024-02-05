@@ -146,6 +146,11 @@ struct windows_per_inferior : public windows_nat::windows_process_info
   CORE_ADDR cygwin_load_start = 0;
   CORE_ADDR cygwin_load_end = 0;
 #endif /* __CYGWIN__ */
+
+#ifdef HAVE_LIBWINIPT
+  /* Number of threads for which IPT was enabled.  */
+  int ipt_threads = 0;
+#endif
 };
 
 struct windows_nat_target : public inf_child_target
@@ -249,6 +254,19 @@ struct windows_nat_target : public inf_child_target
   {
     return serial_event_fd (m_wait_event);
   }
+
+#ifdef HAVE_LIBWINIPT
+  struct btrace_target_info *enable_btrace (thread_info *tp,
+					    const struct btrace_config *conf)
+    override;
+  void disable_btrace (struct btrace_target_info *tinfo) override;
+  void teardown_btrace (struct btrace_target_info *tinfo) override;
+  enum btrace_error read_btrace (struct btrace_data *data,
+				 struct btrace_target_info *btinfo,
+				 enum btrace_read_type type) override;
+  const struct btrace_config *btrace_conf (const struct btrace_target_info *)
+    override;
+#endif
 
   void debug_registers_changed_all_threads ();
 
