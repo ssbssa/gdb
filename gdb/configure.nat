@@ -362,14 +362,16 @@ case ${gdb_host} in
     mingw)
 	case ${gdb_host_cpu} in
 	    i386)
-		NATDEPFILES="${NATDEPFILES} i386-windows-nat.o"
+		NATDEPFILES="${NATDEPFILES} i386-windows-nat.o \
+		nat/windows-btrace.o"
 		;;
 	esac
 	;;
     mingw64)
 	case ${gdb_host_cpu} in
 	    i386)
-		NATDEPFILES="${NATDEPFILES} i386-windows-nat.o amd64-windows-nat.o"
+		NATDEPFILES="${NATDEPFILES} i386-windows-nat.o amd64-windows-nat.o \
+		nat/windows-btrace.o"
 		;;
 	esac
 	;;
