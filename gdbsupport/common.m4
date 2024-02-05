@@ -193,6 +193,11 @@ AC_DEFUN([GDB_AC_COMMON], [
       AC_CHECK_MEMBERS([struct pt_insn.enabled, struct pt_insn.resynced], [], [],
 		       [#include <intel-pt.h>])
       LIBS=$save_LIBS
+
+      AC_LIB_HAVE_LINKFLAGS([winipt], [], [
+#include <windows.h>
+#include <libipt.h>
+      ], [GetIptBufferVersion (0);])
     fi
   fi
 

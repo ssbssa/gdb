@@ -143,6 +143,9 @@
 /* Define if you have the ipt library. */
 #undef HAVE_LIBIPT
 
+/* Define if you have the winipt library. */
+#undef HAVE_LIBWINIPT
+
 /* Define if you have the xxhash library. */
 #undef HAVE_LIBXXHASH
 
