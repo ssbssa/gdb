@@ -80,6 +80,7 @@
 #include "gdbsupport/symbol.h"
 #include "ser-event.h"
 #include "inf-loop.h"
+#include "nat/windows-btrace.h"
 
 #include "readline/readline.h"
 #ifdef TUI
@@ -151,6 +152,11 @@ struct windows_per_inferior : public windows_process_info
   CORE_ADDR cygwin_load_start = 0;
   CORE_ADDR cygwin_load_end = 0;
 #endif /* __CYGWIN__ */
+
+#ifdef HAVE_LIBWINIPT
+  /* Number of threads for which IPT was enabled.  */
+  int ipt_threads = 0;
+#endif
 };
 
 /* The current process.  */
@@ -359,6 +365,17 @@ struct windows_nat_target final : public x86_nat_target<inf_child_target>
   {
     return serial_event_fd (m_wait_event);
   }
+
+#ifdef HAVE_LIBWINIPT
+  struct btrace_target_info *enable_btrace (thread_info *tp,
+					    const struct btrace_config *conf) override;
+  void disable_btrace (struct btrace_target_info *tinfo) override;
+  void teardown_btrace (struct btrace_target_info *tinfo) override;
+  enum btrace_error read_btrace (struct btrace_data *data,
+				 struct btrace_target_info *btinfo,
+				 enum btrace_read_type type) override;
+  const struct btrace_config *btrace_conf (const struct btrace_target_info *) override;
+#endif
 
 #ifndef __CYGWIN__
   bool info_proc (const char *, enum info_proc_what) override;
@@ -2121,6 +2138,10 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
 
   windows_process.windows_initialization_done = 0;
 
+#ifdef HAVE_LIBWINIPT
+  windows_process.ipt_threads = 0;
+#endif
+
   ptid_t last_ptid;
 
   while (1)
@@ -2160,6 +2181,68 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
   windows_process.windows_initialization_done = 1;
   return;
 }
+
+#ifdef HAVE_LIBWINIPT
+/* Enable branch tracing.  */
+
+struct btrace_target_info *
+windows_nat_target::enable_btrace (thread_info *tp,
+				   const struct btrace_config *conf)
+{
+  struct btrace_target_info *tinfo = nullptr;
+  ptid_t ptid = tp->ptid;
+  try
+    {
+      tinfo = windows_enable_btrace (ptid, conf, windows_process.ipt_threads);
+    }
+  catch (const gdb_exception_error &exception)
+    {
+      error (_("Could not enable branch tracing for %s: %s"),
+	     target_pid_to_str (ptid).c_str (), exception.what ());
+    }
+
+  return tinfo;
+}
+
+/* Disable branch tracing.  */
+
+void
+windows_nat_target::disable_btrace (struct btrace_target_info *tinfo)
+{
+  bool ret = windows_disable_btrace (tinfo, windows_process.ipt_threads);
+  delete tinfo;
+
+  if (!ret)
+    error (_("Could not disable branch tracing."));
+}
+
+/* Teardown branch tracing.  */
+
+void
+windows_nat_target::teardown_btrace (struct btrace_target_info *tinfo)
+{
+  windows_disable_btrace (tinfo, windows_process.ipt_threads);
+  delete tinfo;
+}
+
+/* Read branch trace data.  */
+
+enum btrace_error
+windows_nat_target::read_btrace (struct btrace_data *data,
+				 struct btrace_target_info *btinfo,
+				 enum btrace_read_type type)
+{
+  return windows_read_btrace (data, btinfo, type);
+}
+
+/* Get the branch trace configuration.  */
+
+const struct btrace_config *
+windows_nat_target::btrace_conf (const struct btrace_target_info *btinfo)
+{
+  return windows_btrace_conf (btinfo);
+}
+#endif
 
 /* Implement the "supports_dumpcore" target_ops method.  */
 
