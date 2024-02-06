@@ -1,0 +1,59 @@
+# This testcase is part of GDB, the GNU debugger.
+#
+# Copyright 2024 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Test replaying from the beginning of the recording, where also a
+# breakpoint is which doesn't hit because of a condition.
+
+require allow_btrace_tests
+
+standard_testfile record_goto.c
+
+if [prepare_for_testing "failed to prepare" $testfile $srcfile {debug}] {
+    return -1
+}
+
+if ![runto_main] {
+    return -1
+}
+
+# Run to first instruction of fun4.
+gdb_test "break *fun4" "Breakpoint 2 at.*\."
+gdb_test "continue" ".*fun4\.1.*"
+
+# Record 2 next steps.
+gdb_test_no_output "record btrace"
+gdb_test "next" ".*fun4\.2.*" "next to fun1"
+gdb_test "next" ".*fun4\.3.*" "next to fun2"
+
+# The second step was only done so we don't hit the end of the
+# reverse-execution history when replaying the first 'next', so go back
+# 1 step.
+gdb_test "reverse-next" ".*fun4\.2.*" "reverse to fun1"
+
+# Reverse to beginning and replay, with unconditional breakpoint.
+gdb_test "reverse-next" ".*Breakpoint 2.*fun4\.1.*" "reverse to breakpoint"
+gdb_test "reverse-next" ".*No more reverse-execution history\..*fun4\.1.*" \
+	   "reverse to beginning"
+gdb_test "next" ".*fun4\.2.*" "replay first step to fun1"
+
+# Keep breakpoint enabled, but set condition to never stop.
+gdb_test "cond 2 0"
+
+# Reverse to beginning and replay, with never-stopping conditional breakpoint.
+gdb_test "reverse-next" ".*No more reverse-execution history\..*fun4\.1.*" \
+	   "reverse to beginning again"
+gdb_test "next" ".*fun4\.2.*" "replay first step to fun1 again"
