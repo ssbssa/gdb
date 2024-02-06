@@ -6145,6 +6145,7 @@ handle_inferior_event (struct execution_control_state *ecs)
       if (handle_stop_requested (ecs))
 	return;
 
+      clear_step_over_info ();
       interps_notify_no_history ();
       stop_waiting (ecs);
       return;
