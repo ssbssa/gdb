@@ -96,6 +96,17 @@ ARPEGGIO_FILE=$(ARPEGGIO_SRC_DIR).tar.gz
 
 GDB_TOOLS_GIT_DIR=/c/src/repos/gdb-tools.git
 
+LIBIPT_VER_MAJOR=2
+LIBIPT_VER_MINOR=1
+LIBIPT_VER_PATCH=1
+LIBIPT_VER=$(LIBIPT_VER_MAJOR).$(LIBIPT_VER_MINOR).$(LIBIPT_VER_PATCH)
+LIBIPT_SRC_DIR=libipt-$(LIBIPT_VER)
+LIBIPT_FILE=$(LIBIPT_SRC_DIR).tar.gz
+
+WINIPT_HASH=c78e561698fc95bfe4c3817d2efc71b3526c325a
+WINIPT_SRC_DIR=winipt-$(WINIPT_HASH)
+WINIPT_FILE=$(WINIPT_SRC_DIR).zip
+
 FFI_VER=3.4.2
 FFI_SRC_DIR=libffi-$(FFI_VER)
 FFI_FILE=$(FFI_SRC_DIR).tar.gz
@@ -486,6 +497,45 @@ $(SOURCE_DIR)/arpeggio-01-extract.done: | pkg/$(ARPEGGIO_FILE) $(SOURCE_DIR)/xxH
 	@touch $@
 
 
+# libipt
+
+$(SOURCE_DIR)/libipt-01-extract.done: | pkg/$(LIBIPT_FILE) $(SOURCE_DIR)/arpeggio-01-extract.done
+	tar -C $(SOURCE_DIR) -xzf pkg/$(LIBIPT_FILE)
+	cd $(SOURCE_DIR)/$(LIBIPT_SRC_DIR)/libipt/include; sed 's/\$${PT_VERSION_MAJOR}/$(LIBIPT_VER_MAJOR)/;s/\$${PT_VERSION_MINOR}/$(LIBIPT_VER_MINOR)/;s/\$${PT_VERSION_PATCH}/$(LIBIPT_VER_PATCH)/' intel-pt.h.in >intel-pt.h
+	@touch $@
+
+$(BUILD_DIR)/libipt-04-make.done: | $(SOURCE_DIR)/libipt-01-extract.done
+	@mkdir -p $(BUILD_DIR)/libipt/src/windows
+	cp patches/libipt/libipt.mk $(BUILD_DIR)/libipt/Makefile
+	$(MAKE) -C $(BUILD_DIR)/libipt SRC_DIR=$(SOURCE_DIR_ABS)/$(LIBIPT_SRC_DIR)/libipt CC=$(MYTARGET)-gcc AR=$(MYTARGET)-ar PT_VERSION_MAJOR=$(LIBIPT_VER_MAJOR) PT_VERSION_MINOR=$(LIBIPT_VER_MINOR) PT_VERSION_PATCH=$(LIBIPT_VER_PATCH)
+	@touch $@
+
+$(BUILD_DIR)/libipt-05-install.done: | $(BUILD_DIR)/libipt-04-make.done
+	@mkdir -p $(GDB_LIBS)/include $(GDB_LIBS)/lib
+	cp $(SOURCE_DIR)/$(LIBIPT_SRC_DIR)/libipt/include/intel-pt.h $(GDB_LIBS)/include
+	cp $(BUILD_DIR)/libipt/libipt.a $(GDB_LIBS)/lib/
+	@touch $@
+
+
+# winipt
+
+$(SOURCE_DIR)/winipt-01-extract.done: | pkg/$(WINIPT_FILE) $(SOURCE_DIR)/libipt-01-extract.done
+	cd $(SOURCE_DIR); unzip ../pkg/$(WINIPT_FILE)
+	@touch $@
+
+$(BUILD_DIR)/winipt-04-make.done: | $(SOURCE_DIR)/winipt-01-extract.done
+	@mkdir -p $(BUILD_DIR)/winipt/libipt
+	cp patches/winipt/winipt.mk $(BUILD_DIR)/winipt/Makefile
+	$(MAKE) -C $(BUILD_DIR)/winipt SRC_DIR=$(SOURCE_DIR_ABS)/$(WINIPT_SRC_DIR) CC=$(MYTARGET)-gcc AR=$(MYTARGET)-ar
+	@touch $@
+
+$(BUILD_DIR)/winipt-05-install.done: | $(BUILD_DIR)/winipt-04-make.done
+	@mkdir -p $(GDB_LIBS)/include $(GDB_LIBS)/lib
+	cp $(SOURCE_DIR)/$(WINIPT_SRC_DIR)/inc/libipt.h $(GDB_LIBS)/include
+	cp $(BUILD_DIR)/winipt/libwinipt.a $(GDB_LIBS)/lib/
+	@touch $@
+
+
 # gdb
 
 $(SOURCE_DIR)/gdb-01-extract.done: | pkg/$(GDB_FILE) $(SOURCE_DIR)/mpfr-01-extract.done
@@ -626,9 +676,9 @@ $(BUILD_DIR)/gdb-python-04-python.done: | $(BUILD_DIR)/gdb-python-03-make-instal
 
 # gdb-git
 
-$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done
+$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(BUILD_DIR)/libipt-05-install.done $(BUILD_DIR)/winipt-05-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git
-	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git --with-system-gdbinit=$(GDB_DIR)-git/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-git/etc/gdbinit.d
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-02-make.done: | $(BUILD_DIR)/gdb-git-01-configure.done
@@ -659,6 +709,10 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git/share/licenses/mpfr
 	@mkdir -p $(GDB_DIR)-git/share/licenses/xxHash
 	cp -p $(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR)/LICENSE $(GDB_DIR)-git/share/licenses/xxHash
+	@mkdir -p $(GDB_DIR)-git/share/licenses/libipt
+	cp -p $(SOURCE_DIR_ABS)/$(LIBIPT_SRC_DIR)/LICENSE $(GDB_DIR)-git/share/licenses/libipt
+	@mkdir -p $(GDB_DIR)-git/share/licenses/winipt
+	cp -p $(SOURCE_DIR_ABS)/$(WINIPT_SRC_DIR)/LICENSE $(GDB_DIR)-git/share/licenses/winipt
 	@mkdir -p $(GDB_DIR)-git/share/licenses/gdb
 	cp -p $(GDB_GIT_DIR)/COPYING3 $(GDB_DIR)-git/share/licenses/gdb/
 	@touch $@
@@ -714,9 +768,9 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 
 # gdb-git-python3
 
-$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done
+$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done $(BUILD_DIR)/libipt-05-install.done $(BUILD_DIR)/winipt-05-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python3
-	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib --enable-targets=all
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-system-gdbinit=$(GDB_DIR)-git-python3/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-git-python3/etc/gdbinit.d --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib --enable-targets=all
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-configure.done
@@ -765,6 +819,10 @@ $(BUILD_DIR)/gdb-git-python3-08-licenses.done: | $(BUILD_DIR)/gdb-git-python3-07
 	cp -p $(SOURCE_DIR_ABS)/$(MPFR_SRC_DIR)/COPYING.LESSER $(GDB_DIR)-git-python3/share/licenses/mpfr/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/xxHash
 	cp -p $(SOURCE_DIR_ABS)/$(XXHASH_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/xxHash/
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/libipt
+	cp -p $(SOURCE_DIR_ABS)/$(LIBIPT_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/libipt
+	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/winipt
+	cp -p $(SOURCE_DIR_ABS)/$(WINIPT_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/winipt
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/Arpeggio
 	cp -p $(SOURCE_DIR_ABS)/$(ARPEGGIO_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/Arpeggio/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/gdb-tools
@@ -834,6 +892,8 @@ extract-all: | \
   $(SOURCE_DIR)/ffi-01-extract.done \
   $(SOURCE_DIR)/xxHash-01-extract.done \
   $(SOURCE_DIR)/arpeggio-01-extract.done \
+  $(SOURCE_DIR)/libipt-01-extract.done \
+  $(SOURCE_DIR)/winipt-01-extract.done \
 
 
 patch-all: | \
@@ -850,6 +910,8 @@ build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
 build-gmp: | $(BUILD_DIR)/gmp-05-make-install.done
 build-mpfr: | $(BUILD_DIR)/mpfr-05-make-install.done
 build-xxhash: | $(BUILD_DIR)/xxHash-05-install.done
+build-libipt: | $(BUILD_DIR)/libipt-05-install.done
+build-winipt: | $(BUILD_DIR)/winipt-05-install.done
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
 build-gdb-python: | $(BUILD_DIR)/gdb-git-python3-08-licenses.done
 build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done
