@@ -95,7 +95,8 @@ static void insert_step_resume_breakpoint_at_caller (const frame_info_ptr &);
 
 static void insert_longjmp_resume_breakpoint (struct gdbarch *, CORE_ADDR);
 
-static bool maybe_software_singlestep (struct gdbarch *gdbarch);
+static bool maybe_software_singlestep (const thread_info *tp,
+				       gdbarch *gdbarch, CORE_ADDR pc);
 
 static void resume (gdb_signal sig);
 
@@ -2368,11 +2369,12 @@ bool sched_multi = false;
    GDBARCH the current gdbarch.  */
 
 static bool
-maybe_software_singlestep (struct gdbarch *gdbarch)
+maybe_software_singlestep (const thread_info *tp, gdbarch *gdbarch,
+			   CORE_ADDR pc)
 {
   bool hw_step = true;
 
-  if (execution_direction == EXEC_FORWARD
+  if (tp->control.execution_direction == EXEC_FORWARD
       && gdbarch_get_next_pcs_p (gdbarch))
     hw_step = !insert_single_step_breakpoints (gdbarch);
 
@@ -2530,6 +2532,10 @@ do_target_resume (ptid_t resume_ptid, bool step, enum gdb_signal sig)
 
   /* Install inferior's terminal modes.  */
   target_terminal::inferior ();
+
+  scoped_restore save_exec_dir
+    = make_scoped_restore (&execution_direction,
+			   tp->control.execution_direction);
 
   /* Avoid confusing the next resume, if the next stop/resume
      happens to apply to another thread.  */
@@ -2791,6 +2797,7 @@ resume_1 (enum gdb_signal sig)
 	      insert_breakpoints ();
 
 	      resume_ptid = internal_resume_ptid (user_step);
+
 	      do_target_resume (resume_ptid, false, GDB_SIGNAL_0);
 	      tp->set_resumed (true);
 	      return;
@@ -2840,7 +2847,7 @@ resume_1 (enum gdb_signal sig)
 	  set_step_over_info (aspace, regcache_read_pc (regcache), 0,
 			      tp->global_num);
 
-	  step = maybe_software_singlestep (gdbarch);
+	  step = maybe_software_singlestep (tp, gdbarch, pc);
 
 	  insert_breakpoints ();
 	}
@@ -2859,7 +2866,7 @@ resume_1 (enum gdb_signal sig)
 
   /* Do we need to do it the hard way, w/temp breakpoints?  */
   else if (step)
-    step = maybe_software_singlestep (gdbarch);
+    step = maybe_software_singlestep (tp, gdbarch, pc);
 
   /* Currently, our software single-step implementation leads to different
      results than hardware single-stepping in one situation: when stepping
@@ -2930,7 +2937,7 @@ resume_1 (enum gdb_signal sig)
   else
     resume_ptid = internal_resume_ptid (user_step);
 
-  if (execution_direction != EXEC_REVERSE
+  if (tp->control.execution_direction != EXEC_REVERSE
       && step && breakpoint_inserted_here_p (aspace, pc))
     {
       /* There are two cases where we currently need to step a
@@ -3099,6 +3106,7 @@ clear_proceed_status_thread (struct thread_info *tp)
   bpstat_clear (&tp->control.stop_bpstat);
 
   tp->control.is_replaying = target_record_is_replaying (tp->ptid);
+  tp->control.execution_direction = ::execution_direction;
 }
 
 /* Notify the current interpreter and observers that the target is about to
@@ -3208,7 +3216,7 @@ schedlock_applies (struct thread_info *tp)
 	      && tp->control.stepping_command)
 	  || (scheduler_mode == schedlock_replay
 	      && target_record_will_replay (minus_one_ptid,
-					    execution_direction)));
+					    tp->control.execution_direction)));
 }
 
 /* When FORCE_P is false, set process_stratum_target::COMMIT_RESUMED_STATE
@@ -3645,7 +3653,7 @@ proceed (CORE_ADDR addr, enum gdb_signal siggnal)
       if (cur_thr->stop_pc_p ()
 	  && pc == cur_thr->stop_pc ()
 	  && breakpoint_here_p (aspace, pc) == ordinary_breakpoint_here
-	  && execution_direction != EXEC_REVERSE)
+	  && cur_thr->control.execution_direction != EXEC_REVERSE)
 	/* There is a breakpoint at the address we will resume at,
 	   step one instruction before inserting breakpoints so that
 	   we do not stop right away (and report a second hit at this
@@ -4977,7 +4985,7 @@ adjust_pc_after_break (struct thread_info *thread,
      breakpoint at PC - 1.  We'd then report a hit on B1, although
      INSN1 hadn't been de-executed yet.  Doing nothing is the correct
      behavior.  */
-  if (execution_direction == EXEC_REVERSE)
+  if (thread->control.execution_direction == EXEC_REVERSE)
     return;
 
   /* If the target can tell whether the thread hit a SW breakpoint,
@@ -7564,7 +7572,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 
       delete_step_resume_breakpoint (ecs->event_thread);
       if (ecs->event_thread->control.proceed_to_finish
-	  && execution_direction == EXEC_REVERSE)
+	  && ecs->event_thread->control.execution_direction == EXEC_REVERSE)
 	{
 	  struct thread_info *tp = ecs->event_thread;
 
@@ -7579,7 +7587,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 	}
       fill_in_stop_func (gdbarch, ecs);
       if (ecs->event_thread->stop_pc () == ecs->stop_func_start
-	  && execution_direction == EXEC_REVERSE)
+	  && ecs->event_thread->control.execution_direction == EXEC_REVERSE)
 	{
 	  /* We are stepping over a function call in reverse, and just
 	     hit the step-resume breakpoint at the start address of
@@ -7699,7 +7707,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 
   if (pc_in_thread_step_range (ecs->event_thread->stop_pc (),
 			       ecs->event_thread)
-      && (execution_direction != EXEC_REVERSE
+      && (ecs->event_thread->control.execution_direction != EXEC_REVERSE
 	  || *curr_frame_id == original_frame_id))
     {
       infrun_debug_printf
@@ -7718,7 +7726,7 @@ process_event_stop_test (struct execution_control_state *ecs)
       CORE_ADDR stop_pc = ecs->event_thread->stop_pc ();
       if (stop_pc == ecs->event_thread->control.step_range_start
 	  && stop_pc != ecs->stop_func_start
-	  && execution_direction == EXEC_REVERSE)
+	  && ecs->event_thread->control.execution_direction == EXEC_REVERSE)
 	end_stepping_range (ecs);
       else
 	keep_going (ecs);
@@ -7740,7 +7748,7 @@ process_event_stop_test (struct execution_control_state *ecs)
      backward through the trampoline code, and that's handled further
      down, so there is nothing for us to do here.  */
 
-  if (execution_direction != EXEC_REVERSE
+  if (ecs->event_thread->control.execution_direction != EXEC_REVERSE
       && ecs->event_thread->control.step_over_calls == STEP_OVER_UNDEBUGGABLE
       && in_solib_dynsym_resolve_code (ecs->event_thread->stop_pc ())
       && (ecs->event_thread->control.step_start_function == nullptr
@@ -7889,7 +7897,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 
       /* Reverse stepping through solib trampolines.  */
 
-      if (execution_direction == EXEC_REVERSE
+      if (ecs->event_thread->control.execution_direction == EXEC_REVERSE
 	  && ecs->event_thread->control.step_over_calls != STEP_OVER_NONE
 	  && (gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc)
 	      || (ecs->stop_func_start == 0
@@ -7917,7 +7925,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 	     stepped into (backwards), and continue to there.  When we
 	     get there, we'll need to single-step back to the caller.  */
 
-	  if (execution_direction == EXEC_REVERSE)
+	  if (ecs->event_thread->control.execution_direction == EXEC_REVERSE)
 	    {
 	      /* If we're already at the start of the function, we've either
 		 just stepped backward into a single instruction function,
@@ -7980,7 +7988,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 						  tmp_sal)
 	    && !inline_frame_is_marked_for_skip (true, ecs->event_thread))
 	  {
-	    if (execution_direction == EXEC_REVERSE)
+	    if (ecs->event_thread->control.execution_direction == EXEC_REVERSE)
 	      handle_step_into_function_backward (gdbarch, ecs);
 	    else
 	      handle_step_into_function (gdbarch, ecs);
@@ -7998,7 +8006,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 	  return;
 	}
 
-      if (execution_direction == EXEC_REVERSE)
+      if (ecs->event_thread->control.execution_direction == EXEC_REVERSE)
 	{
 	  /* If we're already at the start of the function, we've either just
 	     stepped backward into a single instruction function without line
@@ -8027,7 +8035,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 
   /* Reverse stepping through solib trampolines.  */
 
-  if (execution_direction == EXEC_REVERSE
+  if (ecs->event_thread->control.execution_direction == EXEC_REVERSE
       && ecs->event_thread->control.step_over_calls != STEP_OVER_NONE)
     {
       CORE_ADDR stop_pc = ecs->event_thread->stop_pc ();
@@ -8639,6 +8647,7 @@ keep_going_stepped_thread (struct thread_info *tp)
 
       tp->set_resumed (true);
       resume_ptid = internal_resume_ptid (tp->control.stepping_command);
+
       do_target_resume (resume_ptid, false, GDB_SIGNAL_0);
     }
   else
