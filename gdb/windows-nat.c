@@ -3471,6 +3471,7 @@ windows_nat_target::thread_name (struct thread_info *thr)
 }
 
 
+#ifndef __CYGWIN__
 /* Set stdout and stderr handles to binary unbuffered mode.  */
 
 static void
@@ -3514,6 +3515,7 @@ show_maint_testsuite_mode (struct ui_file *file, int from_tty,
 {
   gdb_printf (file, _("Testsuite mode is %s.\n"), value);
 }
+#endif
 
 
 
@@ -3638,6 +3640,7 @@ Use \"%ps\" or \"%ps\" command to load executable/libraries directly."),
 	      styled_string (command_style.style (), "dll"));
     }
 
+#ifndef __CYGWIN__
   add_setshow_boolean_cmd ("testsuite-mode", class_maintenance,
 			   &maint_testsuite_mode, _("\
 Set to adapt to dejagnu testsuite runs."), _("\
@@ -3649,6 +3652,7 @@ to allow better testing."),
 			   show_maint_testsuite_mode,
 			   &maintenance_set_cmdlist,
 			   &maintenance_show_cmdlist);
+#endif
 }
 
 /* Hardware watchpoint support, adapted from go32-nat.c code.  */
