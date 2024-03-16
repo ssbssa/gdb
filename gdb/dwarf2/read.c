@@ -10272,6 +10272,14 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
 				nullptr, nullptr))
     {
     case PC_BOUNDS_NOT_PRESENT:
+	{
+	  /* If gcc >= 6 assume an empty block means it was optimized away.  */
+	  int major, minor;
+	  if (cu->producer != nullptr
+	      && producer_is_gcc (cu->producer, &major, &minor)
+	      && major >= 6)
+	    return;
+	}
       /* DW_TAG_lexical_block has no attributes, process its children as if
 	 there was no wrapping by that DW_TAG_lexical_block.
 	 GCC does no longer produces such DWARF since GCC r224161.  */
