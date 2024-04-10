@@ -6578,8 +6578,6 @@ handle_inferior_event (struct execution_control_state *ecs)
       if (handle_stop_requested (ecs))
 	return;
 
-      interps_notify_no_history ();
-
       /* Cancel an in-flight step-over.  It will not succeed since we
 	 won't be able to step at the end of the execution history.  */
       {
@@ -9055,7 +9053,6 @@ keep_going_pass_signal (struct execution_control_state *ecs)
   if (ecs->event_thread->control.is_replaying
       && !target_record_is_replaying (ecs->event_thread->ptid))
     {
-      interps_notify_no_history ();
       ecs->ws.set_no_history ();
       set_last_target_status (ecs->target, ecs->ptid, ecs->ws);
       stop_print_frame = true;
@@ -9713,6 +9710,9 @@ normal_stop ()
      thread/inferior.  */
   if (saved_context.changed ())
     return true;
+
+  if (last.kind () == TARGET_WAITKIND_NO_HISTORY)
+    interps_notify_no_history ();
 
   /* Notify observers about the stop.  This is where the interpreters
      print the stop event.  */
