@@ -237,6 +237,9 @@ struct thread_control_state
   /* True if the thread is evaluating a BP condition.  */
   bool in_cond_eval = false;
 
+  /* Whether the thread was replaying when the command was issued.  */
+  bool is_replaying = false;
+
 private:
   /* Function the thread was in as of last it started stepping.  */
   struct symbol *m_step_start_function = nullptr;
