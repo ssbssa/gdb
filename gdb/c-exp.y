@@ -479,8 +479,15 @@ exp	:	exp DOT_STAR exp
 			{ pstate->wrap2<structop_member_operation> (); }
 	;
 
-exp	:	exp '[' exp1 ']'
-			{ pstate->wrap2<subscript_operation> (); }
+exp	:	exp '['
+			{ pstate->start_arglist (); }
+		arglist ']'	%prec ARROW
+			{
+			  std::vector<operation_up> args
+			    = pstate->pop_vector (pstate->end_arglist ());
+			  pstate->push_new<multi_subscript_operation>
+			    (pstate->pop (), std::move (args));
+			}
 	;
 
 exp	:	exp OBJC_LBRAC exp1 ']'
