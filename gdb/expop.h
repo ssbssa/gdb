@@ -1315,9 +1315,6 @@ class subscript_operation
 public:
   using usual_ax_binop_operation<BINOP_SUBSCRIPT,
 				 eval_op_subscript>::usual_ax_binop_operation;
-
-  value *evaluate_for_sizeof (struct expression *exp,
-			      enum noside noside) override;
 };
 
 /* Implementation of comparison operations.  */
@@ -2099,6 +2096,9 @@ public:
   value *evaluate (struct type *expect_type,
 		   struct expression *exp,
 		   enum noside noside) override;
+
+  value *evaluate_for_sizeof (struct expression *exp,
+			      enum noside noside) override;
 
   enum exp_opcode opcode () const override
   { return MULTI_SUBSCRIPT; }
