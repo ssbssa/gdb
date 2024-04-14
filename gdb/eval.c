@@ -2259,13 +2259,35 @@ multi_subscript_operation::evaluate (struct type *expect_type,
 				     struct expression *exp,
 				     enum noside noside)
 {
-  value *arg1 = std::get<0> (m_storage)->evaluate_with_coercion (exp, noside);
+  value *arg1 = std::get<0> (m_storage)->evaluate (nullptr, exp, noside);
   std::vector<operation_up> &values = std::get<1> (m_storage);
-  value **argvec = XALLOCAVEC (struct value *, values.size ());
+  std::vector<value *> argvec (values.size ());
   for (int ix = 0; ix < values.size (); ++ix)
-    argvec[ix] = values[ix]->evaluate_with_coercion (exp, noside);
-  return eval_multi_subscript (expect_type, exp, noside, arg1,
-			       gdb::make_array_view (argvec, values.size ()));
+    argvec[ix] = values[ix]->evaluate (nullptr, exp, noside);
+
+  if (overload_resolution
+      && exp->language_defn->la_language == language_cplus
+      && unop_user_defined_p (MULTI_SUBSCRIPT, arg1))
+    {
+      argvec.insert (argvec.begin(), value_addr (arg1));
+      int static_memfuncp;
+      find_overload_match (argvec, "operator[]", METHOD, &argvec[0], nullptr,
+			   &arg1, nullptr, &static_memfuncp, 0, noside);
+      if (static_memfuncp)
+	argvec.erase (argvec.begin ());
+
+      return evaluate_subexp_do_call (exp, noside, arg1, argvec,
+				      nullptr, expect_type);
+    }
+
+  if (argvec.empty ())
+    error (_("cannot subscript without argument"));
+
+  if (exp->language_defn->la_language != language_m2)
+    return eval_op_subscript (expect_type, exp, noside, BINOP_SUBSCRIPT,
+			      arg1, argvec.back ());
+
+  return eval_multi_subscript (expect_type, exp, noside, arg1, argvec);
 }
 
 value *
@@ -2762,8 +2784,8 @@ var_msym_value_operation::evaluate_for_sizeof (struct expression *exp,
 }
 
 value *
-subscript_operation::evaluate_for_sizeof (struct expression *exp,
-					  enum noside noside)
+multi_subscript_operation::evaluate_for_sizeof (struct expression *exp,
+						enum noside noside)
 {
   if (noside == EVAL_NORMAL)
     {
