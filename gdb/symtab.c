@@ -2269,7 +2269,10 @@ lookup_local_symbol (const char *name,
       if (blocksym.symbol != nullptr)
 	return blocksym;
 
-      if (block->inlined_p ())
+      if (block->inlined_p () ||
+	  (block->function () != nullptr
+	   && block->function ()->language () == language_cplus
+	   && !block->function ()->is_artificial ()))
 	break;
       block = block->superblock ();
     }
