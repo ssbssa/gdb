@@ -2203,7 +2203,10 @@ lookup_local_symbol (const char *name,
 	    return blocksym;
 	}
 
-      if (block->function () != NULL && block->inlined_p ())
+      if (block->function () != nullptr
+	  && (block->inlined_p ()
+	      || (block->function ()->language () == language_cplus
+		  && !block->function ()->is_artificial ())))
 	break;
       block = block->superblock ();
     }
