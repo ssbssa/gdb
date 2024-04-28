@@ -1923,8 +1923,7 @@ eval_binop_assign_modify (struct type *expect_type, struct expression *exp,
   return value_assign (arg1, arg2);
 }
 
-/* Note that ARGS needs 2 empty slots up front and must end with a
-   null pointer.  */
+/* Note that ARGS needs 2 empty slots up front.  */
 static struct value *
 eval_op_objc_msgcall (struct type *expect_type, struct expression *exp,
 		      enum noside noside, CORE_ADDR selector,
@@ -2264,7 +2263,7 @@ objc_msgcall_operation::evaluate (struct type *expect_type,
   return eval_op_objc_msgcall (expect_type, exp, noside, std::
 			       get<0> (m_storage), target,
 			       gdb::make_array_view (argvec,
-						     args.size () + 3));
+						     args.size () + 2));
 }
 
 value *
