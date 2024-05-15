@@ -136,7 +136,7 @@ GDB_CONF=$(SOURCE_DIR_ABS)/$(GDB_SRC_DIR)/configure \
 	 --with-pkgversion=$(MYPKG)
 GDB_ENV=export \
 	PKG_CONFIG_PATH="$(GDB_LIBS)/lib/pkgconfig" \
-	CPPFLAGS="-I$(GDB_LIBS)/include -DUSE_RELATIVE_SRC_HIGHLIGHT" \
+	CPPFLAGS="-I$(GDB_LIBS)/include -DUSE_RELATIVE_SRC_HIGHLIGHT -D__MINGW_USE_VC2005_COMPAT=1" \
 	LDFLAGS="-L$(GDB_LIBS)/lib" \
 	;
 GDB_GIT_DIR=/c/src/repos/binutils-gdb.git
@@ -909,6 +909,7 @@ build-source-highlight: | $(BUILD_DIR)/source-highlight-05-make-install.done
 build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
 build-gmp: | $(BUILD_DIR)/gmp-05-make-install.done
 build-mpfr: | $(BUILD_DIR)/mpfr-05-make-install.done
+build-python: | $(BUILD_DIR)/python3-05-make-install.done
 build-xxhash: | $(BUILD_DIR)/xxHash-05-install.done
 build-libipt: | $(BUILD_DIR)/libipt-05-install.done
 build-winipt: | $(BUILD_DIR)/winipt-05-install.done
