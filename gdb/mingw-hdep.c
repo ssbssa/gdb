@@ -349,6 +349,11 @@ gdb_console_fputs (const char *linebuf, FILE *fstream)
 	}
       else
 	{
+	  for (n_read = 0; (c = linebuf[n_read]) != 0
+	       && c != '\033' && c != '\n'; n_read++);
+	  if (n_read > 0)
+	    fwrite (linebuf, 1, n_read, fstream);
+
 	  /* When we are about to write newline, we need to clear to
 	     EOL with the normal attribute, to avoid spilling the
 	     colors to the next screen line.  We assume here that no
@@ -373,9 +378,10 @@ gdb_console_fputs (const char *linebuf, FILE *fstream)
 		  FillConsoleOutputCharacter (hstdout, ' ', nchars,
 					      start_pos, &written);
 		}
+
+	      fputc (c, fstream);
+	      n_read += 1;
 	    }
-	  fputc (c, fstream);
-	  n_read = 1;
 	}
     }
 
