@@ -476,6 +476,7 @@ language_defn::read_var_value (struct symbol *var,
 	/* Relocate address, unless there is no section or the variable is
 	   a TLS variable. */
 	if (obj_section == NULL
+	    || obj_section->the_bfd_section == nullptr
 	    || (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
 	  addr = CORE_ADDR (bmsym.minsym->unrelocated_address ());
 	else
@@ -484,6 +485,7 @@ language_defn::read_var_value (struct symbol *var,
 	  addr = symbol_overlayed_address (addr, obj_section);
 	/* Determine address of TLS variable. */
 	if (obj_section
+	    && obj_section->the_bfd_section != nullptr
 	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
 	  addr = target_translate_tls_address (obj_section->objfile, addr);
       }
