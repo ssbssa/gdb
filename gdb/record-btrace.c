@@ -47,6 +47,7 @@
 #include <forward_list>
 #include "objfiles.h"
 #include "interps.h"
+#include "gdbcore.h"
 
 static const target_info record_btrace_target_info = {
   "record-btrace",
@@ -56,7 +57,7 @@ static const target_info record_btrace_target_info = {
 
 /* The target_ops of record-btrace.  */
 
-class record_btrace_target final : public target_ops
+class record_btrace_target : public target_ops
 {
 public:
   const target_info &info () const override
@@ -139,7 +140,152 @@ public:
   void done_generating_core () override;
 };
 
+static const target_info record_btrace_core_target_info = {
+  "record-btrace-core",
+  N_("Branch tracing target"),
+  N_("Collect control-flow trace and provide the execution history.")
+};
+
+class record_btrace_core_target final : public record_btrace_target
+{
+public:
+  const target_info &info () const override
+  { return record_btrace_core_target_info; }
+
+  void kill () override
+  {
+    for (thread_info *tp : current_inferior ()->non_exited_threads ())
+      {
+	btrace_teardown (tp);
+
+	thread_cancel_execution_command (tp);
+      }
+
+    current_inferior ()->unpush_target (this);
+  }
+
+  void prepare_to_store (struct regcache *regcache) override {}
+  void store_registers (struct regcache *, int) override
+  {
+    error (_("You can't do that without a process to debug."));
+  }
+
+  int insert_breakpoint (struct gdbarch *,
+			 struct bp_target_info *) override
+  { return 0; }
+  int remove_breakpoint (struct gdbarch *,
+			 struct bp_target_info *,
+			 enum remove_bp_reason) override
+  { return 0; }
+
+  bool has_execution (inferior *inf) override
+  { return true; }
+
+  struct btrace_target_info *enable_btrace (thread_info *tp,
+					    const struct btrace_config *conf) override
+  {
+    if (conf->format != BTRACE_FORMAT_PT && conf->format != BTRACE_FORMAT_NONE)
+      error (_("Unknown branch trace format."));
+
+    char sect_name[32];
+    bfd *core_bfd = current_program_space->core_bfd ();
+
+    sprintf (sect_name, ".coreipt/%d", (int) tp->ptid.lwp ());
+    asection *osec = bfd_get_section_by_name (core_bfd, sect_name);
+    if (osec == nullptr)
+      return nullptr;
+
+    strcat (sect_name, "/2");
+    asection *osec2 = bfd_get_section_by_name (core_bfd, sect_name);
+
+    std::unique_ptr<btrace_target_info> tinfo
+      { std::make_unique<btrace_target_info> (tp->ptid) };
+
+    tinfo->conf.format = BTRACE_FORMAT_PT;
+    tinfo->conf.pt.size = bfd_section_size (osec);
+    if (osec2 != nullptr)
+      tinfo->conf.pt.size += bfd_section_size (osec2);
+
+    return tinfo.release ();
+  }
+  void disable_btrace (struct btrace_target_info *tinfo) override
+  {
+    delete tinfo;
+  }
+  void teardown_btrace (struct btrace_target_info *tinfo) override
+  {
+    delete tinfo;
+  }
+  enum btrace_error read_btrace (struct btrace_data *data,
+				 struct btrace_target_info *btinfo,
+				 enum btrace_read_type type) override
+  {
+    if (btinfo->conf.format != BTRACE_FORMAT_PT)
+      return BTRACE_ERR_NOT_SUPPORTED;
+
+    if (type == BTRACE_READ_NEW)
+      type = BTRACE_READ_ALL;
+
+    if (type != BTRACE_READ_ALL)
+      return BTRACE_ERR_NOT_SUPPORTED;
+
+    data->format = BTRACE_FORMAT_PT;
+    data->variant.pt.data = nullptr;
+    data->variant.pt.size = 0;
+
+    bfd *core_bfd = current_program_space->core_bfd ();
+
+    asection *sec_cpuinfo = bfd_get_section_by_name (core_bfd,
+						     ".corecpuinfo");
+    if (sec_cpuinfo == nullptr || bfd_section_size (sec_cpuinfo) != 6)
+      return BTRACE_ERR_UNKNOWN;
+
+    uint16_t cpuinfo[3];
+    if (!bfd_get_section_contents (core_bfd, sec_cpuinfo, cpuinfo, 0, 6))
+      return BTRACE_ERR_UNKNOWN;
+
+    btrace_cpu *cpu = &data->variant.pt.config.cpu;
+    cpu->vendor = CV_INTEL;
+    cpu->family = cpuinfo[1];
+    cpu->model = cpuinfo[2] >> 8;
+    cpu->stepping = cpuinfo[2] & 0xff;
+
+    char sect_name[32];
+
+    sprintf (sect_name, ".coreipt/%d", (int) btinfo->ptid.lwp ());
+    asection *osec = bfd_get_section_by_name (core_bfd, sect_name);
+    if (osec == nullptr)
+      return BTRACE_ERR_UNKNOWN;
+
+    strcat (sect_name, "/2");
+    asection *osec2 = bfd_get_section_by_name (core_bfd, sect_name);
+
+    uint32_t trace_size = bfd_section_size (osec);
+    uint32_t trace_size2 = 0;
+    if (osec2 != nullptr)
+      trace_size2 = bfd_section_size (osec2);
+
+    gdb::unique_xmalloc_ptr<gdb_byte> bytes
+      ((gdb_byte *) xmalloc (trace_size + trace_size2));
+
+    if (!bfd_get_section_contents (core_bfd, osec, bytes.get (), 0, trace_size))
+      return BTRACE_ERR_UNKNOWN;
+    if (trace_size2 > 0
+	&& !bfd_get_section_contents (core_bfd, osec2, bytes.get () + trace_size, 0, trace_size2))
+      return BTRACE_ERR_UNKNOWN;
+
+    data->variant.pt.data = bytes.release ();
+    data->variant.pt.size = trace_size + trace_size2;
+    return BTRACE_ERR_NONE;
+  }
+  const struct btrace_config *btrace_conf (const struct btrace_target_info *btinfo) override
+  {
+    return &btinfo->conf;
+  }
+};
+
 static record_btrace_target record_btrace_ops;
+static record_btrace_core_target record_btrace_core_ops;
 
 /* Initialize the record-btrace target ops.  */
 
@@ -3019,6 +3165,54 @@ cmd_record_btrace_start (const char *args, int from_tty)
     }
 }
 
+struct scoped_btrace_core_unpush
+{
+  scoped_btrace_core_unpush () = default;
+
+  DISABLE_COPY_AND_ASSIGN (scoped_btrace_core_unpush);
+
+  ~scoped_btrace_core_unpush ()
+  {
+    if (!m_discarded)
+      current_inferior ()->unpush_target (&record_btrace_core_ops);
+  }
+
+  bool m_discarded = false;
+};
+
+static void
+cmd_record_btrace_restore (const char *args, int from_tty)
+{
+  core_file_command (args, from_tty);
+
+  record_preopen ();
+
+  const char *format;
+
+  current_inferior ()->push_target (&record_btrace_core_ops);
+
+  scoped_btrace_core_unpush btrace_core_disable;
+  scoped_btrace_disable btrace_disable;
+
+  for (thread_info *tp : current_inferior ()->non_exited_threads ())
+    {
+      btrace_enable (tp, &record_btrace_conf);
+
+      btrace_disable.add_thread (tp);
+    }
+
+  record_btrace_async_inferior_event_handler
+    = create_async_event_handler (record_btrace_handle_async_inferior_event,
+				  NULL, "record-btrace");
+  record_btrace_generating_corefile = 0;
+
+  format = btrace_format_short_string (record_btrace_conf.format);
+  interps_notify_record_changed (current_inferior (), 1, "btrace", format);
+
+  btrace_disable.discard ();
+  btrace_core_disable.m_discarded = true;
+}
+
 /* The "show record btrace replay-memory-access" command.  */
 
 static void
@@ -3212,6 +3406,13 @@ Start branch trace recording in Intel Processor Trace format.\n\n\
 This format may not be available on all processors."),
 	     &record_btrace_cmdlist);
   add_alias_cmd ("pt", record_btrace_pt_cmd, class_obscure, 1, &record_cmdlist);
+
+  cmd_list_element *record_btrace_restore_cmd
+    = add_cmd ("restore", class_obscure, cmd_record_btrace_restore,
+	       _("\
+Restore a branch trace recording."),
+	       &record_btrace_cmdlist);
+  set_cmd_completer (record_btrace_restore_cmd, deprecated_filename_completer);
 
   add_setshow_prefix_cmd ("btrace", class_support,
 			  _("Set record options."),
