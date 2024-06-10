@@ -2307,13 +2307,31 @@ windows_nat_target::dumpcore (const char *filename)
 	}
     }
 
-  CHECK (fMiniDumpWriteDump (windows_process.handle,
+  BOOL ok = 0;
+#ifdef HAVE_LIBWINIPT
+  if (windows_process.ipt_threads)
+    {
+      MINIDUMP_TYPE type
+	= (MINIDUMP_TYPE) (MiniDumpWithFullMemory
+			   | 0x00400000); // MiniDumpWithIptTrace
+      ok = fMiniDumpWriteDump (windows_process.handle,
+			       windows_process.current_event.dwProcessId,
+			       file,
+			       type,
+			       meip,
+			       NULL, /* UserStreamParam */
+			       NULL); /* CallbackParam */
+    }
+#endif
+  if (!ok)
+    ok = fMiniDumpWriteDump (windows_process.handle,
 			     windows_process.current_event.dwProcessId,
 			     file,
 			     MiniDumpWithFullMemory,
 			     meip,
 			     NULL, /* UserStreamParam */
-			     NULL)); /* CallbackParam */
+			     NULL); /* CallbackParam */
+  CHECK (ok);
 
   FreeLibrary (dbghelp);
   CloseHandle (file);
