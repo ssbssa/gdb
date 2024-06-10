@@ -3538,6 +3538,25 @@ typedef struct
 }
 dump_thread_name;
 
+typedef struct
+{
+  uint16_t traceVersion;
+  uint16_t validTrace;
+  uint32_t traceSize;
+}
+dump_ipt_trace_data;
+
+typedef struct
+{
+  uint64_t threadId;
+  uint32_t timingSettings;
+  uint32_t mtcFrequency;
+  uint32_t frequencyToTscRatio;
+  uint32_t ringBufferOffset;
+  uint32_t traceSize;
+}
+dump_ipt_trace_header;
+
 #pragma pack(pop)
 
 
@@ -3579,6 +3598,7 @@ coff_core_file_p (bfd *abfd)
   uint32_t systemInfoRva = 0;
   uint32_t miscInfoRva = 0;
   uint32_t threadNamesRva = 0;
+  uint32_t iptTraceRva = 0;
 
   if (bfd_read (&header, sizeof header, abfd) != sizeof header)
     goto fail;
@@ -3624,6 +3644,9 @@ coff_core_file_p (bfd *abfd)
 	  break;
 	case ThreadNamesStream:
 	  threadNamesRva = dir.loc.rva;
+	  break;
+	case IptTraceStream:
+	  iptTraceRva = dir.loc.rva;
 	  break;
 	}
     }
@@ -3907,6 +3930,12 @@ coff_core_file_p (bfd *abfd)
 	  || (arch != 0 && arch != 9))
 	goto fail;
 
+      make_bfd_asection (abfd, ".corecpuinfo",
+			 SEC_HAS_CONTENTS,
+			 systemInfoRva,
+			 6,
+			 0);
+
       bfd_default_set_arch_mach (abfd, bfd_arch_i386,
 				 arch == 9 ? bfd_mach_x86_64 : 0);
     }
@@ -3957,6 +3986,56 @@ coff_core_file_p (bfd *abfd)
 	  if (bfd_seek (abfd, threadNamesRva + 4 + (n + 1) * sizeof name,
 			SEEK_SET) != 0)
 	    goto fail;
+	}
+    }
+
+  if (iptTraceRva)
+    {
+      dump_ipt_trace_data ipt_data;
+      uint32_t data_pos = 0;
+      dump_ipt_trace_header ipt_header;
+      char secname[32];
+
+      if (bfd_seek (abfd, iptTraceRva, SEEK_SET) != 0
+	  || bfd_read (&ipt_data, sizeof ipt_data, abfd) != sizeof ipt_data)
+	goto fail;
+
+      while (data_pos + sizeof ipt_header < ipt_data.traceSize)
+	{
+	  if (bfd_seek (abfd, iptTraceRva + sizeof ipt_data + data_pos, SEEK_SET) != 0
+	      || bfd_read (&ipt_header, sizeof ipt_header, abfd) != sizeof ipt_header)
+	    goto fail;
+
+	  data_pos += sizeof ipt_header;
+
+	  if (data_pos + ipt_header.traceSize > ipt_data.traceSize)
+	    break;
+
+	  sprintf (secname, ".coreipt/%u", (unsigned) ipt_header.threadId);
+
+	  uint32_t rbo = ipt_header.ringBufferOffset;
+	  sec = make_bfd_asection (abfd, secname,
+				   SEC_HAS_CONTENTS,
+				   iptTraceRva + sizeof ipt_data + data_pos + rbo,
+				   ipt_header.traceSize - rbo,
+				   0);
+	  if (!sec)
+	    goto fail;
+
+	  if (rbo > 0)
+	    {
+	      sprintf (secname, ".coreipt/%u/2", (unsigned) ipt_header.threadId);
+
+	      sec = make_bfd_asection (abfd, secname,
+				       SEC_HAS_CONTENTS,
+				       iptTraceRva + sizeof ipt_data + data_pos,
+				       rbo,
+				       0);
+	      if (!sec)
+		goto fail;
+	    }
+
+	  data_pos += ipt_header.traceSize;
 	}
     }
 
