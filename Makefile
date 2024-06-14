@@ -38,7 +38,7 @@ PDCURSES_CONF=$(SOURCE_DIR_ABS)/$(PDCURSES_SRC_DIR)/configure \
 	      --build=$(MYBUILD) --host=$(MYTARGET) \
 	      --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
-ICONV_VER=1.16
+ICONV_VER=1.17
 ICONV_SRC_DIR=libiconv-$(ICONV_VER)
 ICONV_FILE=$(ICONV_SRC_DIR).tar.gz
 ICONV_CONF=$(SOURCE_DIR_ABS)/$(ICONV_SRC_DIR)/configure \
@@ -299,7 +299,15 @@ $(SOURCE_DIR)/iconv-01-extract.done: | pkg/$(ICONV_FILE) $(SOURCE_DIR)/pdcurses-
 	tar -C $(SOURCE_DIR) -xzf pkg/$(ICONV_FILE)
 	@touch $@
 
-$(BUILD_DIR)/iconv-03-configure.done: | $(BUILD_DIR)/expat-03-configure.done $(BUILD_DIR)/pdcurses-04-make-install.done $(SOURCE_DIR)/iconv-01-extract.done
+$(SOURCE_DIR)/iconv-02-patch-01-cp65001.done: $(SOURCE_DIR)/iconv-01-extract.done
+	patch -d $(SOURCE_DIR)/$(ICONV_SRC_DIR) -p0 <patches/iconv/cp65001.patch
+	@touch $@
+
+$(SOURCE_DIR)/iconv-02-patch-02-regen.done: $(SOURCE_DIR)/iconv-02-patch-01-cp65001.done
+	$(MAKE) -j1 -C $(SOURCE_DIR)/$(ICONV_SRC_DIR) -f Makefile.devel
+	@touch $@
+
+$(BUILD_DIR)/iconv-03-configure.done: | $(BUILD_DIR)/expat-03-configure.done $(BUILD_DIR)/pdcurses-04-make-install.done $(SOURCE_DIR)/iconv-02-patch-02-regen.done
 	@mkdir -p $(BUILD_DIR)/iconv
 	cd $(BUILD_DIR)/iconv && $(ICONV_CONF)
 	@touch $@
