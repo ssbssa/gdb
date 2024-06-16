@@ -4019,6 +4019,27 @@ static BOOL CALLBACK symbol_callback (PSYMBOL_INFO si,
 
       pli->functions.push_back (sym);
     }
+  else if (si->Tag == SymTagThunk)
+    {
+      if (si->Flags & SYMFLAG_THUNK)
+	{
+	  ULONGEST val = si->Value + base_ofs;
+
+	  for (symbol *sym : pli->functions)
+	    {
+	      if (sym->value_block ()->start () == val)
+		{
+		  std::string imp_name
+		    = string_printf ("__thunk_%s", sym->linkage_name ());
+		  struct minimal_symbol *msym = pli->reader->record_full
+		    (imp_name.c_str (), true, unrelocated_addr (si->Address),
+		     mst_data, 0);
+		  if (msym)
+		    msym->set_size (si->Size);
+		}
+	    }
+	}
+    }
   else if (si->Tag == SymTagPublicSymbol)
     {
       struct minimal_symbol *msym = pli->reader->record_full
