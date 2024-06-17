@@ -153,12 +153,14 @@ GDB_GIT_CONF=$(GDB_GIT_DIR)/configure \
 	 --with-pkgversion=$(MYPKG)
 GDB_TEST_CONF=/c/src/repos/gdb-testsuite/configure \
 	 --build=$(MYBUILD) --host=$(MYTARGET) --target=$(MYTARGET) \
+	 --enable-static --disable-shared \
 	 --disable-nls \
 	 --enable-curses --enable-tui \
 	 --with-libiconv-prefix=$(GDB_LIBS) \
 	 --with-liblzma-prefix=$(GDB_LIBS) \
+	 --with-xxhash \
 	 --disable-install-libbfd --disable-install-libiberty \
-	 --disable-binutils --disable-gas --disable-gprof --disable-ld \
+	 --disable-binutils --disable-gas --disable-gprof --disable-ld --disable-sim \
 	 --with-pkgversion=$(MYPKG)
 GDB_REDHAT64_CONF=$(GDB_GIT_DIR)/configure \
 	 --build=$(MYBUILD) --host=$(MYBUILD) --target=x86_64-redhat-linux \
@@ -856,7 +858,7 @@ $(BUILD_DIR)/binutils-git-02-make.done: | $(BUILD_DIR)/binutils-git-01-configure
 
 $(BUILD_DIR)/gdb-test-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-test
-	$(GDB_ENV) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test --with-system-gdbinit=$(GDB_DIR)-test/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-test/etc/gdbinit.d --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-test/lib
 	@touch $@
 
 $(BUILD_DIR)/gdb-test-02-make.done: | $(BUILD_DIR)/gdb-test-01-configure.done
