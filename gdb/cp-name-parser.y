@@ -157,9 +157,10 @@ cpname_state::d_grab ()
 #define INT_SHORT	(1 << 1)
 #define INT_LONG	(1 << 2)
 #define INT_LLONG	(1 << 3)
+#define INT_INT128	(1 << 4)
 
-#define INT_SIGNED	(1 << 4)
-#define INT_UNSIGNED	(1 << 5)
+#define INT_SIGNED	(1 << 5)
+#define INT_UNSIGNED	(1 << 6)
 
 /* Helper functions.  These wrap the demangler tree interface, handle
    allocation from our global store, and return the allocated component.  */
@@ -273,7 +274,7 @@ static void yyerror (cpname_state *, const char *);
 
 /* Special type cases, put in to allow the parser to distinguish different
    legal basetypes.  */
-%token SIGNED_KEYWORD LONG SHORT INT_KEYWORD CONST_KEYWORD VOLATILE_KEYWORD DOUBLE_KEYWORD BOOL
+%token SIGNED_KEYWORD LONG SHORT INT_KEYWORD CONST_KEYWORD VOLATILE_KEYWORD DOUBLE_KEYWORD BOOL INT128
 %token ELLIPSIS RESTRICT VOID FLOAT_KEYWORD CHAR WCHAR_T
 
 %token <opname> ASSIGN_MODIFY
@@ -722,6 +723,8 @@ int_part	:	INT_KEYWORD
 			{ $$ = INT_LONG; }
 		|	SHORT
 			{ $$ = INT_SHORT; }
+		|	INT128
+			{ $$ = INT_INT128; }
 		;
 
 int_seq		:	int_part
@@ -1290,6 +1293,13 @@ cpname_state::d_int_type (int flags)
       break;
     case INT_UNSIGNED | INT_LLONG | INT_LONG:
       name = "unsigned long long";
+      break;
+    case INT_INT128:
+    case INT_SIGNED | INT_INT128:
+      name = "__int128";
+      break;
+    case INT_UNSIGNED | INT_INT128:
+      name = "unsigned __int128";
       break;
     default:
       return NULL;
@@ -1929,6 +1939,8 @@ yylex (YYSTYPE *lvalp, cpname_state *state)
 	return TEMPLATE;
       if (startswith (tokstart, "volatile"))
 	return VOLATILE_KEYWORD;
+      if (startswith (tokstart, "__int128"))
+	return INT128;
       break;
     case 7:
       HANDLE_SPECIAL ("virtual thunk to ", DEMANGLE_COMPONENT_VIRTUAL_THUNK);
