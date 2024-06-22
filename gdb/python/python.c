@@ -928,7 +928,7 @@ gdbpy_rbreak (PyObject *self, PyObject *args, PyObject *kw)
 
       gdbpy_ref<> argList (Py_BuildValue("(s)", symbol_name.c_str ()));
       gdbpy_ref<> obj (PyObject_CallObject ((PyObject *)
-					    &breakpoint_object_type,
+					    &gdbpy_breakpoint_object_type,
 					    argList.get ()));
 
       /* Tolerate individual breakpoint failures.  */
