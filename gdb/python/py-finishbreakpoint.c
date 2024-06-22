@@ -493,7 +493,7 @@ PyTypeObject finish_breakpoint_object_type =
   0,                              /* tp_methods */
   0,                              /* tp_members */
   finish_breakpoint_object_getset,/* tp_getset */
-  &breakpoint_object_type,        /* tp_base */
+  &gdbpy_breakpoint_object_type,  /* tp_base */
   0,                              /* tp_dict */
   0,                              /* tp_descr_get */
   0,                              /* tp_descr_set */
