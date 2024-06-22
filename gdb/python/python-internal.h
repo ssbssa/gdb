@@ -338,7 +338,7 @@ extern PyTypeObject value_object_type;
 extern PyTypeObject block_object_type;
 extern PyTypeObject symbol_object_type;
 extern PyTypeObject event_object_type;
-extern PyTypeObject breakpoint_object_type;
+extern PyTypeObject gdbpy_breakpoint_object_type;
 extern PyTypeObject frame_object_type;
 extern PyTypeObject thread_object_type;
 
