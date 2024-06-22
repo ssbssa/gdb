@@ -1165,6 +1165,10 @@ gdbpy_breakpoint_cond_says_stop (const struct extension_language_defn *extlang,
   if (bp_obj == NULL)
     return EXT_LANG_BP_STOP_UNSET;
 
+  /* Only subclasses of gdb.Breakpoint can have a "stop" method.  */
+  if (Py_IS_TYPE (py_bp, &gdbpy_breakpoint_object_type))
+    return EXT_LANG_BP_STOP_UNSET;
+
   stop = -1;
 
   gdbpy_enter enter_py (b->gdbarch);
@@ -1215,6 +1219,10 @@ gdbpy_breakpoint_has_cond (const struct extension_language_defn *extlang,
     return 0;
 
   py_bp = (PyObject *) b->py_bp_object;
+
+  /* Only subclasses of gdb.Breakpoint can have a "stop" method.  */
+  if (Py_IS_TYPE (py_bp, &gdbpy_breakpoint_object_type))
+    return 0;
 
   gdbpy_enter enter_py (b->gdbarch);
   return PyObject_HasAttrString (py_bp, stop_func);
