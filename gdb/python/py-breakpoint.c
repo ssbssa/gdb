@@ -1113,14 +1113,14 @@ build_bp_list (struct breakpoint *b, PyObject *list)
 bool
 gdbpy_breakpoint_init_breakpoint_type ()
 {
-  if (breakpoint_object_type.tp_new == nullptr)
+  if (gdbpy_breakpoint_object_type.tp_new == nullptr)
     {
-      breakpoint_object_type.tp_new = PyType_GenericNew;
-      if (PyType_Ready (&breakpoint_object_type) < 0)
+      gdbpy_breakpoint_object_type.tp_new = PyType_GenericNew;
+      if (PyType_Ready (&gdbpy_breakpoint_object_type) < 0)
 	{
 	  /* Reset tp_new back to nullptr so future calls to this function
 	     will try calling PyType_Ready again.  */
-	  breakpoint_object_type.tp_new = nullptr;
+	  gdbpy_breakpoint_object_type.tp_new = nullptr;
 	  return false;
 	}
     }
@@ -1262,7 +1262,7 @@ gdbpy_breakpoint_created (struct breakpoint *bp)
     }
   else
     {
-      newbp = PyObject_New (gdbpy_breakpoint_object, &breakpoint_object_type);
+      newbp = PyObject_New (gdbpy_breakpoint_object, &gdbpy_breakpoint_object_type);
       pybp_debug_printf ("attaching new breakpoint object");
     }
   if (newbp)
@@ -1362,7 +1362,7 @@ gdbpy_initialize_breakpoints (void)
     return -1;
 
   if (gdb_pymodule_addobject (gdb_module, "Breakpoint",
-			      (PyObject *) &breakpoint_object_type) < 0)
+			      (PyObject *) &gdbpy_breakpoint_object_type) < 0)
     return -1;
 
   gdb::observers::breakpoint_created.attach (gdbpy_breakpoint_created,
@@ -1507,7 +1507,7 @@ static PyMethodDef breakpoint_object_methods[] =
   { NULL } /* Sentinel.  */
 };
 
-PyTypeObject breakpoint_object_type =
+PyTypeObject gdbpy_breakpoint_object_type =
 {
   PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Breakpoint",		  /*tp_name*/
