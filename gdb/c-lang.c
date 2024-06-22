@@ -772,6 +772,10 @@ c_language_arch_info (struct gdbarch *gdbarch,
   add (builtin->builtin_decdouble);
   add (builtin->builtin_declong);
 
+  type_allocator alloc (gdbarch);
+  add (init_integer_type (alloc, 128, 0, "__int128"));
+  add (init_integer_type (alloc, 128, 1, "unsigned __int128"));
+
   lai->set_string_char_type (builtin->builtin_char);
   lai->set_bool_type (builtin->builtin_int);
 }
@@ -917,6 +921,10 @@ public:
     add (builtin->builtin_char16);
     add (builtin->builtin_char32);
     add (builtin->builtin_wchar);
+
+    type_allocator alloc (gdbarch);
+    add (init_integer_type (alloc, 128, 0, "__int128"));
+    add (init_integer_type (alloc, 128, 1, "unsigned __int128"));
 
     lai->set_string_char_type (builtin->builtin_char);
     lai->set_bool_type (builtin->builtin_bool, "bool");
