@@ -233,7 +233,7 @@ static void c_print_token (FILE *file, int type, YYSTYPE value);
 
 /* Special type cases, put in to allow the parser to distinguish different
    legal basetypes.  */
-%token SIGNED_KEYWORD LONG SHORT INT_KEYWORD CONST_KEYWORD VOLATILE_KEYWORD DOUBLE_KEYWORD
+%token SIGNED_KEYWORD LONG SHORT INT_KEYWORD CONST_KEYWORD VOLATILE_KEYWORD DOUBLE_KEYWORD INT128_KEYWORD
 %token RESTRICT ATOMIC
 %token FLOAT_KEYWORD COMPLEX
 
@@ -1393,6 +1393,9 @@ scalar_type:
 	|	SHORT
 			{ $$ = lookup_signed_typename (pstate->language (),
 						       "short"); }
+	|	INT128_KEYWORD
+			{ $$ = lookup_signed_typename (pstate->language (),
+						       "__int128"); }
 	|	LONG INT_KEYWORD
 			{ $$ = lookup_signed_typename (pstate->language (),
 						       "long"); }
@@ -1462,6 +1465,12 @@ scalar_type:
 	|	SHORT UNSIGNED INT_KEYWORD
 			{ $$ = lookup_unsigned_typename (pstate->language (),
 							 "short"); }
+	|	INT128_KEYWORD SIGNED_KEYWORD
+			{ $$ = lookup_signed_typename (pstate->language (),
+						       "__int128"); }
+	|	INT128_KEYWORD UNSIGNED
+			{ $$ = lookup_unsigned_typename (pstate->language (),
+							 "__int128"); }
 	|	DOUBLE_KEYWORD
 			{ $$ = lookup_typename (pstate->language (),
 						"double",
@@ -1611,6 +1620,13 @@ type_name:	TYPENAME
 		  $$.stoken.length = 5;
 		  $$.type = lookup_signed_typename (pstate->language (),
 						    "short");
+		}
+	|	INT128_KEYWORD
+		{
+		  $$.stoken.ptr = "__int128";
+		  $$.stoken.length = 8;
+		  $$.type = lookup_signed_typename (pstate->language (),
+						    "__int128");
 		}
 	;
 
@@ -1811,6 +1827,7 @@ field_name
 	|	INT_KEYWORD { $$ = typename_stoken ("int"); }
 	|	LONG { $$ = typename_stoken ("long"); }
 	|	SHORT { $$ = typename_stoken ("short"); }
+	|	INT128_KEYWORD { $$ = typename_stoken ("__int128"); }
 	|	SIGNED_KEYWORD { $$ = typename_stoken ("signed"); }
 	|	UNSIGNED { $$ = typename_stoken ("unsigned"); }
 	;
