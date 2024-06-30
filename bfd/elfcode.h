@@ -1949,6 +1949,13 @@ NAME(_bfd_elf,bfd_from_remote_memory)
 	}
     }
 
+  if (high_offset < sizeof x_ehdr)
+    {
+      bfd_set_error (bfd_error_wrong_format);
+      free (x_phdrs);
+      return NULL;
+    }
+
   /* Now we know the size of the whole image we want read in.  */
   contents = (bfd_byte *) bfd_zmalloc (high_offset);
   if (contents == NULL)
