@@ -4035,7 +4035,7 @@ read_range_type (const char **pp, int typenums[2], int type_size,
       struct type *float_type
 	= dbx_init_float_type (objfile, n2 * TARGET_CHAR_BIT);
 
-      if (self_subrange)
+      if (self_subrange && float_type->code () == TYPE_CODE_FLT)
 	return init_complex_type (NULL, float_type);
       else
 	return float_type;
