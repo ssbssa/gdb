@@ -6225,7 +6225,10 @@ read_sun_floating_type (const char **pp, int typenums[2],
       || details == NF_COMPLEX32)
     {
       rettype = dbx_init_float_type (objfile, nbits / 2);
-      return init_complex_type (NULL, rettype);
+      if (can_create_complex_type (rettype))
+	return init_complex_type (NULL, rettype);
+      else
+	return rettype;
     }
 
   return dbx_init_float_type (objfile, nbits);
@@ -6520,7 +6523,7 @@ read_range_type (const char **pp, int typenums[2], int type_size,
       struct type *float_type
 	= dbx_init_float_type (objfile, n2 * TARGET_CHAR_BIT);
 
-      if (self_subrange)
+      if (self_subrange && can_create_complex_type (float_type))
 	return init_complex_type (NULL, float_type);
       else
 	return float_type;
