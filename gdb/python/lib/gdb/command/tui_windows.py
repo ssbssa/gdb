@@ -220,7 +220,7 @@ class TextWindow(object):
         gdb.register_window_type(window_name, cls)
 
 
-def val_cmp_color(prev, cur, sym_not_init, argument, empty=False):
+def val_cmp_color(prev, cur, sym_not_init, argument, artificial, empty=False):
     """Returns the color escape sequences for variable name and value."""
     var_col_s, var_col_e, val_col_s, val_col_e = "", "", "", ""
     if empty:
@@ -232,7 +232,10 @@ def val_cmp_color(prev, cur, sym_not_init, argument, empty=False):
     elif prev != cur:
         # Variable contents changed
         val_col_s, val_col_e = "\033[1;31m", "\033[0m"
-    if argument:
+    if artificial:
+        # Variable is artificial
+        var_col_s, var_col_e = "\033[1;34m", "\033[0m"
+    elif argument:
         # Variable is a function argument
         var_col_s, var_col_e = "\033[1;35m", "\033[0m"
     elif sym_not_init:
@@ -538,6 +541,10 @@ class VariableWindow(TextWindow):
             if hasattr(v, "expand"):
                 expand = v.expand()
 
+            artificial = False
+            if hasattr(v, "artificial"):
+                artificial = v.artificial()
+
             self.add_val(
                 name,
                 name,
@@ -552,6 +559,7 @@ class VariableWindow(TextWindow):
                 raw,
                 fmt,
                 error,
+                artificial,
             )
         self.prev_vals = cur_vals
 
@@ -570,6 +578,7 @@ class VariableWindow(TextWindow):
         raw,
         fmt,
         error,
+        artificial=False,
     ):
         if num == 0:
             n2 = fn
@@ -607,12 +616,12 @@ class VariableWindow(TextWindow):
         if v is None:
             if error is None:
                 (var_col_s, var_col_e, val_col_s, val_col_e) = val_cmp_color(
-                    False, False, sym_not_init, argument, empty=True
+                    False, False, sym_not_init, argument, artificial, empty=True
                 )
                 self.lines.append(spaces + numstr + "  " + var_col_s + n + var_col_e)
             else:
                 (var_col_s, var_col_e, val_col_s, val_col_e) = val_cmp_color(
-                    False, False, sym_not_init, argument
+                    False, False, sym_not_init, argument, artificial
                 )
                 self.lines.append(
                     spaces
@@ -631,7 +640,7 @@ class VariableWindow(TextWindow):
         if isinstance(v, basestring):
             v = output_convert(v)
             (var_col_s, var_col_e, val_col_s, val_col_e) = val_cmp_color(
-                prev_val, v, sym_not_init, argument
+                prev_val, v, sym_not_init, argument, artificial
             )
             self.lines.append(
                 spaces
@@ -680,6 +689,7 @@ class VariableWindow(TextWindow):
                     raw,
                     fmt,
                     str(sys.exc_info()[1]),
+                    artificial,
                 )
                 return
 
@@ -701,6 +711,7 @@ class VariableWindow(TextWindow):
                     raw,
                     fmt,
                     "optimized out",
+                    artificial,
                 )
                 return
 
@@ -772,7 +783,7 @@ class VariableWindow(TextWindow):
                 valstr = output_convert(valstr)
                 sp = valstr.split("\n")
                 (var_col_s, var_col_e, val_col_s, val_col_e) = val_cmp_color(
-                    prev_val, valstr, sym_not_init, argument
+                    prev_val, valstr, sym_not_init, argument, artificial
                 )
                 self.lines.append(
                     spaces
@@ -793,7 +804,7 @@ class VariableWindow(TextWindow):
                 cur_entry[1] = valstr
             else:
                 (var_col_s, var_col_e, val_col_s, val_col_e) = val_cmp_color(
-                    prev_val, False, sym_not_init, argument
+                    prev_val, False, sym_not_init, argument, artificial
                 )
                 self.lines.append(spaces + numstr + var_col_s + n + var_col_e + cv_str)
                 self.line_names.append(n2)
@@ -812,6 +823,7 @@ class VariableWindow(TextWindow):
                 raw,
                 fmt,
                 str(sys.exc_info()[1]),
+                artificial,
             )
             return
 
@@ -964,6 +976,7 @@ class VariableWindow(TextWindow):
                 raw,
                 fmt,
                 str(sys.exc_info()[1]),
+                artificial,
             )
 
 
@@ -981,6 +994,7 @@ class VarNameValue(object):
         fmt=None,
         err=None,
         exp=False,
+        art=False,
     ):
         self.sym = sym
         self.val = val
@@ -991,6 +1005,7 @@ class VarNameValue(object):
         self.fmt = fmt
         self.err = err
         self.exp = exp
+        self.art = art
 
     def symbol(self):
         return self.sym
@@ -1018,6 +1033,9 @@ class VarNameValue(object):
 
     def expand(self):
         return self.exp
+
+    def artificial(self):
+        return self.art
 
 
 class LocalsWindow(VariableWindow):
@@ -1061,6 +1079,7 @@ class LocalsWindow(VariableWindow):
                                 undecl=sym_not_init,
                                 arg=symbol.is_argument,
                                 err=error,
+                                art=symbol.is_artificial,
                             )
                 if block.function:
                     break
