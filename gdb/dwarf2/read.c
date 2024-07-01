@@ -16293,7 +16293,7 @@ cooked_indexer::scan_attributes (dwarf2_per_cu_data *scanning_per_cu,
 	    {
 	      /* Self-reference, we're done.  */
 	    }
-	  else
+	  else if (new_abbrev != nullptr)
 	    scan_attributes (scanning_per_cu, new_reader, new_info_ptr,
 			     new_info_ptr, new_abbrev, name, linkage_name,
 			     flags, nullptr, parent_entry, maybe_defer,
