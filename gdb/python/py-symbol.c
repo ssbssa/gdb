@@ -205,6 +205,16 @@ sympy_is_variable (PyObject *self, void *closure)
 			      || theclass == LOC_OPTIMIZED_OUT));
 }
 
+static PyObject *
+sympy_is_artificial (PyObject *self, void *closure)
+{
+  struct symbol *symbol = NULL;
+
+  SYMPY_REQUIRE_VALID (self, symbol);
+
+  return PyBool_FromLong (symbol->is_artificial ());
+}
+
 /* Implementation of gdb.Symbol.needs_frame -> Boolean.
    Returns true iff the symbol needs a frame for evaluation.  */
 
@@ -716,6 +726,8 @@ to display demangled or mangled names.", NULL },
     "True if the symbol is a function or method." },
   { "is_variable", sympy_is_variable, NULL,
     "True if the symbol is a variable." },
+  { "is_artificial", sympy_is_artificial, NULL,
+    "True if the symbol is artificial." },
   { "needs_frame", sympy_needs_frame, NULL,
     "True if the symbol requires a frame for evaluation." },
   { "line", sympy_line, NULL,
