@@ -1400,7 +1400,7 @@ getsymname (struct internal_syment *symbol_entry)
 
   if (symbol_entry->_n._n_n._n_zeroes == 0)
     {
-      if (symbol_entry->_n._n_n._n_offset > stringtab_length)
+      if (symbol_entry->_n._n_n._n_offset >= stringtab_length)
 	error (_("COFF Error: string table offset (%s) outside string table (length %ld)"),
 	       hex_string (symbol_entry->_n._n_n._n_offset), stringtab_length);
       result = stringtab + symbol_entry->_n._n_n._n_offset;
