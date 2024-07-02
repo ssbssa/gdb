@@ -906,7 +906,8 @@ read_ofile_symtab (struct objfile *objfile, legacy_psymtab *pst)
 	{
 	  if (sizeof (nlist.n_value) > 4
 	      /* We are a 64-bit debugger debugging a 32-bit program.  */
-	      && (type == N_LSYM || type == N_PSYM))
+	      && (type == N_LSYM || type == N_PSYM)
+	      && !bfd_get_sign_extend_vma (abfd))
 	      /* We have to be careful with the n_value in the case of N_LSYM
 		 and N_PSYM entries, because they are signed offsets from frame
 		 pointer, but we actually read them as unsigned 32-bit values.
