@@ -10748,10 +10748,6 @@ dwarf2_rnglists_process (unsigned offset, struct dwarf2_cu *cu,
 	  return false;
 	}
 
-      /* Empty range entries have no effect.  */
-      if (range_beginning == range_end)
-	continue;
-
       /* Only DW_RLE_offset_pair needs the base address added.  */
       if (rlet == DW_RLE_offset_pair)
 	{
@@ -10869,10 +10865,6 @@ dwarf2_ranges_process (unsigned offset, struct dwarf2_cu *cu, dwarf_tag tag,
 	  complaint (_("Invalid .debug_ranges data (inverted range)"));
 	  return 0;
 	}
-
-      /* Empty range entries have no effect.  */
-      if (range_beginning == range_end)
-	continue;
 
       range_beginning = (unrelocated_addr) ((CORE_ADDR) range_beginning
 					    + (CORE_ADDR) *base);
@@ -11095,8 +11087,8 @@ dwarf2_get_pc_bounds (struct die_info *die, unrelocated_addr *lowpc,
   if (ret == PC_BOUNDS_NOT_PRESENT || ret == PC_BOUNDS_INVALID)
     return ret;
 
-  /* partial_die_info::read has also the strict LOW < HIGH requirement.  */
-  if (high <= low)
+  /* partial_die_info::read has also the same low < high requirement.  */
+  if (low > high || (low == high && die->tag != DW_TAG_inlined_subroutine))
     return PC_BOUNDS_INVALID;
 
   /* When using the GNU linker, .gnu.linkonce. sections are used to
@@ -18040,20 +18032,8 @@ private:
 
   /* Additional bits of state we need to track.  */
 
-  /* The last file that we called dwarf2_start_subfile for.
-     This is only used for TLLs.  */
-  unsigned int m_last_file = 0;
   /* The last file a line number was recorded for.  */
   struct subfile *m_last_subfile = NULL;
-
-  /* The address of the last line entry.  */
-  unrelocated_addr m_last_address;
-
-  /* Set to true when a previous line at the same address (using
-     m_last_address) had LEF_IS_STMT set in m_flags.  This is reset to false
-     when a line entry at a new address (m_address different to
-     m_last_address) is processed.  */
-  bool m_stmt_at_address = false;
 
   /* When true, record the lines we decode.  */
   bool m_currently_recording_lines = true;
@@ -18212,7 +18192,8 @@ dwarf_record_line_1 (struct gdbarch *gdbarch, struct subfile *subfile,
 
 static void
 dwarf_finish_line (struct gdbarch *gdbarch, struct subfile *subfile,
-		   unrelocated_addr address, struct dwarf2_cu *cu)
+		   unrelocated_addr address, struct dwarf2_cu *cu,
+		   bool end_sequence)
 {
   if (subfile == NULL)
     return;
@@ -18225,7 +18206,8 @@ dwarf_finish_line (struct gdbarch *gdbarch, struct subfile *subfile,
 		  paddress (gdbarch, (CORE_ADDR) address));
     }
 
-  dwarf_record_line_1 (gdbarch, subfile, 0, address, LEF_IS_STMT, cu);
+  dwarf_record_line_1 (gdbarch, subfile, end_sequence ? 0 : -1, address,
+		       LEF_IS_STMT, cu);
 }
 
 void
@@ -18253,38 +18235,17 @@ lnp_state_machine::record_line (bool end_sequence)
   /* For now we ignore lines not starting on an instruction boundary.
      But not when processing end_sequence for compatibility with the
      previous version of the code.  */
-  else if (m_op_index == 0 || end_sequence)
+  else if ((m_op_index == 0 && m_line != 0) || end_sequence)
     {
-      /* When we switch files we insert an end maker in the first file,
-	 switch to the second file and add a new line entry.  The
-	 problem is that the end marker inserted in the first file will
-	 discard any previous line entries at the same address.  If the
-	 line entries in the first file are marked as is-stmt, while
-	 the new line in the second file is non-stmt, then this means
-	 the end marker will discard is-stmt lines so we can have a
-	 non-stmt line.  This means that there are less addresses at
-	 which the user can insert a breakpoint.
-
-	 To improve this we track the last address in m_last_address,
-	 and whether we have seen an is-stmt at this address.  Then
-	 when switching files, if we have seen a stmt at the current
-	 address, and we are switching to create a non-stmt line, then
-	 discard the new line.  */
-      bool file_changed
-	= m_last_subfile != m_cu->get_builder ()->get_current_subfile ();
-      bool ignore_this_line
-	= ((file_changed && !end_sequence && m_last_address == m_address
-	    && ((m_flags & LEF_IS_STMT) == 0)
-	    && m_stmt_at_address)
-	   || (!end_sequence && m_line == 0));
-
-      if ((file_changed && !ignore_this_line) || end_sequence)
+      if (m_last_subfile != m_cu->get_builder ()->get_current_subfile ()
+	  || end_sequence)
 	{
 	  dwarf_finish_line (m_gdbarch, m_last_subfile, m_address,
-			     m_currently_recording_lines ? m_cu : nullptr);
+			     m_currently_recording_lines ? m_cu : nullptr,
+			     end_sequence || (m_flags & LEF_IS_STMT) != 0);
 	}
 
-      if (!end_sequence && !ignore_this_line)
+      if (!end_sequence)
 	{
 	  linetable_entry_flags lte_flags = m_flags;
 	  if (producer_is_codewarrior (m_cu))
@@ -18304,15 +18265,6 @@ lnp_state_machine::record_line (bool end_sequence)
 	  m_last_line = m_line;
 	}
     }
-
-  /* Track whether we have seen any IS_STMT true at m_address in case we
-     have multiple line table entries all at m_address.  */
-  if (m_last_address != m_address)
-    {
-      m_stmt_at_address = false;
-      m_last_address = m_address;
-    }
-  m_stmt_at_address |= (m_flags & LEF_IS_STMT) != 0;
 }
 
 lnp_state_machine::lnp_state_machine (struct dwarf2_cu *cu, gdbarch *arch,
@@ -18326,8 +18278,7 @@ lnp_state_machine::lnp_state_machine (struct dwarf2_cu *cu, gdbarch *arch,
        This is currently used by MIPS code,
        cf. `mips_adjust_dwarf2_line'.  */
     m_address ((unrelocated_addr) gdbarch_adjust_dwarf2_line (arch, 0, 0)),
-    m_flags (lh->default_is_stmt ? LEF_IS_STMT : (linetable_entry_flags) 0),
-    m_last_address (m_address)
+    m_flags (lh->default_is_stmt ? LEF_IS_STMT : (linetable_entry_flags) 0)
 {
 }
 

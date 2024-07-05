@@ -8113,6 +8113,31 @@ process_event_stop_test (struct execution_control_state *ecs)
       return;
     }
 
+  /* Handle the case when subroutines have multiple ranges.
+     When we step from one part to the next part of the same subroutine,
+     all subroutine levels are skipped again which begin here.
+     Compensate for this by removing all skipped subroutines,
+     which were already executing from the user's perspective.  */
+
+  if (get_stack_frame_id (frame)
+      == ecs->event_thread->control.step_stack_frame_id
+      && inline_skipped_frames (ecs->event_thread)
+      && ecs->event_thread->control.step_frame_id.artificial_depth > 0
+      && ecs->event_thread->control.step_frame_id.code_addr_p)
+    {
+      const struct block *prev, *curr;
+      int depth = 0;
+      prev = block_for_pc (ecs->event_thread->control.step_frame_id.code_addr);
+      curr = block_for_pc (ecs->event_thread->stop_pc ());
+      while (curr && curr->inlined_p () && !curr->contains (prev))
+	{
+	  depth ++;
+	  curr = curr->superblock ();
+	}
+      while (inline_skipped_frames (ecs->event_thread) > depth)
+	step_into_inline_frame (ecs->event_thread);
+    }
+
   /* Look for "calls" to inlined functions, part one.  If the inline
      frame machinery detected some skipped call sites, we have entered
      a new inline function.  */
@@ -8171,6 +8196,8 @@ process_event_stop_test (struct execution_control_state *ecs)
       infrun_debug_printf ("stepping through inlined function");
 
       if (ecs->event_thread->control.step_over_calls == STEP_OVER_ALL
+	  || ecs->event_thread->stop_pc () != stop_pc_sal.pc
+	  || !stop_pc_sal.is_stmt
 	  || inline_frame_is_marked_for_skip (false, ecs->event_thread))
 	keep_going (ecs);
       else
@@ -8219,7 +8246,8 @@ process_event_stop_test (struct execution_control_state *ecs)
 	  end_stepping_range (ecs);
 	  return;
 	}
-      else if (*curr_frame_id == original_frame_id)
+      else if (get_stack_frame_id (frame)
+	       == ecs->event_thread->control.step_stack_frame_id)
 	{
 	  /* We are not at the start of a statement, and we have not changed
 	     frame.
