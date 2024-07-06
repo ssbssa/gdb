@@ -1057,6 +1057,22 @@ show_condition_evaluation_mode (struct ui_file *file, int from_tty,
 		value);
 }
 
+static const block *
+block_for_pc_sym (CORE_ADDR pc, const symbol *sym)
+{
+  const block *b = block_for_pc (pc);
+
+  if (sym != nullptr)
+    {
+      const block *vb = sym->value_block ();
+      if (vb != nullptr
+	  && vb->containing_function () != b->containing_function ())
+	return vb;
+    }
+
+  return b;
+}
+
 /* Parse COND_STRING in the context of LOC and set as the condition
    expression of LOC.  BP_NUM is the number of LOC's owner, LOC_NUM is
    the number of LOC within its owner.  In case of parsing error, mark
@@ -1070,7 +1086,8 @@ set_breakpoint_location_condition (const char *cond_string, bp_location *loc,
   try
     {
       expression_up new_exp = parse_exp_1 (&cond_string, loc->address,
-					   block_for_pc (loc->address), 0);
+					   block_for_pc_sym (loc->address,
+							     loc->symbol), 0);
       if (*cond_string != 0)
 	has_junk = true;
       else
@@ -1177,7 +1194,7 @@ set_breakpoint_condition (struct breakpoint *b, const char *exp,
 		{
 		  const char *arg = exp;
 		  parse_exp_1 (&arg, loc.address,
-			       block_for_pc (loc.address), 0);
+			       block_for_pc_sym (loc.address, loc.symbol), 0);
 		  if (*arg != 0)
 		    error (_("Junk at end of expression"));
 		  break;
@@ -2706,7 +2723,7 @@ build_target_condition_list (struct bp_location *bl)
    Return NULL if there was any error during parsing.  */
 
 static agent_expr_up
-parse_cmd_to_aexpr (CORE_ADDR scope, char *cmd)
+parse_cmd_to_aexpr (CORE_ADDR scope, const symbol *sym, char *cmd)
 {
   const char *cmdrest;
   const char *format_start, *format_end;
@@ -2750,7 +2767,8 @@ parse_cmd_to_aexpr (CORE_ADDR scope, char *cmd)
       const char *cmd1;
 
       cmd1 = cmdrest;
-      expression_up expr = parse_exp_1 (&cmd1, scope, block_for_pc (scope),
+      expression_up expr = parse_exp_1 (&cmd1, scope,
+					block_for_pc_sym (scope, sym),
 					PARSER_COMMA_TERMINATES);
       argvec.push_back (expr.release ());
       cmdrest = cmd1;
@@ -2827,7 +2845,7 @@ build_target_command_list (struct bp_location *bl)
 		 force_breakpoint_reinsertion).  We just
 		 need to parse the command to bytecodes again.  */
 	      loc->cmd_bytecode
-		= parse_cmd_to_aexpr (bl->address,
+		= parse_cmd_to_aexpr (bl->address, bl->symbol,
 				      loc->owner->extra_string.get ());
 	    }
 
@@ -9409,7 +9427,8 @@ create_breakpoint (struct gdbarch *gdbarch,
 	      const char *cond = cond_string_copy.get ();
 	      try
 		{
-		  parse_exp_1 (&cond, sal.pc, block_for_pc (sal.pc), 0);
+		  parse_exp_1 (&cond, sal.pc,
+			       block_for_pc_sym (sal.pc, sal.symbol), 0);
 		  /* One success is sufficient to keep going.  */
 		  break;
 		}
@@ -13095,7 +13114,8 @@ update_breakpoint_locations (code_breakpoint *b,
 	  try
 	    {
 	      new_loc->cond = parse_exp_1 (&s, sal.pc,
-					   block_for_pc (sal.pc),
+					   block_for_pc_sym (sal.pc,
+							     sal.symbol),
 					   0);
 	    }
 	  catch (const gdb_exception_error &e)
