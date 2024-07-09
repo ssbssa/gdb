@@ -1234,13 +1234,13 @@ if test "${enable_source_highlight}" != "no"; then
     fi
   else
     if ${pkg_config_prog_path} --exists source-highlight; then
-      case "$LDFLAGS" in
-        *static-libstdc*)
-          AC_MSG_ERROR([source highlight is incompatible with -static-libstdc++; dnl
-either use --disable-source-highlight or dnl
---without-static-standard-libraries])
-          ;;
-      esac
+#      case "$LDFLAGS" in
+#        *static-libstdc*)
+#          AC_MSG_ERROR([source highlight is incompatible with -static-libstdc++; dnl
+#either use --disable-source-highlight or dnl
+#--without-static-standard-libraries])
+#          ;;
+#      esac
 
       srchigh_pkg_cflags=`${pkg_config_prog_path} --cflags source-highlight`
       srchigh_pkg_libs=`${pkg_config_prog_path} --libs source-highlight`
