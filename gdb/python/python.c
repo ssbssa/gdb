@@ -2512,6 +2512,12 @@ py_initialize ()
     (concat (gdb_ldirname (python_libdir.c_str ()).c_str (), SLASH_STRING, "bin",
 	      SLASH_STRING, "python", (char *) NULL));
 
+#ifdef _WIN32
+  for (char *p = progname.get (); *p; p++)
+    if (*p == '/')
+      *p = '\\';
+#endif
+
   {
     std::string oldloc = setlocale (LC_ALL, NULL);
     SCOPE_EXIT { setlocale (LC_ALL, oldloc.c_str ()); };
