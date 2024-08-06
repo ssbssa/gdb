@@ -29,6 +29,93 @@
 
 #include <windows.h>
 #include <signal.h>
+#include <winternl.h>
+
+static char *
+windows_follow_symlink (const char *name)
+{
+  HANDLE h = INVALID_HANDLE_VALUE;
+
+  do
+    {
+      DWORD attr = GetFileAttributes (name);
+      if (attr == INVALID_FILE_ATTRIBUTES
+	  || !(attr & FILE_ATTRIBUTE_REPARSE_POINT))
+	break;
+
+      h = CreateFile (name, 0,
+		      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		      NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (h == INVALID_HANDLE_VALUE)
+	break;
+
+      HMODULE ntdll = GetModuleHandle ("ntdll.dll");
+      if (ntdll == nullptr)
+	break;
+
+      typedef LONG NTAPI func_NtQueryObject(HANDLE, OBJECT_INFORMATION_CLASS,
+					    PVOID, ULONG, PULONG);
+      func_NtQueryObject *fNtQueryObject
+	= (func_NtQueryObject *) GetProcAddress(ntdll, "NtQueryObject");
+      if (fNtQueryObject == nullptr)
+	break;
+
+      size_t s = sizeof (OBJECT_NAME_INFORMATION) + PATH_MAX;
+      gdb::unique_xmalloc_ptr<OBJECT_NAME_INFORMATION> oni
+	((OBJECT_NAME_INFORMATION *) xmalloc (s));
+      ULONG len;
+      if (fNtQueryObject (h, ObjectNameInformation,
+			  oni.get (), s, &len) != 0)
+	break;
+
+      int half = oni->Name.Length / 2;
+      if (half <= 0 || half >= PATH_MAX)
+	break;
+
+      oni->Name.Buffer[half] = 0;
+
+      char target[PATH_MAX];
+      BOOL used_default = FALSE;
+      int res = WideCharToMultiByte (CP_ACP, 0,
+				     oni->Name.Buffer, -1,
+				     target, sizeof (target),
+				     nullptr, &used_default);
+      if (res <= 0 || res >= PATH_MAX)
+	break;
+
+      char drives[128];
+      if (!GetLogicalDriveStrings (sizeof (drives) - 1, drives))
+	break;
+
+      char drive[3] = " :";
+      char *p = drives;
+      char path[PATH_MAX];
+      while (*p)
+	{
+	  drive[0] = *p;
+	  if (QueryDosDevice (drive, path, sizeof (path)))
+	    {
+	      size_t l = strlen (path);
+	      if (strncmp (target, path, l) == 0)
+		{
+		  gdb::unique_xmalloc_ptr<char> target_real
+		    = xstrprintf ("%s%s",
+				  drive, target + l);
+		  CloseHandle (h);
+		  return target_real.release ();
+		}
+
+	      while (*p++);
+	    }
+	}
+    }
+  while (false);
+
+  if (h != INVALID_HANDLE_VALUE)
+    CloseHandle (h);
+
+  return xstrdup (name);
+}
 
 /* Return an absolute file name of the running GDB, if possible, or
    ARGV0 if not.  The return value is in malloc'ed storage.  */
@@ -39,7 +126,7 @@ windows_get_absolute_argv0 (const char *argv0)
   char full_name[PATH_MAX];
 
   if (GetModuleFileName (NULL, full_name, PATH_MAX))
-    return xstrdup (full_name);
+    return windows_follow_symlink (full_name);
   return xstrdup (argv0);
 }
 
