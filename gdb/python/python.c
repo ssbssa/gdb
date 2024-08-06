@@ -2266,6 +2266,12 @@ do_start_initialization ()
      for Python versions that do not duplicate program_name.  */
   static wchar_t *progname_copy;
 
+#ifdef _WIN32
+  for (char *p = progname.get (); *p; p++)
+    if (*p == '/')
+      *p = '\\';
+#endif
+
   std::string oldloc = setlocale (LC_ALL, NULL);
   setlocale (LC_ALL, "");
   size_t progsize = strlen (progname.get ());
