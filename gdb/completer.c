@@ -56,6 +56,9 @@ static void set_rl_completer_word_break_characters (const char *break_chars);
 
 static bool gdb_path_isdir (const char *filename);
 
+static void reg_completer (completion_tracker &tracker,
+			   const char *text, const char *word);
+
 /* See completer.h.  */
 
 class completion_tracker::completion_hash_entry
@@ -1477,6 +1480,13 @@ void
 complete_expression (completion_tracker &tracker,
 		     const char *text, const char *word)
 {
+  if (word > text && word[-1] == '$')
+    {
+      complete_internalvar (tracker, word);
+      reg_completer (tracker, text, word);
+      return;
+    }
+
   expression_up exp;
   std::unique_ptr<expr_completion_base> expr_completer;
 
@@ -2282,6 +2292,16 @@ reggroup_completer (struct cmd_list_element *ignore,
 {
   reg_or_group_completer_1 (tracker, text, word,
 			    complete_reggroup_names);
+}
+
+/* Perform completion on register names.  */
+
+static void
+reg_completer (completion_tracker &tracker,
+	       const char *text, const char *word)
+{
+  reg_or_group_completer_1 (tracker, text, word,
+			    complete_register_names);
 }
 
 /* The default completer_handle_brkchars implementation.  */
