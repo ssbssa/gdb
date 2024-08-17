@@ -287,8 +287,31 @@ info_osdata_command (const char *arg, int from_tty)
   info_osdata (arg);
 }
 
+/* Completion for the "info os" command.  */
+
+static void
+info_osdata_completer (cmd_list_element *,
+		       completion_tracker &tracker, const char *text,
+		       const char *word)
+{
+  std::unique_ptr<osdata> osdata = get_osdata ("");
+
+  for (const osdata_item &item : osdata->items)
+    {
+      if (!item.columns.empty ())
+	{
+	  const std::string &value = item.columns[0].value;
+	  if (startswith (value, text))
+	    tracker.add_completion (make_completion_match_str (value.c_str (),
+							       text, word));
+	}
+    }
+}
+
 INIT_GDB_FILE (osdata)
 {
-  add_info ("os", info_osdata_command,
-	   _("Show OS data ARG."));
+  cmd_list_element *info_osdata_cmd
+    = add_info ("os", info_osdata_command,
+		_("Show OS data ARG."));
+  set_cmd_completer (info_osdata_cmd, info_osdata_completer);
 }
