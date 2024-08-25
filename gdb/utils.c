@@ -3376,9 +3376,9 @@ ldirname (const char *filename)
 
   /* On DOS based file systems, convert "d:foo" to "d:.", so that we
      create "d:./bar" later instead of the (different) "d:/bar".  */
-  if (base - filename == 2 && IS_ABSOLUTE_PATH (base)
-      && !IS_DIR_SEPARATOR (filename[0]))
-    dirname[base++ - filename] = '.';
+  if (base - filename == 2 && HAS_DRIVE_SPEC (filename)
+      && !IS_DIR_SEPARATOR (base[0]))
+    dirname += '.';
 
   return dirname;
 }
