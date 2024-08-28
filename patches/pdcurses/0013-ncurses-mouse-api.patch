@@ -1,6 +1,17 @@
---- a/curses.h	2008-07-15 19:13:25.000000000 +0200
-+++ b/curses.h	2020-12-20 16:03:54.139176900 +0100
-@@ -37,6 +37,9 @@
+From cfa503367f8ea9d97c5c04be1d156f3f3277aec8 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 20 Dec 2020 16:03:54 +0100
+Subject: [PATCH 13/14] ncurses mouse api
+
+---
+ curses.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/curses.h b/curses.h
+index 6f3ce19d..f3f0794e 100644
+--- a/curses.h
++++ b/curses.h
+@@ -37,6 +37,9 @@ PDCurses portable platform definitions list:
  #define SYSVcurses      1      /* System V Curses routines */
  #define BSDcurses       1      /* BSD Curses routines */
  #define CHTYPE_LONG     1      /* size of chtype; long */
@@ -10,3 +21,6 @@
  
  /*----------------------------------------------------------------------*/
  
+-- 
+2.39.1.windows.1
+

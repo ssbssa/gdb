@@ -1,6 +1,17 @@
---- a/pdcurses/terminfo.c	2015-01-04 16:35:55.002144800 +0100
-+++ b/pdcurses/terminfo.c	2015-01-04 17:23:26.706334400 +0100
-@@ -197,6 +197,13 @@
+From 24fc0f743617fe35ae6201477b0e491d750885fc Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 4 Jan 2015 17:23:26 +0100
+Subject: [PATCH 08/14] line up
+
+---
+ pdcurses/terminfo.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/pdcurses/terminfo.c b/pdcurses/terminfo.c
+index e9959788..53c3fffd 100644
+--- a/pdcurses/terminfo.c
++++ b/pdcurses/terminfo.c
+@@ -197,6 +197,13 @@ char *tgetstr(const char *id, char **area)
          *area += 2;
          return val;
      }
@@ -14,7 +25,7 @@
  #endif
  
      return (char *)NULL;
-@@ -284,6 +291,21 @@
+@@ -284,6 +291,21 @@ void PDC_clear_page(void)
      SetConsoleWindowInfo(hout, TRUE, &sr);
      SetConsoleCursorPosition(hout, coord);
  }
@@ -36,7 +47,7 @@
  #endif
  
  int tputs(const char *str, int affcnt, int (*putfunc)(int))
-@@ -300,6 +322,11 @@
+@@ -300,6 +322,11 @@ int tputs(const char *str, int affcnt, int (*putfunc)(int))
              PDC_clear_page();
              continue;
          }
@@ -48,3 +59,6 @@
  #endif
          putfunc(c);
      }
+-- 
+2.39.1.windows.1
+

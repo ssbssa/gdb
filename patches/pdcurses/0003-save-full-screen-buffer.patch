@@ -1,14 +1,14 @@
-From 3549dc990e0a5a04a53f31f890a47abb9cc01a04 Mon Sep 17 00:00:00 2001
+From c03f614c37135cbd1bfc7a09f61dbbc5b6f73208 Mon Sep 17 00:00:00 2001
 From: Hannes Domani <ssbssa@yahoo.de>
 Date: Sun, 9 Mar 2014 14:41:49 +0100
-Subject: [PATCH 3/4] save full screen buffer
+Subject: [PATCH 03/14] save full screen buffer
 
 ---
  win32/pdcscrn.c | 28 +++++++++++++++++++++++++++-
  1 file changed, 27 insertions(+), 1 deletion(-)
 
 diff --git a/win32/pdcscrn.c b/win32/pdcscrn.c
-index fed8716..6dd8f9d 100644
+index fed87161..6dd8f9d1 100644
 --- a/win32/pdcscrn.c
 +++ b/win32/pdcscrn.c
 @@ -471,6 +471,32 @@ void PDC_restore_screen_mode(int i)
@@ -54,5 +54,5 @@ index fed8716..6dd8f9d 100644
          /* We can't save the complete buffer, so try and save just
             the displayed window */
 -- 
-1.8.4.msysgit.0
+2.39.1.windows.1
 

@@ -248,7 +248,7 @@ $(SOURCE_DIR)/pdcurses-02-patch-05-no-keypad.done: | $(SOURCE_DIR)/pdcurses-02-p
 	@touch $@
 
 $(SOURCE_DIR)/pdcurses-02-patch-06-ctrl-left-right.done: | $(SOURCE_DIR)/pdcurses-02-patch-05-no-keypad.done
-	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0006-ctrl-left-right.patch
+	patch -d $(SOURCE_DIR)/$(PDCURSES_SRC_DIR) -p1 <patches/pdcurses/0006-ctrl-left-and-ctrl-right.patch
 	@touch $@
 
 $(SOURCE_DIR)/pdcurses-02-patch-07-clear-page.done: | $(SOURCE_DIR)/pdcurses-02-patch-06-ctrl-left-right.done

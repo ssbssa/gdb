@@ -1,6 +1,17 @@
---- a/win32/pdckbd.c	2008-07-20 22:12:04.000000000 +0200
-+++ b/win32/pdckbd.c	2016-03-08 19:00:37.900892400 +0100
-@@ -475,7 +475,7 @@
+From 25663c057f1f5f253ff6e439146a58e7c1fc1fe7 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Tue, 8 Mar 2016 19:00:37 +0100
+Subject: [PATCH 10/14] fix wheel
+
+---
+ win32/pdckbd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/win32/pdckbd.c b/win32/pdckbd.c
+index 1c5b05b0..4ad64268 100644
+--- a/win32/pdckbd.c
++++ b/win32/pdckbd.c
+@@ -475,7 +475,7 @@ static int _process_mouse_event(void)
  
      if (MEV.dwEventFlags == 4)
      {
@@ -9,3 +20,6 @@
              PDC_MOUSE_WHEEL_DOWN : PDC_MOUSE_WHEEL_UP;
  
          pdc_mouse_status.x = -1;
+-- 
+2.39.1.windows.1
+

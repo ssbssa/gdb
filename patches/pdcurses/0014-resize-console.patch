@@ -1,6 +1,17 @@
---- a/win32/pdcscrn.c	2021-04-25 17:17:14.374459400 +0200
-+++ b/win32/pdcscrn.c	2023-02-05 15:31:13.611666400 +0100
-@@ -360,40 +360,42 @@
+From 80c3af939d52cf0c3261a428a68bb2d67c1e6af0 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 5 Feb 2023 15:31:13 +0100
+Subject: [PATCH 14/14] resize console
+
+---
+ win32/pdcscrn.c | 83 ++++++++++++++++++++++---------------------------
+ 1 file changed, 38 insertions(+), 45 deletions(-)
+
+diff --git a/win32/pdcscrn.c b/win32/pdcscrn.c
+index 1135d41b..839e1163 100644
+--- a/win32/pdcscrn.c
++++ b/win32/pdcscrn.c
+@@ -360,40 +360,42 @@ int PDC_scr_open(int argc, char **argv)
      return OK;
  }
  
@@ -16,19 +27,16 @@
 -
 -    if (SetConsoleWindowInfo(con_out, TRUE, rect))
 -        return TRUE;
--
--    run = *rect;
--    run.Right /= 2;
--    run.Bottom /= 2;
 +    CONSOLE_SCREEN_BUFFER_INFO csbi;
 +    SMALL_RECT sr;
  
--    mx = run.Right;
--    my = run.Bottom;
+-    run = *rect;
+-    run.Right /= 2;
+-    run.Bottom /= 2;
 +    GetConsoleScreenBufferInfo (con_out, &csbi);
  
--    if (!SetConsoleWindowInfo(con_out, TRUE, &run))
--        return FALSE;
+-    mx = run.Right;
+-    my = run.Bottom;
 +    if (buffer_size.X > csbi.dwSize.X || buffer_size.Y > csbi.dwSize.Y)
 +    {
 +        if (buffer_size.X > csbi.dwSize.X)
@@ -38,14 +46,16 @@
 +        SetConsoleScreenBufferSize (con_out, csbi.dwSize);
 +    }
  
--    for (run.Right = rect->Right; run.Right >= mx; run.Right--)
--        if (SetConsoleWindowInfo(con_out, TRUE, &run))
--            break;
+-    if (!SetConsoleWindowInfo(con_out, TRUE, &run))
+-        return FALSE;
 +    sr.Right = buffer_ofs.X + console_size.X - 1;
 +    if (sr.Right >= buffer_size.X)
 +        sr.Right = buffer_size.X - 1;
 +    sr.Left = sr.Right - (console_size.X - 1);
-+
+ 
+-    for (run.Right = rect->Right; run.Right >= mx; run.Right--)
+-        if (SetConsoleWindowInfo(con_out, TRUE, &run))
+-            break;
 +    sr.Bottom = buffer_ofs.Y + console_size.Y - 1;
 +    if (sr.Bottom >= buffer_size.Y)
 +        sr.Bottom = buffer_size.Y - 1;
@@ -70,7 +80,7 @@
  }
  
  /* the core of resize_term() */
-@@ -422,11 +424,7 @@
+@@ -422,11 +424,7 @@ int PDC_resize_screen(int nlines, int ncols)
      size.X = rect.Right + 1;
      size.Y = rect.Bottom + 1;
  
@@ -83,7 +93,7 @@
  
      return OK;
  }
-@@ -438,19 +436,11 @@
+@@ -438,19 +436,11 @@ void PDC_reset_prog_mode(void)
      if (is_nt)
      {
          COORD bufsize;
@@ -104,7 +114,7 @@
      }
  
      PDC_mouse_set();
-@@ -462,11 +452,14 @@
+@@ -462,11 +452,14 @@ void PDC_reset_shell_mode(void)
  
      if (is_nt)
      {
@@ -124,3 +134,6 @@
      }
  
      SetConsoleMode(pdc_con_in, old_console_mode);
+-- 
+2.39.1.windows.1
+

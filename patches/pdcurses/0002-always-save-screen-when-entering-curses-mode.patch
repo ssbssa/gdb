@@ -1,14 +1,14 @@
-From e3e0109e2484243cb5753934b7eb02966f269f9c Mon Sep 17 00:00:00 2001
+From b3fc49568d1e9e99887741b40ba279b558bd66d2 Mon Sep 17 00:00:00 2001
 From: Hannes Domani <ssbssa@yahoo.de>
 Date: Sun, 9 Mar 2014 14:40:19 +0100
-Subject: [PATCH 2/4] always save screen when entering curses mode
+Subject: [PATCH 02/14] always save screen when entering curses mode
 
 ---
- win32/pdcscrn.c | 171 +++++++++++++++++++++++++++++---------------------------
+ win32/pdcscrn.c | 171 +++++++++++++++++++++++++-----------------------
  1 file changed, 89 insertions(+), 82 deletions(-)
 
 diff --git a/win32/pdcscrn.c b/win32/pdcscrn.c
-index b48ddaa..fed8716 100644
+index b48ddaaf..fed87161 100644
 --- a/win32/pdcscrn.c
 +++ b/win32/pdcscrn.c
 @@ -229,7 +229,7 @@ void PDC_scr_close(void)
@@ -240,5 +240,5 @@ index b48ddaa..fed8716 100644
  
  void PDC_init_pair(short pair, short fg, short bg)
 -- 
-1.8.4.msysgit.0
+2.39.1.windows.1
 

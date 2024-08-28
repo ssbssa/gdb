@@ -1,6 +1,17 @@
---- a/pdcurses/terminfo.c	2015-01-02 01:08:29.052867700 +0100
-+++ b/pdcurses/terminfo.c	2015-01-04 16:35:55.002144800 +0100
-@@ -48,6 +48,11 @@
+From 7d2c4a07be698ab8ca8debee60b4910d9595cc63 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Sun, 4 Jan 2015 16:35:55 +0100
+Subject: [PATCH 07/14] clear page
+
+---
+ pdcurses/terminfo.c | 92 ++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 91 insertions(+), 1 deletion(-)
+
+diff --git a/pdcurses/terminfo.c b/pdcurses/terminfo.c
+index 2c503a84..e9959788 100644
+--- a/pdcurses/terminfo.c
++++ b/pdcurses/terminfo.c
+@@ -48,6 +48,11 @@ RCSID("$Id: terminfo.c,v 1.37 2008/07/21 12:29:20 wmcbrine Exp $")
  
  #include <term.h>
  
@@ -12,7 +23,7 @@
  TERMINAL *cur_term = NULL;
  
  int mvcur(int oldrow, int oldcol, int newrow, int newcol)
-@@ -147,6 +152,11 @@
+@@ -147,6 +152,11 @@ int tgetent(char *bp, const char *name)
  {
      PDC_LOG(("tgetent() - called: name %s\n", name));
  
@@ -24,7 +35,7 @@
      return ERR;
  }
  
-@@ -154,7 +164,11 @@
+@@ -154,7 +164,11 @@ int tgetflag(const char *id)
  {
      PDC_LOG(("tgetflag() - called: id %s\n", id));
  
@@ -36,7 +47,7 @@
  }
  
  int tgetnum(const char *id)
-@@ -168,6 +182,23 @@
+@@ -168,6 +182,23 @@ char *tgetstr(const char *id, char **area)
  {
      PDC_LOG(("tgetstr() - called: id %s\n", id));
  
@@ -60,7 +71,7 @@
      return (char *)NULL;
  }
  
-@@ -207,12 +238,71 @@
+@@ -207,12 +238,71 @@ char *tparm(const char *cap, long p1, long p2, long p3, long p4,
      return (char *)NULL;
  }
  
@@ -133,3 +144,6 @@
  
      return 0;
  }
+-- 
+2.39.1.windows.1
+

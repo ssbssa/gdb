@@ -1,0 +1,29 @@
+From c46e99cef85621e4b65662beb65dd8d06bd114ae Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Thu, 1 Jan 2015 14:56:33 +0100
+Subject: [PATCH 06/14] ctrl-left and ctrl-right
+
+---
+ pdcurses/getch.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/pdcurses/getch.c b/pdcurses/getch.c
+index 422799d1..07a0ed12 100644
+--- a/pdcurses/getch.c
++++ b/pdcurses/getch.c
+@@ -272,6 +272,12 @@ int wgetch(WINDOW *win)
+                 case KEY_IC:
+                     backhalf = 'R';
+                     break;
++                case CTL_LEFT:
++                    backhalf = 's';
++                    break;
++                case CTL_RIGHT:
++                    backhalf = 't';
++                    break;
+                 }
+                 if (backhalf)
+                 {
+-- 
+2.39.1.windows.1
+

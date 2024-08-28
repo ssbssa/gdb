@@ -1,25 +1,73 @@
---- a/win32/pdckbd.c	2019-03-17 16:34:47.714015200 +0100
-+++ b/win32/pdckbd.c	2020-11-26 20:06:30.657733200 +0100
-@@ -481,6 +481,22 @@
-         pdc_mouse_status.x = -1;
-         pdc_mouse_status.y = -1;
+From a7158efefd5b5487ed3f3ad6b7486320eadb491c Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Thu, 26 Nov 2020 20:06:30 +0100
+Subject: [PATCH 12/14] wheel coordinates
+
+---
+ win32/pdckbd.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/win32/pdckbd.c b/win32/pdckbd.c
+index 38403593..a1a3a411 100644
+--- a/win32/pdckbd.c
++++ b/win32/pdckbd.c
+@@ -31,6 +31,7 @@ static DWORD event_count = 0;
+ static SHORT left_key;
+ static int key_count = 0;
+ static int save_press = 0;
++static int is_console_window_class = 0;
  
-+        POINT cursor;
-+        GetCursorPos(&cursor);
-+        HWND hwnd = GetConsoleWindow();
-+        RECT rc;
-+        GetClientRect(hwnd, &rc);
-+        ScreenToClient(hwnd, &cursor);
-+        if (cursor.x >= 0 && cursor.x < rc.right &&
-+            cursor.y >= 0 && cursor.y < rc.bottom)
-+        {
-+            CONSOLE_SCREEN_BUFFER_INFO csbi;
-+            GetConsoleScreenBufferInfo(pdc_con_out, &csbi);
-+
-+            pdc_mouse_status.x = cursor.x / (rc.right / csbi.srWindow.Right);
-+            pdc_mouse_status.y = cursor.y / (rc.bottom / csbi.srWindow.Bottom);
-+        }
-+
+ #define KEV save_ip.Event.KeyEvent
+ #define MEV save_ip.Event.MouseEvent
+@@ -483,6 +484,33 @@ static int _process_mouse_event(void)
+ 
          memset(&old_mouse_status, 0, sizeof(old_mouse_status));
  
++        if (!is_console_window_class)
++        {
++            pdc_mouse_status.x = MEV.dwMousePosition.X;
++            pdc_mouse_status.y = MEV.dwMousePosition.Y;
++
++            return KEY_MOUSE;
++        }
++
++        HWND hwnd = GetConsoleWindow();
++        if (hwnd != NULL)
++        {
++            POINT cursor = {0, 0};
++            GetCursorPos(&cursor);
++            RECT rc = {0, 0, 0, 0};
++            GetClientRect(hwnd, &rc);
++            ScreenToClient(hwnd, &cursor);
++            if (cursor.x >= 0 && cursor.x < rc.right &&
++                cursor.y >= 0 && cursor.y < rc.bottom)
++            {
++                CONSOLE_SCREEN_BUFFER_INFO csbi;
++                GetConsoleScreenBufferInfo(pdc_con_out, &csbi);
++
++                pdc_mouse_status.x = cursor.x / (rc.right / csbi.srWindow.Right);
++                pdc_mouse_status.y = cursor.y / (rc.bottom / csbi.srWindow.Bottom);
++            }
++        }
++
          return KEY_MOUSE;
+     }
+ 
+@@ -649,6 +677,14 @@ int PDC_mouse_set(void)
+ 
+     memset(&old_mouse_status, 0, sizeof(old_mouse_status));
+ 
++    HWND hwnd = GetConsoleWindow();
++    if (hwnd != NULL)
++    {
++        char className[100] = "";
++        GetClassName(hwnd, className, sizeof(className));
++        is_console_window_class = strcmp(className, "ConsoleWindowClass") == 0;
++    }
++
+     return OK;
+ }
+ 
+-- 
+2.39.1.windows.1
+

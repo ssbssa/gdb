@@ -1,5 +1,16 @@
---- a/pdcurses/getch.c	2008-07-13 18:08:18.000000000 +0200
-+++ b/pdcurses/getch.c	2014-12-30 16:46:45.604498500 +0100
+From b7a5231eba087d1ea683cab473f32f1b4e0effc1 Mon Sep 17 00:00:00 2001
+From: Hannes Domani <ssbssa@yahoo.de>
+Date: Tue, 30 Dec 2014 16:46:45 +0100
+Subject: [PATCH 05/14] no keypad
+
+---
+ pdcurses/getch.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+
+diff --git a/pdcurses/getch.c b/pdcurses/getch.c
+index 87677bae..422799d1 100644
+--- a/pdcurses/getch.c
++++ b/pdcurses/getch.c
 @@ -2,6 +2,11 @@
  
  #include <curspriv.h>
@@ -12,7 +23,7 @@
  RCSID("$Id: getch.c,v 1.72 2008/07/13 16:08:18 wmcbrine Exp $")
  
  /*man-start**************************************************************
-@@ -238,7 +243,55 @@
+@@ -238,7 +243,55 @@ int wgetch(WINDOW *win)
              /* filter special keys if not in keypad mode */
  
              if (!win->_use_keypad)
@@ -68,3 +79,6 @@
  
              /* filter mouse events; translate mouse clicks in the slk 
                 area to function keys */
+-- 
+2.39.1.windows.1
+
