@@ -8138,9 +8138,8 @@ disable_breakpoints_in_unloaded_shlib (program_space *pspace, const solib &solib
     {
       bool bp_modified = false;
 
-      if (b.type != bp_breakpoint
-	  && b.type != bp_jit_event
-	  && b.type != bp_hardware_breakpoint
+      if (b.type != bp_jit_event
+	  && !is_breakpoint (&b)
 	  && !is_tracepoint (&b))
 	continue;
 
