@@ -84,4 +84,33 @@ proc_with_prefix test_bp_modified_events {} {
     gdb_test "python print(bp_modified_counts\[$bp_num\])" "^2"
 }
 
+# Check that GDB disables dprintf breakpoints within a shared library
+# when the shared library is unloaded.
+proc_with_prefix test_dprintf_at_unload {} {
+    clean_restart $::binfile
+
+    if {![runto_main]} {
+	return
+    }
+
+    gdb_breakpoint $::srcfile:$::bp_line
+    gdb_continue_to_breakpoint "stop before dlclose"
+
+    # Setup a dprintf within the shared library.
+    gdb_test "dprintf foo,\"In foo\""
+    set bp_num [get_integer_valueof "\$bpnum" "*UNKNOWN*" \
+		    "get b/p number"]
+
+    # Unload the shared library, GDB should disable our b/p.
+    gdb_test "next" $::stop_after_bp_re
+
+    # Check that our b/p is now showing as disabled.
+    gdb_test "info breakpoints $bp_num" \
+	[multi_line \
+	     "^Num\\s+Type\\s+Disp\\s+Enb\\s+Address\\s+What" \
+	     "$bp_num\\s+dprintf\\s+keep\\s+y\\s+<PENDING>\\s+foo,\"In foo\"" \
+	     "\\s+printf \"In foo\""]
+}
+
 test_bp_modified_events
+test_dprintf_at_unload
