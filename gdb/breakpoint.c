@@ -13121,7 +13121,7 @@ update_breakpoint_locations (code_breakpoint *b,
 
     for (const bp_location &e : existing_locations)
       {
-	if ((!e.enabled || e.disabled_by_cond) && e.function_name)
+	if (!e.enabled && e.function_name)
 	  {
 	    if (have_ambiguous_names)
 	      {
@@ -13137,7 +13137,6 @@ update_breakpoint_locations (code_breakpoint *b,
 		    if (breakpoint_locations_match (&e, &l, true))
 		      {
 			l.enabled = e.enabled;
-			l.disabled_by_cond = e.disabled_by_cond;
 			break;
 		      }
 		  }
@@ -13150,7 +13149,6 @@ update_breakpoint_locations (code_breakpoint *b,
 				 l.function_name.get ()) == 0)
 		    {
 		      l.enabled = e.enabled;
-		      l.disabled_by_cond = e.disabled_by_cond;
 		      break;
 		    }
 	      }
