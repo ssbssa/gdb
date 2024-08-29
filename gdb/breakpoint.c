@@ -8132,16 +8132,40 @@ disable_breakpoints_in_shlibs (program_space *pspace)
 static void
 disable_breakpoints_in_unloaded_shlib (program_space *pspace, const solib &solib)
 {
+  /* A shared library can appear twice on the runtime-linkers shared library
+     list, but the shared library is actually mapped in only once.  This can
+     happen when linker namespaces are used.  When one of those mappings is
+     removed this function is called.  If we then disable and mark as
+     removed all the b/p within the library then we'll end up leaving
+     software breakpoints in the code (as the library was never actually
+     unmapped).
+
+     To prevent this, we check the shared library list.  If we find some
+     other shared library with the same objfile then we can leave the
+     breakpoints alone.
+
+     If a shared library is mapped a second time, but at a different
+     address, then the shared library will be given a new objfile.  */
+  for (const struct solib &so : pspace->solibs ())
+    {
+      if (&solib == &so)
+	continue;
+
+      /* If the solib has no objfile then it will have no target
+	 sections.  As a result the solib_contains_address_p check
+	 below will fail for this solib so we'll not disable any
+	 breakpoints.  This means we don't need to worry about
+	 disabling breakpoints for a shared library that is mapped
+	 twice.  */
+      if (solib.objfile != nullptr && solib.objfile == so.objfile)
+	return;
+    }
+
   bool disabled_shlib_breaks = false;
 
   for (breakpoint &b : all_breakpoints ())
     {
       bool bp_modified = false;
-
-      if (b.type != bp_jit_event
-	  && !is_breakpoint (&b)
-	  && !is_tracepoint (&b))
-	continue;
 
       for (bp_location &loc : b.locations ())
 	{
@@ -8164,7 +8188,7 @@ disable_breakpoints_in_unloaded_shlib (program_space *pspace, const solib &solib
 
 	  bp_modified = true;
 
-	  if (!disabled_shlib_breaks)
+	  if (!disabled_shlib_breaks && user_breakpoint_p (&b))
 	    {
 	      target_terminal::ours_for_output ();
 	      warning (_("Temporarily disabling breakpoints "
