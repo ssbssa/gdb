@@ -9640,6 +9640,30 @@ dprintf_command (const char *arg, int from_tty)
 }
 
 static void
+dprintf_args_command (const char *arg, int from_tty)
+{
+  const char *p = arg;
+  int bpnum = get_number (&p);
+
+  if (p[0] == '\0')
+    error (_("Format string required"));
+
+  for (breakpoint &b : all_breakpoints ())
+    if (b.number == bpnum)
+      {
+	if (b.type != bp_dprintf)
+	  error (_("This is not a dprintf brakpoint."));
+
+	b.extra_string.reset (xstrdup (p));
+	update_dprintf_command_list (&b);
+
+	return;
+      }
+
+  error (_("No breakpoint number %d."), bpnum);
+}
+
+static void
 agent_printf_command (const char *arg, int from_tty)
 {
   error (_("May only run agent-printf on the target"));
@@ -15361,6 +15385,10 @@ dprintf location,format string,arg1,arg2,...\n\
 location may be a linespec, explicit, or address location.\n"
 "\n" LOCATION_SPEC_HELP_STRING));
   set_cmd_completer (c, location_completer);
+
+  c = add_com ("dprintf-args", class_breakpoint, dprintf_args_command, _("\
+Change the arguments of a dynamic printf.\n\
+Usage is `dprintf-args N format-string,arg1,arg2,...`."));
 
   add_setshow_enum_cmd ("dprintf-style", class_support,
 			dprintf_style_enums, &dprintf_style, _("\
