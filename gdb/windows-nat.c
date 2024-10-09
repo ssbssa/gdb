@@ -67,6 +67,9 @@
 
 #include "i386-tdep.h"
 #include "i387-tdep.h"
+#ifdef __x86_64__
+#include "amd64-tdep.h"
+#endif
 
 #include "windows-tdep.h"
 #include "windows-nat.h"
@@ -142,6 +145,7 @@ struct windows_per_inferior : public windows_process_info
      out bit.  */
 
   const int *mappings = nullptr;
+  int mappings_count = 0;
 
   /* The function to use in order to determine whether a register is
      a segment register or not.  */
@@ -163,6 +167,8 @@ struct windows_per_inferior : public windows_process_info
 
 /* The current process.  */
 static windows_per_inferior windows_process;
+
+static DWORD64 xstate_features;
 
 #define SymInitialize			dyn_SymInitialize
 #define SymCleanup			dyn_SymCleanup
@@ -367,6 +373,8 @@ struct windows_nat_target final : public x86_nat_target<inf_child_target>
   {
     return serial_event_fd (m_wait_event);
   }
+
+  const struct target_desc *read_description () override;
 
 #ifdef HAVE_LIBWINIPT
   struct btrace_target_info *enable_btrace (thread_info *tp,
@@ -639,7 +647,7 @@ windows_nat_target::add_thread (ptid_t ptid, HANDLE h, void *tlb,
     base += 0x2000;
 #endif
   th = new windows_thread_info (ptid.lwp (), h, base);
-  windows_process.initialize_context (th);
+  windows_process.initialize_context (th, xstate_features);
   windows_process.thread_list.emplace_back (th);
 
   /* Add this new thread to the list of threads.
@@ -704,6 +712,70 @@ windows_nat_target::delete_thread (ptid_t ptid, DWORD exit_code,
     windows_process.thread_list.erase (iter);
 }
 
+template<typename Context>
+static char *
+get_context_offset (Context *context, i386_gdbarch_tdep *tdep, int r)
+{
+  char *context_ptr = (char *) context;
+
+  char *context_offset;
+  if (r < windows_process.mappings_count)
+    context_offset = context_ptr + windows_process.mappings[r];
+  else if (I387_PKRU_REGNUM (tdep) > 0 && r >= I387_PKRU_REGNUM (tdep)
+      && r < I387_PKEYSEND_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_PKRU_ID, NULL);
+      context_offset += 8 * (r - I387_PKRU_REGNUM (tdep));
+    }
+  else if (I387_ZMM0H_REGNUM (tdep) > 0 && r >= I387_ZMM0H_REGNUM (tdep)
+	   && r < I387_ZMM16H_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_H_ID, NULL);
+      context_offset += 32 * (r - I387_ZMM0H_REGNUM (tdep));
+    }
+  else if (I387_ZMM0H_REGNUM (tdep) > 0 && r >= I387_ZMM16H_REGNUM (tdep)
+	   && r < I387_ZMMENDH_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, NULL);
+      context_offset += 32 + 64 * (r - I387_ZMM16H_REGNUM (tdep));
+    }
+  else if (I387_K0_REGNUM (tdep) > 0 && r >= I387_K0_REGNUM (tdep)
+	   && r < I387_KEND_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_K_ID, NULL);
+      context_offset += 8 * (r - I387_K0_REGNUM (tdep));
+    }
+  else if (I387_YMM16H_REGNUM (tdep) > 0 && r >= I387_YMM16H_REGNUM (tdep)
+	   && r < I387_YMMH_AVX512_END_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, NULL);
+      context_offset += 16 + 64 * (r - I387_YMM16H_REGNUM (tdep));
+    }
+  else if (I387_XMM16_REGNUM (tdep) > 0 && r >= I387_XMM16_REGNUM (tdep)
+	   && r < I387_XMM_AVX512_END_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, NULL);
+      context_offset += 64 * (r - I387_XMM16_REGNUM (tdep));
+    }
+  else if (I387_YMM0H_REGNUM (tdep) > 0 && r >= I387_YMM0H_REGNUM (tdep)
+	   && r < I387_YMMENDH_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_AVX_ID, NULL);
+      context_offset += 16 * (r - I387_YMM0H_REGNUM (tdep));
+    }
+  else
+    gdb_assert_not_reached ("invalid register number %d", r);
+
+  return context_offset;
+}
+
 /* Fetches register number R from the given windows_thread_info,
    and supplies its value to the given regcache.
 
@@ -721,14 +793,12 @@ windows_fetch_one_register (struct regcache *regcache,
   gdb_assert (r >= 0);
   gdb_assert (!th->reload_context);
 
-  char *context_ptr = windows_process.with_context (th, [] (auto *context)
-    {
-      return (char *) context;
-    });
-
-  char *context_offset = context_ptr + windows_process.mappings[r];
   struct gdbarch *gdbarch = regcache->arch ();
   i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
+  char *context_offset = windows_process.with_context (th, [&] (auto *context)
+    {
+      return get_context_offset (context, tdep, r);
+    });
 
   gdb_assert (!gdbarch_read_pc_p (gdbarch));
   gdb_assert (gdbarch_pc_regnum (gdbarch) >= 0);
@@ -793,6 +863,11 @@ windows_nat_target::fetch_registers (struct regcache *regcache, int r)
       windows_process.with_context (th, [&] (auto *context)
 	{
 	  context->ContextFlags = WindowsContext<decltype(context)>::all;
+	  if (xstate_features != 0)
+	    {
+	      context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+	      set_xstate_features_mask (context, xstate_features);
+	    }
 	  CHECK (get_thread_context (th->h, context));
 	  /* Copy dr values from that thread.
 	     But only if there were not modified since last stop.
@@ -805,6 +880,25 @@ windows_nat_target::fetch_registers (struct regcache *regcache, int r)
 	      windows_process.dr[3] = context->Dr3;
 	      windows_process.dr[6] = context->Dr6;
 	      windows_process.dr[7] = context->Dr7;
+	    }
+
+	  if (xstate_features != 0)
+	    {
+	      DWORD64 features = 0;
+	      CHECK (get_xstate_features_mask (context, &features));
+	      DWORD64 zeroed_features = xstate_features & ~features;
+
+	      for (int f = X86_XSTATE_AVX_ID; f <= X86_XSTATE_PKRU_ID; f++)
+		{
+		  DWORD64 flag = 1ULL << f;
+		  if ((zeroed_features & flag) != 0)
+		    {
+		      DWORD size = 0;
+		      void *loc = locate_xstate_feature (context, f, &size);
+		      if (loc != nullptr && size > 0)
+			memset (loc, 0, size);
+		    }
+		}
 	    }
 	});
 
@@ -830,13 +924,12 @@ windows_store_one_register (const struct regcache *regcache,
 {
   gdb_assert (r >= 0);
 
-  char *context_ptr = windows_process.with_context (th, [] (auto *context)
-    {
-      return (char *) context;
-    });
-
   struct gdbarch *gdbarch = regcache->arch ();
   i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
+  char *context_offset = windows_process.with_context (th, [&] (auto *context)
+    {
+      return get_context_offset (context, tdep, r);
+    });
 
   /* GDB treats some registers as 32-bit, where they are in fact only
      16 bits long.  These cases must be handled specially to avoid
@@ -845,7 +938,7 @@ windows_store_one_register (const struct regcache *regcache,
     {
       gdb_byte bytes[4];
       regcache->raw_collect (r, bytes);
-      memcpy (context_ptr + windows_process.mappings[r], bytes, 2);
+      memcpy (context_offset, bytes, 2);
     }
   else if (r == I387_FOP_REGNUM (tdep))
     {
@@ -854,10 +947,10 @@ windows_store_one_register (const struct regcache *regcache,
       /* The value of FOP occupies the top two bytes in the context,
 	 so write the two low-order bytes from the cache into the
 	 appropriate spot.  */
-      memcpy (context_ptr + windows_process.mappings[r] + 2, bytes, 2);
+      memcpy (context_offset + 2, bytes, 2);
     }
   else
-    regcache->raw_collect (r, context_ptr + windows_process.mappings[r]);
+    regcache->raw_collect (r, context_offset);
 }
 
 /* Store a new register value into the context of the thread tied to
@@ -1532,10 +1625,10 @@ windows_nat_target::windows_continue (DWORD continue_status, int id,
       {
 	windows_process.with_context (th.get (), [&] (auto *context)
 	  {
+	    DWORD debug_registers = WindowsContext<decltype(context)>::debug;
 	    if (th->debug_registers_changed)
 	      {
-		context->ContextFlags
-		  |= WindowsContext<decltype(context)>::debug;
+		context->ContextFlags |= debug_registers;
 		context->Dr0 = windows_process.dr[0];
 		context->Dr1 = windows_process.dr[1];
 		context->Dr2 = windows_process.dr[2];
@@ -1551,6 +1644,13 @@ windows_nat_target::windows_continue (DWORD continue_status, int id,
 		if (GetExitCodeThread (th->h, &ec)
 		    && ec == STILL_ACTIVE)
 		  {
+		    if (xstate_features != 0
+			&& (context->ContextFlags & ~debug_registers) != 0)
+		      {
+			context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+			set_xstate_features_mask (context, xstate_features);
+		      }
+
 		    BOOL status = set_thread_context (th->h, context);
 
 		    if (!killed)
@@ -1695,6 +1795,15 @@ windows_nat_target::resume (ptid_t ptid, int step, enum gdb_signal sig)
 
 	  if (context->ContextFlags)
 	    {
+	      DWORD debug_registers
+		= WindowsContext<decltype(context)>::debug;
+	      if (xstate_features != 0
+		  && (context->ContextFlags & ~debug_registers) != 0)
+		{
+		  context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+		  set_xstate_features_mask (context, xstate_features);
+		}
+
 	      if (th->debug_registers_changed)
 		{
 		  context->Dr0 = windows_process.dr[0];
@@ -2121,12 +2230,14 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
   if (!windows_process.wow64_process)
     {
       windows_process.mappings  = amd64_mappings;
+      windows_process.mappings_count = amd64_mappings_count;
       windows_process.segment_register_p = amd64_windows_segment_register_p;
     }
   else
 #endif
     {
       windows_process.mappings  = i386_mappings;
+      windows_process.mappings_count = i386_mappings_count;
       windows_process.segment_register_p = i386_windows_segment_register_p;
     }
 
@@ -2676,6 +2787,23 @@ windows_nat_target::info_proc (const char *args, enum info_proc_what what)
   return true;
 }
 #endif
+
+const struct target_desc *
+windows_nat_target::read_description ()
+{
+  if (inferior_ptid == null_ptid)
+    return this->beneath ()->read_description ();
+
+  if (xstate_features == 0)
+    return nullptr;
+
+#ifdef __x86_64__
+  if (!windows_process.wow64_process)
+    return amd64_target_description (xstate_features, false);
+  else
+#endif
+    return i386_target_description (xstate_features, false);
+}
 
 /* Try to set or remove a user privilege to the current process.  Return -1
    if that fails, the previous setting of that privilege otherwise.
@@ -4339,6 +4467,8 @@ to allow better testing."),
 			   &maintenance_set_cmdlist,
 			   &maintenance_show_cmdlist);
 #endif
+
+  xstate_features = get_xstate_features ();
 }
 
 /* Hardware watchpoint support, adapted from go32-nat.c code.  */
