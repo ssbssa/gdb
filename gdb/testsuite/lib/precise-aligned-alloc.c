@@ -21,6 +21,26 @@
 #include <string.h>
 #include <stdint.h>
 
+#ifdef _WIN32
+static void *
+aligned_alloc (size_t alignment, size_t size)
+{
+  return _aligned_malloc (size, alignment);
+}
+
+static void
+aligned_free (void *ptr)
+{
+  _aligned_free (ptr);
+}
+#else
+static void
+aligned_free (void *ptr)
+{
+  free (ptr);
+}
+#endif
+
 /* Return true if address P is ALIGNMENT-byte aligned.  */
 
 static int

@@ -134,7 +134,7 @@ main (int argc, char **argv)
       puts ("Bye!"); /* second breakpoint here */
     }
 
-  free (allocated_ptr);
+  aligned_free (allocated_ptr);
 
   return 0;
 }
