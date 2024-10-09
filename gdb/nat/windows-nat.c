@@ -20,6 +20,7 @@
 #include "gdbsupport/common-debug.h"
 #include "gdbsupport/xml-utils.h"
 #include "target/target.h"
+#include "gdbsupport/x86-xstate.h"
 #include <winternl.h>
 
 #undef GetModuleFileNameEx
@@ -89,6 +90,17 @@ static GetProcessInformation_ftype *GetProcessInformation;
 InitializeProcThreadAttributeList_ftype *InitializeProcThreadAttributeList;
 UpdateProcThreadAttribute_ftype *UpdateProcThreadAttribute;
 DeleteProcThreadAttributeList_ftype *DeleteProcThreadAttributeList;
+
+GetEnabledXStateFeatures_ftype *GetEnabledXStateFeatures;
+InitializeContext_ftype *InitializeContext;
+GetXStateFeaturesMask_ftype *GetXStateFeaturesMask;
+SetXStateFeaturesMask_ftype *SetXStateFeaturesMask;
+LocateXStateFeature_ftype *LocateXStateFeature;
+#ifdef __x86_64__
+RtlGetExtendedFeaturesMask_ftype *RtlGetExtendedFeaturesMask;
+RtlSetExtendedFeaturesMask_ftype *RtlSetExtendedFeaturesMask;
+RtlLocateExtendedFeature_ftype *RtlLocateExtendedFeature;
+#endif
 
 /* Note that 'debug_events' must be locally defined in the relevant
    functions.  */
@@ -259,10 +271,35 @@ windows_process_info::pid_to_exec_file (int pid)
   return path;
 }
 
-void windows_process_info::initialize_context (windows_thread_info *th)
+void windows_process_info::initialize_context (windows_thread_info *th,
+					       DWORD xstate_features)
 {
+  if (xstate_features != 0)
+    {
+      DWORD context_flags = with_context (nullptr, [] (auto *context)
+	{
+	  return WindowsContext<decltype(context)>::control;
+	});
+      context_flags |= CONTEXT_XSTATE_FLAG;
+      DWORD xstate_size = 0;
+      InitializeContext (NULL, context_flags, NULL, &xstate_size);
+      th->context_buffer.reset (xmalloc (xstate_size));
+      CONTEXT *context = nullptr;
+      if (!InitializeContext (th->context_buffer.get (),
+			      context_flags, &context, &xstate_size))
+	error ("InitializeContext failure %lu\n", GetLastError ());
 #ifdef __x86_64__
-  if (wow64_process)
+      /* InitializeContext actually initializes a WOW64_CONTEXT when
+	 context_flags contains a WOW64_CONTEXT_* value, so a cast is needed.
+	 */
+      if (wow64_process)
+	th->wow64_context = (WOW64_CONTEXT *) context;
+      else
+#endif
+	th->context = context;
+    }
+#ifdef __x86_64__
+  else if (wow64_process)
     {
       th->context_buffer.reset (xmalloc (sizeof (WOW64_CONTEXT)));
       th->wow64_context = (WOW64_CONTEXT *) th->context_buffer.get ();
@@ -1276,6 +1313,35 @@ disable_randomization_available ()
 
 /* See windows-nat.h.  */
 
+DWORD64
+get_xstate_features ()
+{
+  if (GetEnabledXStateFeatures != nullptr
+      && InitializeContext != nullptr
+      && GetXStateFeaturesMask != nullptr
+      && SetXStateFeaturesMask != nullptr
+      && LocateXStateFeature != nullptr
+#ifdef __x86_64__
+      && RtlGetExtendedFeaturesMask != nullptr
+      && RtlSetExtendedFeaturesMask != nullptr
+      && RtlLocateExtendedFeature != nullptr
+#endif
+  )
+    {
+      DWORD64 xstate_features
+	= GetEnabledXStateFeatures () & X86_XSTATE_ALL_MASK;
+      /* The extended xstate functions are only needed if the available
+	 features exceed SSE.  */
+      if ((xstate_features & ~X86_XSTATE_SSE_MASK) == 0)
+	xstate_features = 0;
+      return xstate_features;
+    }
+
+  return 0;
+}
+
+/* See windows-nat.h.  */
+
 bool
 initialize_loadable ()
 {
@@ -1309,6 +1375,12 @@ initialize_loadable ()
       GPA (hm, InitializeProcThreadAttributeList);
       GPA (hm, UpdateProcThreadAttribute);
       GPA (hm, DeleteProcThreadAttributeList);
+
+      GPA (hm, GetEnabledXStateFeatures);
+      GPA (hm, InitializeContext);
+      GPA (hm, GetXStateFeaturesMask);
+      GPA (hm, SetXStateFeaturesMask);
+      GPA (hm, LocateXStateFeature);
     }
 
   /* Set variables to dummy versions of these processes if the function
@@ -1373,6 +1445,16 @@ initialize_loadable ()
       if (hm)
 	GPA (hm, GetThreadDescription);
     }
+
+#ifdef __x86_64__
+  hm = LoadLibrary (TEXT ("ntdll.dll"));
+  if (hm)
+    {
+      GPA (hm, RtlGetExtendedFeaturesMask);
+      GPA (hm, RtlSetExtendedFeaturesMask);
+      GPA (hm, RtlLocateExtendedFeature);
+    }
+#endif
 
 #undef GPA
 

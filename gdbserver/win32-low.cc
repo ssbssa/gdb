@@ -34,6 +34,7 @@
 #include "gdbsupport/gdb_tilde_expand.h"
 #include "gdbsupport/common-inferior.h"
 #include "gdbsupport/gdb_wait.h"
+#include "tdesc.h"
 
 using namespace windows_nat;
 
@@ -435,8 +436,9 @@ child_fetch_inferior_registers (struct regcache *regcache, int r)
   windows_thread_info *th
     = windows_process.thread_rec (current_thread->id,
 				  INVALIDATE_CONTEXT);
-  if (r == -1 || r > NUM_REGS)
-    child_fetch_inferior_registers (regcache, NUM_REGS);
+  if (r == -1)
+    child_fetch_inferior_registers (regcache,
+				    regcache->tdesc->reg_defs.size ());
   else
     for (regno = 0; regno < r; regno++)
       (*the_low_target.fetch_inferior_register) (regcache, th, regno);
@@ -451,8 +453,9 @@ child_store_inferior_registers (struct regcache *regcache, int r)
   windows_thread_info *th
     = windows_process.thread_rec (current_thread->id,
 				  INVALIDATE_CONTEXT);
-  if (r == -1 || r == 0 || r > NUM_REGS)
-    child_store_inferior_registers (regcache, NUM_REGS);
+  if (r == -1)
+    child_store_inferior_registers (regcache,
+				    regcache->tdesc->reg_defs.size ());
   else
     for (regno = 0; regno < r; regno++)
       (*the_low_target.store_inferior_register) (regcache, th, regno);
@@ -1428,7 +1431,9 @@ void
 initialize_low (void)
 {
   set_target_ops (&the_win32_target);
-  the_low_target.arch_setup ();
 
   initialize_loadable ();
+  /* Has to be done after initialize_loadable, because it uses the xstate
+     functions if available.  */
+  the_low_target.arch_setup ();
 }
