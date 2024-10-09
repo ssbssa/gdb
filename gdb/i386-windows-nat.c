@@ -74,6 +74,9 @@ const int i386_mappings[] =
 #undef context_offset
 #undef CONTEXT
 
+const int i386_mappings_count
+  = sizeof (i386_mappings) / sizeof (i386_mappings[0]);
+
 /* segment_register_p_ftype implementation for x86.  */
 
 int

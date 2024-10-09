@@ -28,12 +28,18 @@ int i386_windows_segment_register_p (int regnum);
 /* context register offests for x86.  */
 extern const int i386_mappings[];
 
+/* number of context register offests for x86.  */
+extern const int i386_mappings_count;
+
 #ifdef __x86_64__
 /* segment_register_p_ftype implementation for amd64.  */
 int amd64_windows_segment_register_p (int regnum);
 
 /* context register offests for amd64.  */
 extern const int amd64_mappings[];
+
+/* number of context register offests for amd64.  */
+extern const int amd64_mappings_count;
 #endif
 
 int
