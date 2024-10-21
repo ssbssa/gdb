@@ -1938,9 +1938,6 @@ mi_execute_command (const char *cmd, int from_tty)
 void
 mi_execute_command (mi_parse *context)
 {
-  if (context->op != MI_COMMAND)
-    error (_("Command is not an MI command"));
-
   mi_interp *mi = as_mi_interp (current_interpreter ());
 
   /* The current interpreter may not be MI, for instance when using

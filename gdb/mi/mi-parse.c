@@ -412,9 +412,14 @@ mi_parse::mi_parse (gdb::unique_xmalloc_ptr<char> command,
   this->token = "";
 
   if (this->command.get ()[0] != '-')
-    throw_error (UNDEFINED_COMMAND_ERROR,
-		 _("MI command '%s' does not start with '-'"),
-		 this->command.get ());
+    {
+      const char *chp = this->command.get ();
+      chp = skip_spaces (chp);
+      this->command = make_unique_xstrdup (chp);
+      this->op = CLI_COMMAND;
+
+      return;
+    }
 
   /* Find the command in the MI table.  */
   this->cmd = mi_cmd_lookup (this->command.get () + 1);

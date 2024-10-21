@@ -26,6 +26,7 @@
 #include "mi/mi-parse.h"
 #include "mi/mi-console.h"
 #include "mi/mi-interp.h"
+#include "top.h"
 
 void
 py_ui_out::add_field (const char *name, const gdbpy_ref<> &obj)
@@ -172,7 +173,10 @@ gdbpy_execute_mi_command (PyObject *self, PyObject *args, PyObject *kw)
       scoped_restore save_uiout = make_scoped_restore (&current_uiout, &uiout);
       auto parser = std::make_unique<mi_parse> (std::move (mi_command),
 						std::move (arg_strings));
-      mi_execute_command (parser.get ());
+      if (parser->op == CLI_COMMAND)
+	execute_command (parser->command.get (), 0);
+      else
+	mi_execute_command (parser.get ());
     }
   catch (const gdb_exception &except)
     {
