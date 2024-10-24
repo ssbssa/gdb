@@ -80,9 +80,9 @@ struct windows_thread_info
   /* The context of the thread, including any manipulations.  */
   union
   {
-    CONTEXT context {};
+    CONTEXT *context = nullptr;
 #ifdef __x86_64__
-    WOW64_CONTEXT wow64_context;
+    WOW64_CONTEXT *wow64_context;
 #endif
   };
 
@@ -105,6 +105,8 @@ struct windows_thread_info
 
   /* The name of the thread.  */
   gdb::unique_xmalloc_ptr<char> name;
+
+  gdb::unique_xmalloc_ptr<void> context_buffer;
 };
 
 
@@ -256,15 +258,17 @@ struct windows_process_info
 
   const char *pid_to_exec_file (int);
 
+  void initialize_context (windows_thread_info *th);
+
   template<typename Function>
   auto with_context (windows_thread_info *th, Function function)
   {
 #ifdef __x86_64__
     if (wow64_process)
-      return function (th != nullptr ? &th->wow64_context : nullptr);
+      return function (th != nullptr ? th->wow64_context : nullptr);
     else
 #endif
-      return function (th != nullptr ? &th->context : nullptr);
+      return function (th != nullptr ? th->context : nullptr);
   }
 
   DWORD *context_flags_ptr (windows_thread_info *th)
