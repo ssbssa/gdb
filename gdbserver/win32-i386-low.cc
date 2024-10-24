@@ -284,6 +284,8 @@ static void
 i386_thread_added (windows_thread_info *th)
 {
   th->debug_registers_changed = true;
+
+  windows_process.initialize_context (th);
 }
 
 static void
