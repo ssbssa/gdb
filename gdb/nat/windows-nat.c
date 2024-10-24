@@ -249,6 +249,23 @@ windows_process_info::pid_to_exec_file (int pid)
   return path;
 }
 
+void windows_process_info::initialize_context (windows_thread_info *th)
+{
+#ifdef __x86_64__
+  if (wow64_process)
+    {
+      th->context_buffer.reset (xmalloc (sizeof (WOW64_CONTEXT)));
+      th->wow64_context = (WOW64_CONTEXT *) th->context_buffer.get ();
+    }
+#endif
+  else
+    {
+      th->context_buffer.reset (xmalloc (sizeof (CONTEXT)));
+      th->context = (CONTEXT *) th->context_buffer.get ();
+    }
+  *context_flags_ptr (th) = 0;
+}
+
 static std::string
 wcstostring (const wchar_t *in, int len)
 {
