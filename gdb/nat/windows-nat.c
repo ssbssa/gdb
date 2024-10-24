@@ -79,6 +79,28 @@ DeleteProcThreadAttributeList_ftype *DeleteProcThreadAttributeList;
   debug_prefixed_printf_cond (debug_events, "windows events", fmt, \
 			      ## __VA_ARGS__)
 
+windows_thread_info::windows_thread_info (windows_process_info *proc_,
+					  DWORD tid_, HANDLE h_, CORE_ADDR tlb)
+  : proc (proc_),
+    tid (tid_),
+    h (h_),
+    thread_local_base (tlb)
+{
+#ifdef __x86_64__
+  if (proc->wow64_process)
+    {
+      context_buffer.reset (xmalloc (sizeof (WOW64_CONTEXT)));
+      wow64_context = (WOW64_CONTEXT *) context_buffer.get ();
+    }
+  else
+#endif
+    {
+      context_buffer.reset (xmalloc (sizeof (CONTEXT)));
+      context = (CONTEXT *) context_buffer.get ();
+    }
+  *proc->context_flags_ptr (this) = 0;
+}
+
 void
 windows_thread_info::suspend ()
 {

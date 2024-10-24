@@ -185,7 +185,7 @@ aarch64_windows_nat_target::cleanup_windows_arch ()
 void
 aarch64_windows_per_inferior::fill_thread_context (windows_thread_info *th)
 {
-  CONTEXT *context = &th->context;
+  CONTEXT *context = th->context;
 
   if (context->ContextFlags == 0)
     {
@@ -199,7 +199,7 @@ aarch64_windows_per_inferior::fill_thread_context (windows_thread_info *th)
 void
 aarch64_windows_per_inferior::invalidate_thread_context (windows_thread_info *th)
 {
-  CONTEXT *context = &th->context;
+  CONTEXT *context = th->context;
   context->ContextFlags = 0;
 }
 
@@ -209,7 +209,7 @@ void
 aarch64_windows_nat_target::thread_context_continue (windows_thread_info *th,
 						     int killed)
 {
-  CONTEXT *context = &th->context;
+  CONTEXT *context = th->context;
 
   if (th->debug_registers_changed)
     {
@@ -250,9 +250,9 @@ aarch64_windows_nat_target::thread_context_step (windows_thread_info *th,
 						 bool enable)
 {
   if (enable)
-    th->context.Cpsr |= 0x200000;
+    th->context->Cpsr |= 0x200000;
   else
-    th->context.Cpsr &= ~0x200000;
+    th->context->Cpsr &= ~0x200000;
 }
 
 /* See windows-nat.h.  */
@@ -263,7 +263,7 @@ aarch64_windows_nat_target::fetch_one_register (struct regcache *regcache,
 {
   gdb_assert (r >= 0);
 
-  char *context_ptr = (char *) &th->context;
+  char *context_ptr = (char *) th->context;
   char *context_offset = context_ptr + aarch64_windows_process.mappings[r];
   struct gdbarch *gdbarch = regcache->arch ();
 
@@ -292,9 +292,9 @@ aarch64_windows_nat_target::store_one_register (const struct regcache *regcache,
 						windows_thread_info *th, int r)
 {
   gdb_assert (r >= 0);
-  gdb_assert (th->context.ContextFlags != 0);
+  gdb_assert (th->context->ContextFlags != 0);
 
-  char *context_ptr = (char *) &th->context;
+  char *context_ptr = (char *) th->context;
 
   regcache->raw_collect (r, context_ptr + aarch64_windows_process.mappings[r]);
 }

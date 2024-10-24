@@ -63,13 +63,7 @@ enum stopping_kind
 struct windows_thread_info
 {
   windows_thread_info (windows_process_info *proc_,
-		       DWORD tid_, HANDLE h_, CORE_ADDR tlb)
-    : proc (proc_),
-      tid (tid_),
-      h (h_),
-      thread_local_base (tlb)
-  {
-  }
+		       DWORD tid_, HANDLE h_, CORE_ADDR tlb);
 
   DISABLE_COPY_AND_ASSIGN (windows_thread_info);
 
@@ -183,9 +177,9 @@ struct windows_thread_info
   /* The context of the thread, including any manipulations.  */
   union
   {
-    CONTEXT context {};
+    CONTEXT *context = nullptr;
 #ifdef __x86_64__
-    WOW64_CONTEXT wow64_context;
+    WOW64_CONTEXT *wow64_context;
 #endif
   };
 
@@ -204,6 +198,10 @@ struct windows_thread_info
 
   /* The name of the thread.  */
   gdb::unique_xmalloc_ptr<char> name;
+
+  /* The buffer for the thread context, including any XState registers if
+     available.  */
+  gdb::unique_xmalloc_ptr<void> context_buffer;
 };
 
 enum handle_exception_result
@@ -318,10 +316,10 @@ struct windows_process_info
   {
 #ifdef __x86_64__
     if (wow64_process)
-      return function (th != nullptr ? &th->wow64_context : nullptr);
+      return function (th != nullptr ? th->wow64_context : nullptr);
     else
 #endif
-      return function (th != nullptr ? &th->context : nullptr);
+      return function (th != nullptr ? th->context : nullptr);
   }
 
   DWORD *context_flags_ptr (windows_thread_info *th)

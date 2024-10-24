@@ -169,7 +169,7 @@ aarch64_initial_stuff (process_info *proc)
 static void
 aarch64_get_thread_context (windows_thread_info *th)
 {
-  CONTEXT *context = &th->context;
+  CONTEXT *context = th->context;
 
   context->ContextFlags = (WindowsContext<decltype(context)>::full
 			   | WindowsContext<decltype(context)>::floating
@@ -193,7 +193,7 @@ aarch64_prepare_to_resume (windows_thread_info *th)
     {
       win32_require_context (th);
 
-      CONTEXT *context = &th->context;
+      CONTEXT *context = th->context;
 
       for (int i = 0; i < aarch64_num_bp_regs; i++)
 	{
@@ -223,7 +223,7 @@ aarch64_thread_added (windows_thread_info *th)
 static void
 aarch64_single_step (windows_thread_info *th)
 {
-  th->context.Cpsr |= 0x200000;
+  th->context->Cpsr |= 0x200000;
 }
 
 /* An array of offset mappings into a Win32 Context structure.
@@ -322,7 +322,7 @@ aarch64_fetch_inferior_register (struct regcache *regcache,
   int mappings_count;
   get_mappings (mappings, mappings_count);
 
-  char *context_ptr = (char *) &th->context;
+  char *context_ptr = (char *) th->context;
   char *context_offset;
   if (r < mappings_count)
     context_offset = context_ptr + mappings[r];
@@ -341,7 +341,7 @@ aarch64_store_inferior_register (struct regcache *regcache,
   int mappings_count;
   get_mappings (mappings, mappings_count);
 
-  char *context_ptr = (char *) &th->context;
+  char *context_ptr = (char *) th->context;
   char *context_offset;
   if (r < mappings_count)
     context_offset = context_ptr + mappings[r];
