@@ -1120,23 +1120,29 @@ tui_dispatch_ctrl_char (unsigned int ch)
   switch (ch)
     {
     case KEY_NPAGE:
+    case KEY_C3:
       win_info->forward_scroll (0);
       break;
     case KEY_PPAGE:
+    case KEY_A3:
       win_info->backward_scroll (0);
       break;
     case KEY_DOWN:
     case KEY_SF:
+    case KEY_C2:
       win_info->forward_scroll (1);
       break;
     case KEY_UP:
     case KEY_SR:
+    case KEY_A2:
       win_info->backward_scroll (1);
       break;
     case KEY_RIGHT:
+    case KEY_B3:
       win_info->left_scroll (1);
       break;
     case KEY_LEFT:
+    case KEY_B1:
       win_info->right_scroll (1);
       break;
     default:
@@ -1272,16 +1278,22 @@ tui_getc_1 (FILE *fp)
       switch (ch)
 	{
 	case KEY_UP:
+	case KEY_A2:
 	  return start_sequence ("\033[A");
 	case KEY_DOWN:
+	case KEY_C2:
 	  return start_sequence ("\033[B");
 	case KEY_RIGHT:
+	case KEY_B3:
 	  return start_sequence ("\033[C");
 	case KEY_LEFT:
+	case KEY_B1:
 	  return start_sequence ("\033[D");
 	case KEY_HOME:
+	case KEY_A1:
 	  return start_sequence ("\033[H");
 	case KEY_END:
+	case KEY_C1:
 	  return start_sequence ("\033[F");
 
 	/* del and ins are unfortunately not hardcoded in readline for
