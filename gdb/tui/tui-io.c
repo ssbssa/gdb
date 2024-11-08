@@ -1119,23 +1119,41 @@ tui_dispatch_ctrl_char (unsigned int ch)
   switch (ch)
     {
     case KEY_NPAGE:
+#ifdef KEY_C3
+    case KEY_C3:
+#endif
       win_info->forward_scroll (0);
       break;
     case KEY_PPAGE:
+#ifdef KEY_A3
+    case KEY_A3:
+#endif
       win_info->backward_scroll (0);
       break;
     case KEY_DOWN:
     case KEY_SF:
+#ifdef KEY_C2
+    case KEY_C2:
+#endif
       win_info->forward_scroll (1);
       break;
     case KEY_UP:
     case KEY_SR:
+#ifdef KEY_A2
+    case KEY_A2:
+#endif
       win_info->backward_scroll (1);
       break;
     case KEY_RIGHT:
+#ifdef KEY_B3
+    case KEY_B3:
+#endif
       win_info->left_scroll (1);
       break;
     case KEY_LEFT:
+#ifdef KEY_B1
+    case KEY_B1:
+#endif
       win_info->right_scroll (1);
       break;
     default:
@@ -1271,16 +1289,34 @@ tui_getc_1 (FILE *fp)
       switch (ch)
 	{
 	case KEY_UP:
+#ifdef KEY_A2
+	case KEY_A2:
+#endif
 	  return start_sequence ("\033[A");
 	case KEY_DOWN:
+#ifdef KEY_C2
+	case KEY_C2:
+#endif
 	  return start_sequence ("\033[B");
 	case KEY_RIGHT:
+#ifdef KEY_B3
+	case KEY_B3:
+#endif
 	  return start_sequence ("\033[C");
 	case KEY_LEFT:
+#ifdef KEY_B1
+	case KEY_B1:
+#endif
 	  return start_sequence ("\033[D");
 	case KEY_HOME:
+#ifdef KEY_A1
+	case KEY_A1:
+#endif
 	  return start_sequence ("\033[H");
 	case KEY_END:
+#ifdef KEY_C1
+	case KEY_C1:
+#endif
 	  return start_sequence ("\033[F");
 
 	/* del and ins are unfortunately not hardcoded in readline for
