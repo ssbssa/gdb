@@ -778,7 +778,7 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 
 # gdb-git-python3
 
-$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done $(BUILD_DIR)/libipt-05-install.done $(BUILD_DIR)/winipt-05-install.done
+$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done $(BUILD_DIR)/libipt-05-install.done $(BUILD_DIR)/winipt-05-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python3
 	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-system-gdbinit=$(GDB_DIR)-git-python3/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-git-python3/etc/gdbinit.d --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib --enable-targets=all
 	@touch $@
@@ -818,7 +818,7 @@ $(BUILD_DIR)/gdb-git-python3-08-licenses.done: | $(BUILD_DIR)/gdb-git-python3-07
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/libffi
 	cp -p $(SOURCE_DIR_ABS)/$(FFI_SRC_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/libffi/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/python
-	cp -p $(GDB_LIBS)/$(PYTHON_DIR)/LICENSE.txt $(GDB_DIR)-git-python3/share/licenses/python/
+	cp -p $(PYTHON3_GIT_DIR)/LICENSE $(GDB_DIR)-git-python3/share/licenses/python/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/boost
 	cp -p $(SOURCE_DIR_ABS)/$(BOOST_SRC_DIR)/LICENSE_1_0.txt $(GDB_DIR)-git-python3/share/licenses/boost/
 	@mkdir -p $(GDB_DIR)-git-python3/share/licenses/source-highlight
