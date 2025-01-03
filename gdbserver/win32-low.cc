@@ -957,7 +957,6 @@ static void
 maybe_adjust_pc (const DEBUG_EVENT &current_event)
 {
   regcache *regcache = get_thread_regcache (current_thread);
-  child_fetch_inferior_registers (regcache, -1);
 
   windows_thread_info *th
     = windows_process.find_thread (current_thread->id);
