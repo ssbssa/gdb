@@ -943,7 +943,6 @@ static void
 maybe_adjust_pc ()
 {
   regcache *regcache = get_thread_regcache (current_thread);
-  child_fetch_inferior_registers (regcache, -1);
 
   windows_thread_info *th
     = windows_process.thread_rec (current_thread->id,
