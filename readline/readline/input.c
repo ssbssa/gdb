@@ -149,7 +149,7 @@ win32_isatty (int fd)
    SIGALRM. */
 #if (defined (HAVE_PSELECT) || defined (HAVE_SELECT)) && !defined (__MINGW32__)
 #  define RL_TIMEOUT_USE_SELECT
-#else
+#elif !defined (__MINGW32__)
 #  define RL_TIMEOUT_USE_SIGALRM
 #  ifdef __MINGW32_MAJOR_VERSION
 /* mingw.org's MinGW doesn't have 'alarm'.  */
@@ -176,12 +176,14 @@ static int set_alarm (unsigned int *, unsigned int *);
 static void reset_alarm (void);
 #endif
 
+#if defined (RL_TIMEOUT_USE_SELECT) || defined (RL_TIMEOUT_USE_SIGALRM)
 /* We implement timeouts as a future time using a supplied interval
    (timeout_duration) from when the timeout is set (timeout_point).
    That allows us to easily determine whether the timeout has occurred
    and compute the time remaining until it does. */
 static struct timeval timeout_point;
 static struct timeval timeout_duration;
+#endif
 
 /* **************************************************************** */
 /*								    */
@@ -568,6 +570,7 @@ reset_alarm ()
 #  endif
 #endif
 
+#if defined (RL_TIMEOUT_USE_SELECT) || defined (RL_TIMEOUT_USE_SIGALRM)
 /* Set a timeout which will be used for the next call of `readline
    ()'.  When (0, 0) are specified the timeout is cleared.  */
 int
@@ -758,6 +761,7 @@ _rl_timeout_handle_sigalrm ()
 #endif
   return -1;
 }
+#endif
 /* **************************************************************** */
 /*								    */
 /*			     Character Input			    */

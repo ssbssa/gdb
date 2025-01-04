@@ -1188,8 +1188,10 @@ _rl_subseq_result (int r, Keymap map, int key, int got_subseq)
 int
 rl_initialize (void)
 {
+#if !defined (__MINGW32__)
   /* Initialize the timeout first to get the precise start time. */
   _rl_timeout_init ();
+#endif
 
   /* If we have never been called before, initialize the
      terminal and data structures. */
