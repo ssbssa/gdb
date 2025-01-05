@@ -61,12 +61,16 @@ handle_eintr (ErrorValType errval, const Fun &f, const Args &... args)
 {
   decltype (f (args...)) ret;
 
+#ifndef _WIN32
   do
+#endif
     {
       errno = 0;
       ret = f (args...);
     }
+#ifndef _WIN32
   while (ret == errval && errno == EINTR);
+#endif
 
   return ret;
 }
