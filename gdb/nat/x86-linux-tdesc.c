@@ -29,6 +29,7 @@
 #include "nat/gdb_ptrace.h"
 #include "nat/x86-xstate.h"
 #include "gdbsupport/x86-xstate.h"
+#include "nat/linux-ptrace.h"
 
 #ifndef __x86_64__
 #include <sys/procfs.h>
