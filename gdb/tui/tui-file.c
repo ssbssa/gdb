@@ -41,5 +41,6 @@ tui_file::flush ()
 {
   if (m_buffered)
     tui_cmd_win ()->refresh_window ();
+  doupdate ();
   stdio_file::flush ();
 }
