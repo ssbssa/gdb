@@ -88,6 +88,7 @@ PYTHON_FILE_LIST = \
 	gdb/xmethod.py \
 	gdb/xmethod_printer.py \
 	gdb/command/__init__.py \
+	gdb/command/attach-by-name.py \
 	gdb/command/explore.py \
 	gdb/command/frame_filters.py \
 	gdb/command/missing_files.py \
