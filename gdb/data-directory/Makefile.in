@@ -97,6 +97,7 @@ PYTHON_FILE_LIST = \
 	gdb/command/tui_windows.py \
 	gdb/command/type_printers.py \
 	gdb/command/unwinders.py \
+	gdb/command/winerror.py \
 	gdb/command/xmethods.py \
 	gdb/dap/breakpoint.py \
 	gdb/dap/bt.py \
