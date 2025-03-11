@@ -346,6 +346,12 @@ struct tui_source_windows
   }
 };
 
+struct defer_tui_update_all_breakpoint_info
+{
+  defer_tui_update_all_breakpoint_info ();
+  ~defer_tui_update_all_breakpoint_info ();
+};
+
 /* Update the execution windows to show the active breakpoints.  This
    is called whenever a breakpoint is inserted, removed or has its
    state changed.  Normally BEING_DELETED is nullptr; if not nullptr,
