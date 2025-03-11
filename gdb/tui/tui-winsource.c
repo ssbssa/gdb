@@ -646,11 +646,29 @@ tui_source_window_base::set_is_exec_point_at (struct tui_line_or_address l,
     refill ();
 }
 
+static bool update_is_deferred = false;
+
+defer_tui_update_all_breakpoint_info::defer_tui_update_all_breakpoint_info ()
+{
+  update_is_deferred = true;
+}
+
+defer_tui_update_all_breakpoint_info::~defer_tui_update_all_breakpoint_info ()
+{
+  update_is_deferred = false;
+
+  if (tui_active)
+    tui_update_all_breakpoint_info (nullptr);
+}
+
 /* See tui-winsource.h.  */
 
 void
 tui_update_all_breakpoint_info (struct breakpoint *being_deleted)
 {
+  if (update_is_deferred)
+    return;
+
   for (tui_source_window_base *win : tui_source_windows ())
     {
       if (win->update_breakpoint_info (being_deleted, false))
