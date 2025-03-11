@@ -72,6 +72,9 @@
 #include "cli/cli-decode.h"
 #include <unordered_set>
 #include "break-cond-parse.h"
+#ifdef TUI
+#include "tui/tui-winsource.h"
+#endif
 
 /* readline include files */
 #include "readline/tilde.h"
@@ -13345,6 +13348,10 @@ breakpoint_re_set (void)
        have been reset.  */
     scoped_restore save_language_mode = make_scoped_restore (&language_mode);
     language_mode = language_mode_manual;
+
+#ifdef TUI
+    defer_tui_update_all_breakpoint_info tui_update_deferrer;
+#endif
 
     /* Note: we must not try to insert locations until after all
        breakpoints have been re-set.  Otherwise, e.g., when re-setting
