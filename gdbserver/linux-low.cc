@@ -5485,6 +5485,116 @@ linux_process_target::read_memory (CORE_ADDR memaddr,
   return proc_xfer_memory (memaddr, myaddr, nullptr, len);
 }
 
+static bool
+proc_mem_file_is_writable ()
+{
+  static std::optional<bool> writable;
+
+  if (writable.has_value ())
+    return *writable;
+
+  writable.emplace (false);
+
+  /* We check whether /proc/pid/mem is writable by trying to write to
+     one of our variables via /proc/self/mem.  */
+
+  scoped_fd fd = gdb_open_cloexec ("/proc/self/mem", O_RDWR | O_LARGEFILE, 0);
+
+  if (fd.get () == -1)
+    {
+      warning (_("opening /proc/self/mem file failed: %s (%d)"),
+	       safe_strerror (errno), errno);
+      return *writable;
+    }
+
+  /* This is the variable we try to write to.  Note OFFSET below.  */
+  volatile gdb_byte test_var = 0;
+
+  gdb_byte writebuf[] = {0x55};
+  ULONGEST offset = (uintptr_t) &test_var;
+
+  int bytes;
+#ifdef HAVE_PREAD64
+  bytes = pwrite64 (fd.get (), writebuf, 1, offset);
+#else
+  bytes = -1;
+  if (lseek (fd.get (), offset, SEEK_SET) != -1)
+    bytes = write (fd.get (), writebuf, 1);
+#endif
+
+  if (bytes == 1 && test_var == 0x55)
+    *writable = true;
+
+  return *writable;
+}
+
+static int
+ptrace_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
+{
+  if (len == 0)
+    {
+      /* Zero length write always succeeds.  */
+      return 0;
+    }
+
+  CORE_ADDR addr = memaddr & -(CORE_ADDR) sizeof (PTRACE_XFER_TYPE);
+  /* Round ending address up; get number of longwords that makes.  */
+  int count
+    = (((memaddr + len) - addr) + sizeof (PTRACE_XFER_TYPE) - 1)
+    / sizeof (PTRACE_XFER_TYPE);
+
+  /* Allocate buffer of that many longwords.  */
+  PTRACE_XFER_TYPE *buffer = XALLOCAVEC (PTRACE_XFER_TYPE, count);
+
+  int pid = current_process ()->pid;
+
+  /* Fill start and end extra bytes of buffer with existing memory data.  */
+
+  errno = 0;
+  /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
+     about coercing an 8 byte integer to a 4 byte pointer.  */
+  buffer[0] = ptrace (PTRACE_PEEKTEXT, pid,
+		      (PTRACE_TYPE_ARG3) (uintptr_t) addr,
+		      (PTRACE_TYPE_ARG4) 0);
+  if (errno)
+    return errno;
+
+  if (count > 1)
+    {
+      errno = 0;
+      buffer[count - 1]
+	= ptrace (PTRACE_PEEKTEXT, pid,
+		  /* Coerce to a uintptr_t first to avoid potential gcc warning
+		     about coercing an 8 byte integer to a 4 byte pointer.  */
+		  (PTRACE_TYPE_ARG3) (uintptr_t) (addr + (count - 1)
+						  * sizeof (PTRACE_XFER_TYPE)),
+		  (PTRACE_TYPE_ARG4) 0);
+      if (errno)
+	return errno;
+    }
+
+  /* Copy data to be written over corresponding part of buffer.  */
+
+  memcpy ((char *) buffer + (memaddr & (sizeof (PTRACE_XFER_TYPE) - 1)),
+	  myaddr, len);
+
+  /* Write the entire buffer.  */
+
+  for (int i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
+    {
+      errno = 0;
+      ptrace (PTRACE_POKETEXT, pid,
+	      /* Coerce to a uintptr_t first to avoid potential gcc warning
+		 about coercing an 8 byte integer to a 4 byte pointer.  */
+	      (PTRACE_TYPE_ARG3) (uintptr_t) addr,
+	      (PTRACE_TYPE_ARG4) buffer[i]);
+      if (errno)
+	return errno;
+    }
+
+  return 0;
+}
+
 /* Copy LEN bytes of data from debugger memory at MYADDR to inferior's
    memory at MEMADDR.  On failure (cannot write to the inferior)
    returns the value of errno.  Always succeeds if LEN is zero.  */
@@ -5510,6 +5620,9 @@ linux_process_target::write_memory (CORE_ADDR memaddr,
       threads_debug_printf ("Writing %s to 0x%08lx in process %d",
 			    str, (long) memaddr, current_process ()->pid);
     }
+
+  if (!proc_mem_file_is_writable ())
+    return ptrace_write_memory (memaddr, myaddr, len);
 
   return proc_xfer_memory (memaddr, nullptr, myaddr, len);
 }
