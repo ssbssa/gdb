@@ -48,6 +48,7 @@
 #include "gdb_bfd.h"
 #include "btrace.h"
 #include "gdbsupport/pathstuff.h"
+#include "stack.h"
 
 #include <algorithm>
 
@@ -729,6 +730,8 @@ objfile_purge_solibs (program_space *pspace)
       if (!(objf->flags & OBJF_USERLOADED) && (objf->flags & OBJF_SHARED))
 	objf->unlink ();
     }
+
+  clear_last_displayed_sal ();
 }
 
 /* See objfiles.h.  */
