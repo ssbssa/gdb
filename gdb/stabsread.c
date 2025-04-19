@@ -1224,13 +1224,10 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
   legacy_psymtab *pst;
 
   /* List of current psymtab's include files.  */
-  const char **psymtab_include_list;
-  int includes_allocated;
-  int includes_used;
+  std::vector<const char *> psymtab_include_list;
 
   /* Index within current psymtab dependency list.  */
-  legacy_psymtab **dependency_list;
-  int dependencies_used, dependencies_allocated;
+  std::vector<legacy_psymtab *> dependency_list;
 
   text_addr = DBX_TEXT_ADDR (objfile);
   text_size = DBX_TEXT_SIZE (objfile);
@@ -1242,17 +1239,6 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
   dbx->ctx.stringtab_global = DBX_STRINGTAB (objfile);
 
   pst = (legacy_psymtab *) 0;
-
-  includes_allocated = 30;
-  includes_used = 0;
-  psymtab_include_list = (const char **) alloca (includes_allocated *
-						 sizeof (const char *));
-
-  dependencies_allocated = 30;
-  dependencies_used = 0;
-  dependency_list =
-    (legacy_psymtab **) alloca (dependencies_allocated *
-				sizeof (legacy_psymtab *));
 
   /* Init bincl list */
   std::vector<struct header_file_location> bincl_storage;
@@ -1384,16 +1370,18 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 		     which are not the address.  */
 		  && unrel_val >= pst->unrelocated_text_low ())
 		{
-		  stabs_end_psymtab (objfile, partial_symtabs,
-				     pst, psymtab_include_list,
-				     includes_used, symnum * dbx->ctx.symbol_size,
+		  stabs_end_psymtab (objfile, partial_symtabs, pst,
+				     psymtab_include_list.data (),
+				     psymtab_include_list.size (),
+				     symnum * dbx->ctx.symbol_size,
 				     unrel_val > pst->unrelocated_text_high ()
 				     ? unrel_val : pst->unrelocated_text_high (),
-				     dependency_list, dependencies_used,
+				     dependency_list.data (),
+				     dependency_list.size (),
 				     textlow_not_set);
 		  pst = (legacy_psymtab *) 0;
-		  includes_used = 0;
-		  dependencies_used = 0;
+		  psymtab_include_list.clear ();
+		  dependency_list.clear ();
 		  dbx->ctx.has_line_numbers = 0;
 		}
 	      else
@@ -1501,17 +1489,19 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 		if (pst)
 		  {
 		    unrelocated_addr unrel_value = unrelocated_addr (valu);
-		    stabs_end_psymtab (objfile, partial_symtabs,
-				       pst, psymtab_include_list,
-				       includes_used, symnum * dbx->ctx.symbol_size,
+		    stabs_end_psymtab (objfile, partial_symtabs, pst,
+				       psymtab_include_list.data (),
+				       psymtab_include_list.size (),
+				       symnum * dbx->ctx.symbol_size,
 				       unrel_value > pst->unrelocated_text_high ()
 				       ? unrel_value
 				       : pst->unrelocated_text_high (),
-				       dependency_list, dependencies_used,
+				       dependency_list.data (),
+				       dependency_list.size (),
 				       prev_textlow_not_set);
 		    pst = (legacy_psymtab *) 0;
-		    includes_used = 0;
-		    dependencies_used = 0;
+		    psymtab_include_list.clear ();
+		    dependency_list.clear ();
 		    dbx->ctx.has_line_numbers = 0;
 		  }
 	      }
@@ -1624,7 +1614,7 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 	    {
 	      int i;
 
-	      for (i = 0; i < includes_used; i++)
+	      for (i = 0; i < psymtab_include_list.size (); i++)
 		if (filename_cmp (namestring, psymtab_include_list[i]) == 0)
 		  {
 		    i = -1;
@@ -1636,16 +1626,7 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 
 	  record_include_file:
 
-	    psymtab_include_list[includes_used++] = namestring;
-	    if (includes_used >= includes_allocated)
-	      {
-		const char **orig = psymtab_include_list;
-
-		psymtab_include_list = (const char **)
-		  alloca ((includes_allocated *= 2) * sizeof (const char *));
-		memcpy (psymtab_include_list, orig,
-			includes_used * sizeof (const char *));
-	      }
+	    psymtab_include_list.push_back (namestring);
 	    continue;
 	  }
 	case N_LSYM:		/* Typedef or automatic variable.  */
@@ -2094,7 +2075,7 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 		int i;
 		int found = 0;
 
-		for (i = 0; i < dependencies_used; i++)
+		for (i = 0; i < dependency_list.size (); i++)
 		  if (dependency_list[i] == needed_pst)
 		    {
 		      found = 1;
@@ -2105,27 +2086,7 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 		if (found)
 		  continue;
 
-		dependency_list[dependencies_used++] = needed_pst;
-		if (dependencies_used >= dependencies_allocated)
-		  {
-		    legacy_psymtab **orig = dependency_list;
-
-		    dependency_list =
-		      (legacy_psymtab **)
-		      alloca ((dependencies_allocated *= 2)
-			      * sizeof (legacy_psymtab *));
-		    memcpy (dependency_list, orig,
-			    (dependencies_used
-			     * sizeof (legacy_psymtab *)));
-#ifdef DEBUG_INFO
-		    gdb_printf (gdb_stderr,
-				"Had to reallocate "
-				"dependency list.\n");
-		    gdb_printf (gdb_stderr,
-				"New dependencies allocated: %d\n",
-				dependencies_allocated);
-#endif
-		  }
+		dependency_list.push_back (needed_pst);
 	      }
 	  }
 	  continue;
@@ -2138,13 +2099,16 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 	  if (pst && gdbarch_sofun_address_maybe_missing (gdbarch))
 	    {
 	      stabs_end_psymtab (objfile, partial_symtabs, pst,
-				 psymtab_include_list, includes_used,
+				 psymtab_include_list.data (),
+				 psymtab_include_list.size (),
 				 symnum * dbx->ctx.symbol_size,
-				 (unrelocated_addr) 0, dependency_list,
-				 dependencies_used, textlow_not_set);
+				 (unrelocated_addr) 0,
+				 dependency_list.data (),
+				 dependency_list.size (),
+				 textlow_not_set);
 	      pst = (legacy_psymtab *) 0;
-	      includes_used = 0;
-	      dependencies_used = 0;
+	      psymtab_include_list.clear ();
+	      dependency_list.clear ();
 	      dbx->ctx.has_line_numbers = 0;
 	    }
 	  continue;
@@ -2204,12 +2168,14 @@ read_stabs_symtab_1 (minimal_symbol_reader &reader,
 	     : CORE_ADDR (dbx->ctx.lowest_text_address))
 	    + text_size));
 
-      stabs_end_psymtab (objfile, partial_symtabs,
-			 pst, psymtab_include_list, includes_used,
+      stabs_end_psymtab (objfile, partial_symtabs, pst,
+			 psymtab_include_list.data (),
+			 psymtab_include_list.size (),
 			 symnum * dbx->ctx.symbol_size,
 			 (text_end > pst->unrelocated_text_high ()
 			  ? text_end : pst->unrelocated_text_high ()),
-			 dependency_list, dependencies_used, textlow_not_set);
+			 dependency_list.data (), dependency_list.size (),
+			 textlow_not_set);
     }
 }
 
