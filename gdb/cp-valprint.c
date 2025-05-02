@@ -683,6 +683,8 @@ cp_find_class_member (struct type **self_p, int *fieldno,
 
   for (i = 0; i < TYPE_N_BASECLASSES (self); i++)
     {
+      if (BASETYPE_VIA_VIRTUAL (self, i))
+	continue;
       LONGEST bitpos = self->field (i).loc_bitpos ();
       LONGEST bitsize = 8 * self->field (i).type ()->length ();
 

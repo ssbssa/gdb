@@ -113,4 +113,5 @@ with_test_prefix "foo::func_f" {
     test_variables_in_super {super}
     test_variables_in_super {foo super}
     test_variables_in_super {foo derived super}
+    gdb_test "print &derived::i" " = \[0-9\]*"
 }
