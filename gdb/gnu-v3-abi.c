@@ -490,6 +490,13 @@ gnuv3_baseclass_offset (struct type *type, int index,
       addr_stack.type = type;
       /* Note that we don't set "valaddr" here.  Doing so causes
 	 regressions.  FIXME.  */
+      if (val->lval () != lval_memory)
+	{
+	  /* Or maybe we do.  */
+	  gdb::array_view<const gdb_byte> view
+	    = gdb::make_array_view (valaddr, type->length ());
+	  addr_stack.valaddr = view;
+	}
       addr_stack.addr = address + embedded_offset;
       addr_stack.next = nullptr;
 
