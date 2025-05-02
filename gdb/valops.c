@@ -3506,6 +3506,7 @@ static bool
 get_baseclass_offset (struct type *vt, struct type *cls,
 		      struct value *v, int *boffs, bool *isvirt)
 {
+  value *vi = value_ind (v);
   for (int i = 0; i < TYPE_N_BASECLASSES (vt); i++)
     {
       struct type *t = vt->field (i).type ();
@@ -3513,9 +3514,9 @@ get_baseclass_offset (struct type *vt, struct type *cls,
 	{
 	  if (BASETYPE_VIA_VIRTUAL (vt, i))
 	    {
-	      const gdb_byte *adr = v->contents_for_printing ().data ();
-	      *boffs = baseclass_offset (vt, i, adr, v->offset (),
-					 value_as_long (v), v);
+	      const gdb_byte *adr = vi->contents_for_printing ().data ();
+	      *boffs = baseclass_offset (vt, i, adr, vi->offset (),
+					 value_as_long (v), vi);
 	      *isvirt = true;
 	    }
 	  else
@@ -3527,9 +3528,9 @@ get_baseclass_offset (struct type *vt, struct type *cls,
 	{
 	  if (*isvirt == false)	/* Add non-virtual base offset.  */
 	    {
-	      const gdb_byte *adr = v->contents_for_printing ().data ();
-	      *boffs += baseclass_offset (vt, i, adr, v->offset (),
-					  value_as_long (v), v);
+	      const gdb_byte *adr = vi->contents_for_printing ().data ();
+	      *boffs += baseclass_offset (vt, i, adr, vi->offset (),
+					  value_as_long (v), vi);
 	    }
 	  return true;
 	}
