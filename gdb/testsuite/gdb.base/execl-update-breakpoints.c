@@ -34,8 +34,14 @@ main (int argc, char **argv)
   len = strlen (argv[0]);
   bin = malloc (len + 1);
   memcpy (bin, argv[0], len + 1);
+#ifdef _WIN32
+  if (len > 4 && !stricmp (bin + len - 4, ".exe"))
+    len -= 4;
+#endif
   if (bin[len - 1] == '1')
     bin[len - 1] = '2';
+  else
+    exit (2);
 
   execl (bin, bin, (char *) NULL);
   perror ("execl failed");

@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <fcntl.h>
+#endif
 
 #include "unbuffer_output.c"
 
@@ -868,6 +871,10 @@ void init_array_rep(
 
 
 int main ()  {
+
+#ifdef _WIN32
+  _setmode (_fileno (stdout), _O_BINARY);
+#endif
 
   /* variables for array and enumerated type testing
    */
