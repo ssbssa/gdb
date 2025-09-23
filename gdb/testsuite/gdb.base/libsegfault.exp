@@ -24,6 +24,9 @@
 # the local machine.
 require {!is_remote host}
 
+# This test don't work on Windows host.
+require {!ishost *-*-mingw*}
+
 # Spawn GDB with LIB preloaded with LD_PRELOAD.  CMDLINE_OPTS are
 # command line options passed to GDB.
 
