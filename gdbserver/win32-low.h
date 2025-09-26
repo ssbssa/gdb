@@ -27,9 +27,13 @@ struct target_desc;
 
 /* The inferior's target description.  This is a global because the
    Windows ports support neither bi-arch nor multi-process.  */
+#if defined __i386__ || defined __x86_64__
 extern const struct target_desc *win32_tdesc;
 #ifdef __x86_64__
 extern const struct target_desc *wow64_win32_tdesc;
+#endif
+#else
+extern const struct target_desc *aarch64_tdesc;
 #endif
 
 #ifdef __CYGWIN__
