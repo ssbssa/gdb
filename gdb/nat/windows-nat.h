@@ -476,6 +476,7 @@ extern DeleteProcThreadAttributeList_ftype *DeleteProcThreadAttributeList;
 
 extern bool disable_randomization_available ();
 
+#if defined __i386__ || defined __x86_64__
 typedef DWORD64 (WINAPI GetEnabledXStateFeatures_ftype) ();
 extern GetEnabledXStateFeatures_ftype *GetEnabledXStateFeatures;
 
@@ -502,6 +503,7 @@ extern RtlSetExtendedFeaturesMask_ftype *RtlSetExtendedFeaturesMask;
 typedef PVOID (WINAPI RtlLocateExtendedFeature_ftype) (PVOID, DWORD, PDWORD);
 extern RtlLocateExtendedFeature_ftype *RtlLocateExtendedFeature;
 #endif
+#endif
 
 /* Helper classes to get the correct ContextFlags values based on the
    used type (CONTEXT or WOW64_CONTEXT).  */
@@ -519,7 +521,9 @@ struct WindowsContext<CONTEXT *>
   static constexpr DWORD full	  = CONTEXT_FULL;
   static constexpr DWORD all	  = (CONTEXT_FULL
 				     | CONTEXT_FLOATING_POINT
+#ifdef CONTEXT_SEGMENTS
 				     | CONTEXT_SEGMENTS
+#endif
 				     | CONTEXT_DEBUG_REGISTERS
 				     | CONTEXT_EXTENDED_REGISTERS);
 };
@@ -566,6 +570,7 @@ enum_process_modules (CONTEXT *, HANDLE process,
   return EnumProcessModules (process, modules, size, needed);
 }
 
+#if defined __i386__ || defined __x86_64__
 static inline BOOL
 get_xstate_features_mask (CONTEXT *context, DWORD64 *mask)
 {
@@ -583,6 +588,7 @@ locate_xstate_feature (CONTEXT *context, DWORD feature, DWORD *length)
 {
   return LocateXStateFeature (context, feature, length);
 }
+#endif
 
 #ifdef __x86_64__
 static inline BOOL
@@ -663,10 +669,12 @@ locate_xstate_feature (WOW64_CONTEXT *context, DWORD feature, DWORD *length)
 }
 #endif
 
+#if defined __i386__ || defined __x86_64__
 /* Return the available xstate features, but only if there is more than SSE
    available.  */
 
 extern DWORD64 get_xstate_features ();
+#endif
 
 /* Load any functions which may not be available in ancient versions
    of Windows.  */

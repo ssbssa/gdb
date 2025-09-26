@@ -77,6 +77,9 @@ case ${gdb_host} in
     cygwin*)
 	NATDEPFILES='x86-nat.o nat/x86-dregs.o windows-nat.o nat/windows-nat.o'
 	;;
+    mingw64a)
+	NATDEPFILES='aarch64-nat.o windows-nat.o nat/windows-nat.o nat/aarch64-hw-point.o'
+	;;
     mingw*)
 	NATDEPFILES='x86-nat.o nat/x86-dregs.o windows-nat.o nat/windows-nat.o'
 	HAVE_NATIVE_GCORE_HOST=1

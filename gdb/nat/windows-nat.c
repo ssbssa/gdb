@@ -91,6 +91,7 @@ InitializeProcThreadAttributeList_ftype *InitializeProcThreadAttributeList;
 UpdateProcThreadAttribute_ftype *UpdateProcThreadAttribute;
 DeleteProcThreadAttributeList_ftype *DeleteProcThreadAttributeList;
 
+#if defined __i386__ || defined __x86_64__
 GetEnabledXStateFeatures_ftype *GetEnabledXStateFeatures;
 InitializeContext_ftype *InitializeContext;
 GetXStateFeaturesMask_ftype *GetXStateFeaturesMask;
@@ -100,6 +101,7 @@ LocateXStateFeature_ftype *LocateXStateFeature;
 RtlGetExtendedFeaturesMask_ftype *RtlGetExtendedFeaturesMask;
 RtlSetExtendedFeaturesMask_ftype *RtlSetExtendedFeaturesMask;
 RtlLocateExtendedFeature_ftype *RtlLocateExtendedFeature;
+#endif
 #endif
 
 /* Note that 'debug_events' must be locally defined in the relevant
@@ -274,6 +276,7 @@ windows_process_info::pid_to_exec_file (int pid)
 void windows_process_info::initialize_context (windows_thread_info *th,
 					       DWORD xstate_features)
 {
+#if defined __i386__ || defined __x86_64__
   if (xstate_features != 0)
     {
       DWORD context_flags = with_context (nullptr, [] (auto *context)
@@ -306,6 +309,7 @@ void windows_process_info::initialize_context (windows_thread_info *th,
     }
 #endif
   else
+#endif
     {
       th->context_buffer.reset (xmalloc (sizeof (CONTEXT)));
       th->context = (CONTEXT *) th->context_buffer.get ();
@@ -935,6 +939,7 @@ windows_process_info::add_dll (LPVOID load_addr)
   if (!ret)
     return;
 
+#if defined __i386__ || defined __x86_64__
   char system_dir[MAX_PATH];
   char syswow_dir[MAX_PATH];
   size_t system_dir_len = 0;
@@ -965,6 +970,7 @@ windows_process_info::add_dll (LPVOID load_addr)
 	}
 
     }
+#endif
   for (i = 1; i < (int) (cb_needed / sizeof (HMODULE)); i++)
     {
       MODULEINFO mi;
@@ -988,6 +994,8 @@ windows_process_info::add_dll (LPVOID load_addr)
 #else
       name = dll_name;
 #endif
+
+#if defined __i386__ || defined __x86_64__
       /* Convert the DLL path of 32bit processes returned by
 	 GetModuleFileNameEx from the 64bit system directory to the
 	 32bit syswow64 directory if necessary.  */
@@ -1000,6 +1008,7 @@ windows_process_info::add_dll (LPVOID load_addr)
 	  syswow_dll_path += name + system_dir_len;
 	  name = syswow_dll_path.c_str();
 	}
+#endif
 
       /* Record the DLL if either LOAD_ADDR is NULL or the address
 	 at which the DLL was loaded is equal to LOAD_ADDR.  */
@@ -1311,6 +1320,7 @@ disable_randomization_available ()
 	  && DeleteProcThreadAttributeList != nullptr);
 }
 
+#if defined __i386__ || defined __x86_64__
 /* See windows-nat.h.  */
 
 DWORD64
@@ -1339,6 +1349,7 @@ get_xstate_features ()
 
   return 0;
 }
+#endif
 
 /* See windows-nat.h.  */
 
@@ -1376,11 +1387,13 @@ initialize_loadable ()
       GPA (hm, UpdateProcThreadAttribute);
       GPA (hm, DeleteProcThreadAttributeList);
 
+#if defined __i386__ || defined __x86_64__
       GPA (hm, GetEnabledXStateFeatures);
       GPA (hm, InitializeContext);
       GPA (hm, GetXStateFeaturesMask);
       GPA (hm, SetXStateFeaturesMask);
       GPA (hm, LocateXStateFeature);
+#endif
     }
 
   /* Set variables to dummy versions of these processes if the function
