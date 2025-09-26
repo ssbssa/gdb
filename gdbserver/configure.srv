@@ -61,6 +61,12 @@ case "${gdbserver_host}" in
 			ipa_obj="${ipa_obj} linux-aarch64-tdesc-ipa.o"
 			ipa_obj="${ipa_obj} arch/aarch64-ipa.o"
 			;;
+  aarch64-*-mingw*)	srv_regobj=""
+			srv_tgtobj="arch/aarch64.o nat/aarch64-hw-point.o"
+			srv_tgtobj="${srv_tgtobj} win32-low.o win32-aarch64-low.o"
+			srv_tgtobj="${srv_tgtobj} nat/windows-nat.o"
+			srv_mingw=yes
+			;;
   aarch64*-*-netbsd*)	srv_regobj=""
 			srv_tgtobj="netbsd-low.o netbsd-aarch64-low.o fork-child.o"
 			srv_tgtobj="${srv_tgtobj} nat/fork-inferior.o"

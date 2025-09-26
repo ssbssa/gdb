@@ -63,9 +63,13 @@ gdbserver_windows_process windows_process;
 
 int using_threads = 1;
 
+#if defined __i386__ || defined __x86_64__
 const struct target_desc *win32_tdesc;
 #ifdef __x86_64__
 const struct target_desc *wow64_win32_tdesc;
+#endif
+#else
+const struct target_desc *aarch64_tdesc;
 #endif
 
 #define NUM_REGS (the_low_target.num_regs ())
@@ -325,12 +329,16 @@ do_initial_child_stuff (HANDLE proch, DWORD pid, int attached)
 #endif
 
   proc = add_process (pid, attached);
+#if defined __i386__ || defined __x86_64__
 #ifdef __x86_64__
   if (windows_process.wow64_process)
     proc->tdesc = wow64_win32_tdesc;
   else
 #endif
     proc->tdesc = win32_tdesc;
+#else
+  proc->tdesc = aarch64_tdesc;
+#endif
   child_init_thread_list ();
   windows_process.child_initialization_done = 0;
 
@@ -922,6 +930,12 @@ fake_breakpoint_event (void)
   windows_process.current_event.dwDebugEventCode = EXCEPTION_DEBUG_EVENT;
   windows_process.current_event.u.Exception.ExceptionRecord.ExceptionCode
     = EXCEPTION_BREAKPOINT;
+#ifdef __aarch64__
+  /* On aarch64, hardware breakpoints also get EXCEPTION_BREAKPOINT,
+     but they can be recognized with ExceptionInformation.  */
+  windows_process.current_event.u.Exception.ExceptionRecord.NumberParameters = 1;
+  windows_process.current_event.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0;
+#endif
 
   for_each_thread (suspend_one_thread);
 }
@@ -951,7 +965,14 @@ maybe_adjust_pc ()
 
   if (windows_process.current_event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT
       && ((windows_process.current_event.u.Exception.ExceptionRecord.ExceptionCode
-	   == EXCEPTION_BREAKPOINT)
+	   == EXCEPTION_BREAKPOINT
+#ifdef __aarch64__
+	   /* On aarch64, hardware breakpoints also get EXCEPTION_BREAKPOINT,
+	      but they can be recognized with ExceptionInformation.  */
+	   && windows_process.current_event.u.Exception.ExceptionRecord.NumberParameters == 1
+	   && windows_process.current_event.u.Exception.ExceptionRecord.ExceptionInformation[0] == 0
+#endif
+	   )
 	  || (windows_process.current_event.u.Exception.ExceptionRecord.ExceptionCode
 	      == STATUS_WX86_BREAKPOINT))
       && windows_process.child_initialization_done)
