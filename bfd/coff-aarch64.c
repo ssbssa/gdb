@@ -988,7 +988,7 @@ const bfd_target
     _bfd_dummy_target,
     coff_object_p,
     bfd_generic_archive_p,
-    coff_object_p
+    coff_core_file_p
   },
   {				/* bfd_set_format.  */
     _bfd_bool_bfd_false_error,

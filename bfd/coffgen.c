@@ -3927,7 +3927,7 @@ coff_core_file_p (bfd *abfd)
       uint16_t arch;
       if (bfd_seek (abfd, systemInfoRva, SEEK_SET) != 0
 	  || bfd_read (&arch, sizeof arch, abfd) != sizeof arch
-	  || (arch != 0 && arch != 9))
+	  || (arch != 0 && arch != 9 && arch != 12))
 	goto fail;
 
       make_bfd_asection (abfd, ".corecpuinfo",
@@ -3936,8 +3936,12 @@ coff_core_file_p (bfd *abfd)
 			 6,
 			 0);
 
-      bfd_default_set_arch_mach (abfd, bfd_arch_i386,
-				 arch == 9 ? bfd_mach_x86_64 : 0);
+      if (arch == 0 || arch == 9)
+	bfd_default_set_arch_mach (abfd, bfd_arch_i386,
+				   arch == 9 ? bfd_mach_x86_64 : 0);
+      else
+	bfd_default_set_arch_mach (abfd, bfd_arch_aarch64,
+				   bfd_mach_aarch64);
     }
 
   if (miscInfoRva)

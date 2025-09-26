@@ -21,6 +21,41 @@
 #include "regset.h"
 #include "windows-tdep.h"
 
+static const struct regcache_map_entry aarch64_windows_gregmap[] =
+{
+  { 1, REGCACHE_MAP_SKIP, 4 }, /* ContextFlags */
+  { 1, AARCH64_CPSR_REGNUM, 4 },
+  { 29, AARCH64_X0_REGNUM, 8 },
+  { 1, AARCH64_FP_REGNUM, 8 },
+  { 1, AARCH64_LR_REGNUM, 8 },
+  { 1, AARCH64_SP_REGNUM, 8 },
+  { 1, AARCH64_PC_REGNUM, 8 },
+  { 32, AARCH64_V0_REGNUM, 16 },
+  { 1, AARCH64_FPSR_REGNUM, 4 },
+  { 1, AARCH64_FPCR_REGNUM, 4 },
+  { 0 }
+};
+
+#define AARCH64_WINDOWS_SIZEOF_GREGSET 318
+
+static const struct regset aarch64_windows_gregset =
+{
+  aarch64_windows_gregmap, regcache_supply_regset, regcache_collect_regset,
+  REGSET_VARIABLE_SIZE
+};
+
+/* Implement the "iterate_over_regset_sections" gdbarch method.  */
+
+static void
+aarch64_win_iterate_over_regset_sections (struct gdbarch *gdbarch,
+					  iterate_over_regset_sections_cb *cb,
+					  void *cb_data,
+					  const struct regcache *regcache)
+{
+  cb (".reg", AARCH64_WINDOWS_SIZEOF_GREGSET, AARCH64_WINDOWS_SIZEOF_GREGSET,
+      &aarch64_windows_gregset, NULL, cb_data);
+}
+
 /* Implement the "auto_wide_charset" gdbarch method.  */
 
 static const char *
@@ -47,6 +82,14 @@ aarch64_windows_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_sw_breakpoint_from_kind (gdbarch,
 				       aarch64_w_breakpoint::bp_from_kind);
   set_gdbarch_decr_pc_after_break (gdbarch, 4);
+
+  set_gdbarch_iterate_over_regset_sections
+    (gdbarch, aarch64_win_iterate_over_regset_sections);
+
+  /* Core file support.  */
+  set_gdbarch_core_xfer_shared_libraries
+    (gdbarch, windows_core_xfer_shared_libraries);
+  set_gdbarch_core_pid_to_str (gdbarch, windows_core_pid_to_str);
 
   windows_init_abi (info, gdbarch);
 
