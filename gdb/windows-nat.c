@@ -2622,6 +2622,8 @@ get_socket_info (HANDLE h, func_NtDeviceIoControlFile *fNtDeviceIoControlFile,
   return NULL;
 }
 
+static bool socket_details = false;
+
 bool
 windows_nat_target::info_proc (const char *args, enum info_proc_what what)
 {
@@ -2689,7 +2691,8 @@ windows_nat_target::info_proc (const char *args, enum info_proc_what what)
 			       sizeof (OBJECT_NAME_INFORMATION), &len))
 	    object_name = convert_unicode_string (&oni->Name);
 
-	  if (fNtDeviceIoControlFile && object_type_name && object_name
+	  if (socket_details && fNtDeviceIoControlFile
+	      && object_type_name && object_name
 	      && !strcmp (object_type_name.get (), "File")
 	      && !strcmp (object_name.get (), "\\Device\\Afd"))
 	    {
@@ -4548,6 +4551,14 @@ Show whether to display kernel exceptions in child process."), NULL,
 			   &pdb_symbols, _("\
 Set whether symbols are read from PDB files."), _("\
 Show whether symbols are read from PDB files."), NULL,
+			   NULL,
+			   NULL, /* FIXME: i18n: */
+			   &setlist, &showlist);
+
+  add_setshow_boolean_cmd ("proc-files-socket-details", class_obscure,
+			   &socket_details, _("\
+Set whether info proc files shows socket details."), _("\
+Show whether info proc files shows socket details."), NULL,
 			   NULL,
 			   NULL, /* FIXME: i18n: */
 			   &setlist, &showlist);
