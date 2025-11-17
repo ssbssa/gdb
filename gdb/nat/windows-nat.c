@@ -530,6 +530,7 @@ windows_process_info::add_dll (LPVOID load_addr)
   if (!ret)
     return;
 
+#if defined __i386__ || defined __x86_64__
   char system_dir[MAX_PATH];
   char syswow_dir[MAX_PATH];
   size_t system_dir_len = 0;
@@ -560,6 +561,7 @@ windows_process_info::add_dll (LPVOID load_addr)
 	}
 
     }
+#endif
   for (i = 1; i < (int) (cb_needed / sizeof (HMODULE)); i++)
     {
       MODULEINFO mi;
@@ -583,6 +585,8 @@ windows_process_info::add_dll (LPVOID load_addr)
 #else
       name = dll_name;
 #endif
+
+#if defined __i386__ || defined __x86_64__
       /* Convert the DLL path of 32bit processes returned by
 	 GetModuleFileNameEx from the 64bit system directory to the
 	 32bit syswow64 directory if necessary.  */
@@ -595,6 +599,7 @@ windows_process_info::add_dll (LPVOID load_addr)
 	  syswow_dll_path += name + system_dir_len;
 	  name = syswow_dll_path.c_str();
 	}
+#endif
 
       /* Record the DLL if either LOAD_ADDR is NULL or the address
 	 at which the DLL was loaded is equal to LOAD_ADDR.  */

@@ -339,7 +339,8 @@ read_pe_exported_syms (minimal_symbol_reader &reader,
   is_pe64 = (strcmp (target, "pe-x86-64") == 0
 	     || strcmp (target, "pei-x86-64") == 0
 	     || strcmp (target, "pe-aarch64") == 0
-	     || strcmp (target, "pei-aarch64") == 0);
+	     || strcmp (target, "pei-aarch64") == 0
+	     || strcmp (target, "pei-aarch64-little") == 0);
   is_pe32 = (strcmp (target, "pe-i386") == 0
 	     || strcmp (target, "pei-i386") == 0
 	     || strcmp (target, "pe-arm-wince-little") == 0
@@ -638,7 +639,8 @@ pe_text_section_offset (struct bfd *abfd)
   is_pe64 = (strcmp (target, "pe-x86-64") == 0
 	     || strcmp (target, "pei-x86-64") == 0
 	     || strcmp (target, "pe-aarch64") == 0
-	     || strcmp (target, "pei-aarch64") == 0);
+	     || strcmp (target, "pei-aarch64") == 0
+	     || strcmp (target, "pei-aarch64-little") == 0);
   is_pe32 = (strcmp (target, "pe-i386") == 0
 	     || strcmp (target, "pei-i386") == 0
 	     || strcmp (target, "pe-arm-wince-little") == 0

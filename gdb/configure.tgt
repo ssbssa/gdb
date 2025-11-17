@@ -155,6 +155,11 @@ aarch64*-*-linux*)
 			symfile-mem.o linux-record.o"
 	;;
 
+aarch64-*-mingw*)
+        # Target: MingW/aarch64
+	gdb_target_obs="aarch64-windows-tdep.o windows-tdep.o"
+        ;;
+
 alpha*-*-linux*)
 	# Target: Little-endian Alpha running Linux
 	gdb_target_obs="alpha-mdebug-tdep.o alpha-linux-tdep.o \

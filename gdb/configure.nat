@@ -77,6 +77,10 @@ case ${gdb_host} in
     cygwin*)
 	NATDEPFILES='x86-nat.o nat/x86-dregs.o windows-nat.o nat/windows-nat.o'
 	;;
+    mingw64a)
+	NATDEPFILES='aarch64-nat.o aarch64-windows-nat.o windows-nat.o \
+	nat/windows-nat.o nat/aarch64-hw-point.o'
+	;;
     mingw*)
 	NATDEPFILES='x86-nat.o nat/x86-dregs.o windows-nat.o nat/windows-nat.o'
 	;;

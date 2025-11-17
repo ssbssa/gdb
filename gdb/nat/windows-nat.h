@@ -474,7 +474,9 @@ struct WindowsContext<CONTEXT *>
   static constexpr DWORD full	  = CONTEXT_FULL;
   static constexpr DWORD all	  = (CONTEXT_FULL
 				     | CONTEXT_FLOATING_POINT
+#ifdef CONTEXT_SEGMENTS
 				     | CONTEXT_SEGMENTS
+#endif
 				     | CONTEXT_DEBUG_REGISTERS
 				     | CONTEXT_EXTENDED_REGISTERS);
 };
