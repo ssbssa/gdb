@@ -72,10 +72,6 @@
 
 using namespace windows_nat;
 
-/* The current process.  */
-static windows_per_inferior x86_windows_process;
-windows_per_inferior *windows_process = &x86_windows_process;
-
 #undef STARTUPINFO
 
 #ifndef __CYGWIN__
@@ -2867,10 +2863,6 @@ INIT_GDB_FILE (windows_nat)
   /* x86_dr_low.debug_register_length field is set by
      calling x86_set_debug_register_length function
      in processor windows specific native file.  */
-
-  /* The target is not a global specifically to avoid a C++ "static
-     initializer fiasco" situation.  */
-  add_inf_child_target (new x86_nat_target<windows_nat_target>);
 
 #ifdef __CYGWIN__
   cygwin_internal (CW_SET_DOS_FILE_WARNING, 0);

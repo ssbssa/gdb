@@ -1990,6 +1990,7 @@ ALLDEPFILES = \
 	x86-gnu-nat.c \
 	x86-nat.c \
 	x86-tdep.c \
+	x86-windows-nat.c \
 	xstormy16-tdep.c \
 	xtensa-config.c \
 	xtensa-linux-nat.c \
