@@ -23,6 +23,9 @@
 
 #include "x86-nat.h"
 
+#include "i386-tdep.h"
+#include "i387-tdep.h"
+
 using namespace windows_nat;
 
 /* If we're not using the old Cygwin header file set, define the
@@ -53,17 +56,26 @@ check (BOOL ok, const char *file, int line)
 struct x86_windows_per_inferior : public windows_per_inferior
 {
   uintptr_t dr[8] {};
+
+  /* The function to use in order to determine whether a register is
+     a segment register or not.  */
+  segment_register_p_ftype *segment_register_p = nullptr;
 };
 
 struct x86_windows_nat_target final : public x86_nat_target<windows_nat_target>
 {
-  void initialize_windows_arch () override;
+  void initialize_windows_arch (bool attaching) override;
   void cleanup_windows_arch () override;
 
   void fill_thread_context (windows_thread_info *th) override;
 
   void thread_context_continue (windows_thread_info *th, int killed) override;
   void thread_context_step (windows_thread_info *th) override;
+
+  void fetch_one_register (struct regcache *regcache,
+			   windows_thread_info *th, int r) override;
+  void store_one_register (const struct regcache *regcache,
+			   windows_thread_info *th, int r) override;
 };
 
 /* The current process.  */
@@ -73,9 +85,25 @@ windows_per_inferior *windows_process = &x86_windows_process;
 /* See windows-nat.h.  */
 
 void
-x86_windows_nat_target::initialize_windows_arch ()
+x86_windows_nat_target::initialize_windows_arch (bool attaching)
 {
   memset (x86_windows_process.dr, 0, sizeof (x86_windows_process.dr));
+
+#ifdef __x86_64__
+  x86_windows_process.ignore_first_breakpoint
+    = !attaching && x86_windows_process.wow64_process;
+
+  if (!x86_windows_process.wow64_process)
+    {
+      x86_windows_process.mappings  = amd64_mappings;
+      x86_windows_process.segment_register_p = amd64_windows_segment_register_p;
+    }
+  else
+#endif
+    {
+      x86_windows_process.mappings  = i386_mappings;
+      x86_windows_process.segment_register_p = i386_windows_segment_register_p;
+    }
 }
 
 /* See windows-nat.h.  */
@@ -157,6 +185,111 @@ x86_windows_nat_target::thread_context_step (windows_thread_info *th)
     {
       context->EFlags |= FLAG_TRACE_BIT;
     });
+}
+
+/* See windows-nat.h.  */
+
+void
+x86_windows_nat_target::fetch_one_register (struct regcache *regcache,
+					    windows_thread_info *th, int r)
+{
+  gdb_assert (r >= 0);
+  gdb_assert (!th->reload_context);
+
+  char *context_ptr = x86_windows_process.with_context (th, [] (auto *context)
+    {
+      return (char *) context;
+    });
+
+  char *context_offset = context_ptr + x86_windows_process.mappings[r];
+  struct gdbarch *gdbarch = regcache->arch ();
+  i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
+
+  gdb_assert (!gdbarch_read_pc_p (gdbarch));
+  gdb_assert (gdbarch_pc_regnum (gdbarch) >= 0);
+  gdb_assert (!gdbarch_write_pc_p (gdbarch));
+
+  /* GDB treats some registers as 32-bit, where they are in fact only
+     16 bits long.  These cases must be handled specially to avoid
+     reading extraneous bits from the context.  */
+  if (r == I387_FISEG_REGNUM (tdep)
+      || x86_windows_process.segment_register_p (r))
+    {
+      gdb_byte bytes[4] = {};
+      memcpy (bytes, context_offset, 2);
+      regcache->raw_supply (r, bytes);
+    }
+  else if (r == I387_FOP_REGNUM (tdep))
+    {
+      long l = (*((long *) context_offset) >> 16) & ((1 << 11) - 1);
+      regcache->raw_supply (r, &l);
+    }
+  else
+    {
+      if (th->stopped_at_software_breakpoint
+	  && !th->pc_adjusted
+	  && r == gdbarch_pc_regnum (gdbarch))
+	{
+	  int size = register_size (gdbarch, r);
+	  if (size == 4)
+	    {
+	      uint32_t value;
+	      memcpy (&value, context_offset, size);
+	      value -= gdbarch_decr_pc_after_break (gdbarch);
+	      memcpy (context_offset, &value, size);
+	    }
+	  else
+	    {
+	      gdb_assert (size == 8);
+	      uint64_t value;
+	      memcpy (&value, context_offset, size);
+	      value -= gdbarch_decr_pc_after_break (gdbarch);
+	      memcpy (context_offset, &value, size);
+	    }
+	  /* Make sure we only rewrite the PC a single time.  */
+	  th->pc_adjusted = true;
+	}
+      regcache->raw_supply (r, context_offset);
+    }
+}
+
+/* See windows-nat.h.  */
+
+void
+x86_windows_nat_target::store_one_register (const struct regcache *regcache,
+					    windows_thread_info *th, int r)
+{
+  gdb_assert (r >= 0);
+
+  char *context_ptr = x86_windows_process.with_context (th, [] (auto *context)
+    {
+      return (char *) context;
+    });
+
+  struct gdbarch *gdbarch = regcache->arch ();
+  i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
+
+  /* GDB treats some registers as 32-bit, where they are in fact only
+     16 bits long.  These cases must be handled specially to avoid
+     overwriting other registers in the context.  */
+  if (r == I387_FISEG_REGNUM (tdep)
+      || x86_windows_process.segment_register_p (r))
+    {
+      gdb_byte bytes[4];
+      regcache->raw_collect (r, bytes);
+      memcpy (context_ptr + x86_windows_process.mappings[r], bytes, 2);
+    }
+  else if (r == I387_FOP_REGNUM (tdep))
+    {
+      gdb_byte bytes[4];
+      regcache->raw_collect (r, bytes);
+      /* The value of FOP occupies the top two bytes in the context,
+	 so write the two low-order bytes from the cache into the
+	 appropriate spot.  */
+      memcpy (context_ptr + x86_windows_process.mappings[r] + 2, bytes, 2);
+    }
+  else
+    regcache->raw_collect (r, context_ptr + x86_windows_process.mappings[r]);
 }
 
 /* Hardware watchpoint support, adapted from go32-nat.c code.  */

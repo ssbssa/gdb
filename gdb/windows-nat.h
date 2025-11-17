@@ -83,10 +83,6 @@ struct windows_per_inferior : public windows_nat::windows_process_info
 
   const int *mappings = nullptr;
 
-  /* The function to use in order to determine whether a register is
-     a segment register or not.  */
-  segment_register_p_ftype *segment_register_p = nullptr;
-
   std::vector<windows_solib> solibs;
 
 #ifdef __CYGWIN__
@@ -182,7 +178,7 @@ struct windows_nat_target : public inf_child_target
   }
 
   /* Initialize arch-specific data.  */
-  virtual void initialize_windows_arch () = 0;
+  virtual void initialize_windows_arch (bool attaching) = 0;
   /* Cleanup arch-specific data.  */
   virtual void cleanup_windows_arch () = 0;
 
@@ -194,6 +190,26 @@ struct windows_nat_target : public inf_child_target
 					int killed) = 0;
   /* Set the stepping bit in the thread context.  */
   virtual void thread_context_step (windows_thread_info *th) = 0;
+
+  /* Fetches register number R from the given windows_thread_info,
+     and supplies its value to the given regcache.
+
+     This function assumes that R is non-negative.  A failed assertion
+     is raised if that is not true.
+
+     This function assumes that TH->RELOAD_CONTEXT is not set, meaning
+     that the windows_thread_info has an up-to-date context.  A failed
+     assertion is raised if that assumption is violated.  */
+  virtual void fetch_one_register (struct regcache *regcache,
+				   windows_thread_info *th, int r) = 0;
+
+  /* Collect the register number R from the given regcache, and store
+     its value into the corresponding area of the given thread's context.
+
+     This function assumes that R is non-negative.  A failed assertion
+     assertion is raised if that is not true.  */
+  virtual void store_one_register (const struct regcache *regcache,
+				   windows_thread_info *th, int r) = 0;
 
 private:
 

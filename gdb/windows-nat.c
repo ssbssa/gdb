@@ -57,9 +57,6 @@
 #include "xml-support.h"
 #include "inttypes.h"
 
-#include "i386-tdep.h"
-#include "i387-tdep.h"
-
 #include "windows-tdep.h"
 #include "windows-nat.h"
 #include "complaints.h"
@@ -386,79 +383,6 @@ windows_nat_target::delete_thread (ptid_t ptid, DWORD exit_code,
     windows_process->thread_list.erase (iter);
 }
 
-/* Fetches register number R from the given windows_thread_info,
-   and supplies its value to the given regcache.
-
-   This function assumes that R is non-negative.  A failed assertion
-   is raised if that is not true.
-
-   This function assumes that TH->RELOAD_CONTEXT is not set, meaning
-   that the windows_thread_info has an up-to-date context.  A failed
-   assertion is raised if that assumption is violated.  */
-
-static void
-windows_fetch_one_register (struct regcache *regcache,
-			    windows_thread_info *th, int r)
-{
-  gdb_assert (r >= 0);
-  gdb_assert (!th->reload_context);
-
-  char *context_ptr = windows_process->with_context (th, [] (auto *context)
-    {
-      return (char *) context;
-    });
-
-  char *context_offset = context_ptr + windows_process->mappings[r];
-  struct gdbarch *gdbarch = regcache->arch ();
-  i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
-
-  gdb_assert (!gdbarch_read_pc_p (gdbarch));
-  gdb_assert (gdbarch_pc_regnum (gdbarch) >= 0);
-  gdb_assert (!gdbarch_write_pc_p (gdbarch));
-
-  /* GDB treats some registers as 32-bit, where they are in fact only
-     16 bits long.  These cases must be handled specially to avoid
-     reading extraneous bits from the context.  */
-  if (r == I387_FISEG_REGNUM (tdep) || windows_process->segment_register_p (r))
-    {
-      gdb_byte bytes[4] = {};
-      memcpy (bytes, context_offset, 2);
-      regcache->raw_supply (r, bytes);
-    }
-  else if (r == I387_FOP_REGNUM (tdep))
-    {
-      long l = (*((long *) context_offset) >> 16) & ((1 << 11) - 1);
-      regcache->raw_supply (r, &l);
-    }
-  else
-    {
-      if (th->stopped_at_software_breakpoint
-	  && !th->pc_adjusted
-	  && r == gdbarch_pc_regnum (gdbarch))
-	{
-	  int size = register_size (gdbarch, r);
-	  if (size == 4)
-	    {
-	      uint32_t value;
-	      memcpy (&value, context_offset, size);
-	      value -= gdbarch_decr_pc_after_break (gdbarch);
-	      memcpy (context_offset, &value, size);
-	    }
-	  else
-	    {
-	      gdb_assert (size == 8);
-	      uint64_t value;
-	      memcpy (&value, context_offset, size);
-	      value -= gdbarch_decr_pc_after_break (gdbarch);
-	      memcpy (context_offset, &value, size);
-	    }
-	  /* Make sure we only rewrite the PC a single time.  */
-	  th->pc_adjusted = true;
-	}
-      regcache->raw_supply (r, context_offset);
-    }
-}
-
 void
 windows_nat_target::fetch_registers (struct regcache *regcache, int r)
 {
@@ -479,51 +403,9 @@ windows_nat_target::fetch_registers (struct regcache *regcache, int r)
 
   if (r < 0)
     for (r = 0; r < gdbarch_num_regs (regcache->arch()); r++)
-      windows_fetch_one_register (regcache, th, r);
+      fetch_one_register (regcache, th, r);
   else
-    windows_fetch_one_register (regcache, th, r);
-}
-
-/* Collect the register number R from the given regcache, and store
-   its value into the corresponding area of the given thread's context.
-
-   This function assumes that R is non-negative.  A failed assertion
-   assertion is raised if that is not true.  */
-
-static void
-windows_store_one_register (const struct regcache *regcache,
-			    windows_thread_info *th, int r)
-{
-  gdb_assert (r >= 0);
-
-  char *context_ptr = windows_process->with_context (th, [] (auto *context)
-    {
-      return (char *) context;
-    });
-
-  struct gdbarch *gdbarch = regcache->arch ();
-  i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
-
-  /* GDB treats some registers as 32-bit, where they are in fact only
-     16 bits long.  These cases must be handled specially to avoid
-     overwriting other registers in the context.  */
-  if (r == I387_FISEG_REGNUM (tdep) || windows_process->segment_register_p (r))
-    {
-      gdb_byte bytes[4];
-      regcache->raw_collect (r, bytes);
-      memcpy (context_ptr + windows_process->mappings[r], bytes, 2);
-    }
-  else if (r == I387_FOP_REGNUM (tdep))
-    {
-      gdb_byte bytes[4];
-      regcache->raw_collect (r, bytes);
-      /* The value of FOP occupies the top two bytes in the context,
-	 so write the two low-order bytes from the cache into the
-	 appropriate spot.  */
-      memcpy (context_ptr + windows_process->mappings[r] + 2, bytes, 2);
-    }
-  else
-    regcache->raw_collect (r, context_ptr + windows_process->mappings[r]);
+    fetch_one_register (regcache, th, r);
 }
 
 /* Store a new register value into the context of the thread tied to
@@ -542,9 +424,9 @@ windows_nat_target::store_registers (struct regcache *regcache, int r)
 
   if (r < 0)
     for (r = 0; r < gdbarch_num_regs (regcache->arch ()); r++)
-      windows_store_one_register (regcache, th, r);
+      store_one_register (regcache, th, r);
   else
-    windows_store_one_register (regcache, th, r);
+    store_one_register (regcache, th, r);
 }
 
 bool
@@ -1469,7 +1351,7 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
 {
   struct inferior *inf;
 
-  initialize_windows_arch ();
+  initialize_windows_arch (attaching);
 
   windows_process->last_sig = GDB_SIGNAL_0;
   windows_process->open_process_used = 0;
@@ -1486,22 +1368,6 @@ windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
   windows_clear_solib ();
   clear_proceed_status (0);
   init_wait_for_inferior ();
-
-#ifdef __x86_64__
-  windows_process->ignore_first_breakpoint
-    = !attaching && windows_process->wow64_process;
-
-  if (!windows_process->wow64_process)
-    {
-      windows_process->mappings  = amd64_mappings;
-      windows_process->segment_register_p = amd64_windows_segment_register_p;
-    }
-  else
-#endif
-    {
-      windows_process->mappings  = i386_mappings;
-      windows_process->segment_register_p = i386_windows_segment_register_p;
-    }
 
   inferior_appeared (inf, pid);
   inf->attach_flag = attaching;
