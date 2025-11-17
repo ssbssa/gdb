@@ -54,8 +54,6 @@ struct windows_per_inferior : public windows_nat::windows_process_info
   void handle_unload_dll () override;
   bool handle_access_violation (const EXCEPTION_RECORD *rec) override;
 
-  uintptr_t dr[8] {};
-
   int windows_initialization_done = 0;
 
   std::vector<std::unique_ptr<windows_thread_info>> thread_list;
@@ -182,6 +180,20 @@ struct windows_nat_target : public inf_child_target
   {
     return serial_event_fd (m_wait_event);
   }
+
+  /* Initialize arch-specific data.  */
+  virtual void initialize_windows_arch () = 0;
+  /* Cleanup arch-specific data.  */
+  virtual void cleanup_windows_arch () = 0;
+
+  /* Fill in the threads context.  */
+  virtual void fill_thread_context (windows_thread_info *th) = 0;
+
+  /* Prepare the thread context for continuing.  */
+  virtual void thread_context_continue (windows_thread_info *th,
+					int killed) = 0;
+  /* Set the stepping bit in the thread context.  */
+  virtual void thread_context_step (windows_thread_info *th) = 0;
 
 private:
 

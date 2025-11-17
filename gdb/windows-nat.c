@@ -62,7 +62,6 @@
 
 #include "windows-tdep.h"
 #include "windows-nat.h"
-#include "x86-nat.h"
 #include "complaints.h"
 #include "gdbsupport/gdb_tilde_expand.h"
 #include "gdbsupport/pathstuff.h"
@@ -82,18 +81,6 @@ using namespace windows_nat;
 #   define STARTUPINFO STARTUPINFOW
 #endif
 
-/* If we're not using the old Cygwin header file set, define the
-   following which never should have been in the generic Win32 API
-   headers in the first place since they were our own invention...  */
-#ifndef _GNU_H_WINDOWS_H
-enum
-  {
-    FLAG_TRACE_BIT = 0x100,
-  };
-#endif
-
-#define DR6_CLEAR_VALUE 0xffff0ff0
-
 /* The string sent by cygwin when it processes a signal.
    FIXME: This should be in a cygwin include file.  */
 #ifndef _CYGWIN_SIGNAL_STRING
@@ -112,12 +99,6 @@ enum
 #define DEBUG_EXCEPT(fmt, ...) \
   debug_prefixed_printf_cond (debug_exceptions, "windows except", fmt, \
 			      ## __VA_ARGS__)
-
-static void cygwin_set_dr (int i, CORE_ADDR addr);
-static void cygwin_set_dr7 (unsigned long val);
-static CORE_ADDR cygwin_get_dr (int i);
-static unsigned long cygwin_get_dr6 (void);
-static unsigned long cygwin_get_dr7 (void);
 
 /* User options.  */
 static bool new_console = false;
@@ -491,23 +472,7 @@ windows_nat_target::fetch_registers (struct regcache *regcache, int r)
 
   if (th->reload_context)
     {
-      windows_process->with_context (th, [&] (auto *context)
-	{
-	  context->ContextFlags = WindowsContext<decltype(context)>::all;
-	  CHECK (get_thread_context (th->h, context));
-	  /* Copy dr values from that thread.
-	     But only if there were not modified since last stop.
-	     PR gdb/2388 */
-	  if (!th->debug_registers_changed)
-	    {
-	      windows_process->dr[0] = context->Dr0;
-	      windows_process->dr[1] = context->Dr1;
-	      windows_process->dr[2] = context->Dr2;
-	      windows_process->dr[3] = context->Dr3;
-	      windows_process->dr[6] = context->Dr6;
-	      windows_process->dr[7] = context->Dr7;
-	    }
-	});
+      fill_thread_context (th);
 
       th->reload_context = false;
     }
@@ -1006,35 +971,7 @@ windows_nat_target::windows_continue (DWORD continue_status, int id,
   for (auto &th : windows_process->thread_list)
     if (id == -1 || id == (int) th->tid)
       {
-	windows_process->with_context (th.get (), [&] (auto *context)
-	  {
-	    if (th->debug_registers_changed)
-	      {
-		context->ContextFlags
-		  |= WindowsContext<decltype(context)>::debug;
-		context->Dr0 = windows_process->dr[0];
-		context->Dr1 = windows_process->dr[1];
-		context->Dr2 = windows_process->dr[2];
-		context->Dr3 = windows_process->dr[3];
-		context->Dr6 = DR6_CLEAR_VALUE;
-		context->Dr7 = windows_process->dr[7];
-		th->debug_registers_changed = false;
-	      }
-	    if (context->ContextFlags)
-	      {
-		DWORD ec = 0;
-
-		if (GetExitCodeThread (th->h, &ec)
-		    && ec == STILL_ACTIVE)
-		  {
-		    BOOL status = set_thread_context (th->h, context);
-
-		    if (!killed)
-		      CHECK (status);
-		  }
-		context->ContextFlags = 0;
-	      }
-	  });
+	thread_context_continue (th.get (), killed);
 
 	th->resume ();
       }
@@ -1150,10 +1087,7 @@ windows_nat_target::resume (ptid_t ptid, int step, enum gdb_signal sig)
       regcache *regcache = get_thread_regcache (inferior_thread ());
       struct gdbarch *gdbarch = regcache->arch ();
       fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
-      windows_process->with_context (th, [&] (auto *context)
-	{
-	  context->EFlags |= FLAG_TRACE_BIT;
-	});
+      thread_context_step (th);
     }
 
   /* Allow continuing with the same signal that interrupted us.
@@ -1533,15 +1467,12 @@ windows_nat_target::wait (ptid_t ptid, struct target_waitstatus *ourstatus,
 void
 windows_nat_target::do_initial_windows_stuff (DWORD pid, bool attaching)
 {
-  int i;
   struct inferior *inf;
+
+  initialize_windows_arch ();
 
   windows_process->last_sig = GDB_SIGNAL_0;
   windows_process->open_process_used = 0;
-  for (i = 0;
-       i < sizeof (windows_process->dr) / sizeof (windows_process->dr[0]);
-       i++)
-    windows_process->dr[i] = 0;
 #ifdef __CYGWIN__
   windows_process->cygwin_load_start = 0;
   windows_process->cygwin_load_end = 0;
@@ -1887,7 +1818,7 @@ windows_nat_target::detach (inferior *inf, int from_tty)
 
   target_announce_detach (from_tty);
 
-  x86_cleanup_dregs ();
+  cleanup_windows_arch ();
   switch_to_no_thread ();
   detach_inferior (inf);
 
@@ -2619,7 +2550,7 @@ void
 windows_nat_target::mourn_inferior ()
 {
   (void) windows_continue (DBG_CONTINUE, -1, 0, true);
-  x86_cleanup_dregs();
+  cleanup_windows_arch ();
   if (windows_process->open_process_used)
     {
       CHECK (CloseHandle (windows_process->handle));
@@ -2854,16 +2785,6 @@ windows_nat_target::thread_name (struct thread_info *thr)
 
 INIT_GDB_FILE (windows_nat)
 {
-  x86_dr_low.set_control = cygwin_set_dr7;
-  x86_dr_low.set_addr = cygwin_set_dr;
-  x86_dr_low.get_addr = cygwin_get_dr;
-  x86_dr_low.get_status = cygwin_get_dr6;
-  x86_dr_low.get_control = cygwin_get_dr7;
-
-  /* x86_dr_low.debug_register_length field is set by
-     calling x86_set_debug_register_length function
-     in processor windows specific native file.  */
-
 #ifdef __CYGWIN__
   cygwin_internal (CW_SET_DOS_FILE_WARNING, 0);
 #endif
@@ -2951,61 +2872,6 @@ Use \"%ps\" or \"%ps\" command to load executable/libraries directly."),
 	      styled_string (command_style.style (), "file"),
 	      styled_string (command_style.style (), "dll"));
     }
-}
-
-/* Hardware watchpoint support, adapted from go32-nat.c code.  */
-
-/* Pass the address ADDR to the inferior in the I'th debug register.
-   Here we just store the address in dr array, the registers will be
-   actually set up when windows_continue is called.  */
-static void
-cygwin_set_dr (int i, CORE_ADDR addr)
-{
-  if (i < 0 || i > 3)
-    internal_error (_("Invalid register %d in cygwin_set_dr.\n"), i);
-  windows_process->dr[i] = addr;
-
-  for (auto &th : windows_process->thread_list)
-    th->debug_registers_changed = true;
-}
-
-/* Pass the value VAL to the inferior in the DR7 debug control
-   register.  Here we just store the address in D_REGS, the watchpoint
-   will be actually set up in windows_wait.  */
-static void
-cygwin_set_dr7 (unsigned long val)
-{
-  windows_process->dr[7] = (CORE_ADDR) val;
-
-  for (auto &th : windows_process->thread_list)
-    th->debug_registers_changed = true;
-}
-
-/* Get the value of debug register I from the inferior.  */
-
-static CORE_ADDR
-cygwin_get_dr (int i)
-{
-  return windows_process->dr[i];
-}
-
-/* Get the value of the DR6 debug status register from the inferior.
-   Here we just return the value stored in dr[6]
-   by the last call to thread_rec for current_event.dwThreadId id.  */
-static unsigned long
-cygwin_get_dr6 (void)
-{
-  return (unsigned long) windows_process->dr[6];
-}
-
-/* Get the value of the DR7 debug status register from the inferior.
-   Here we just return the value stored in dr[7] by the last call to
-   thread_rec for current_event.dwThreadId id.  */
-
-static unsigned long
-cygwin_get_dr7 (void)
-{
-  return (unsigned long) windows_process->dr[7];
 }
 
 /* Determine if the thread referenced by "ptid" is alive
