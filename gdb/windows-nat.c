@@ -682,127 +682,6 @@ windows_per_inferior::handle_output_debug_string
   return retval;
 }
 
-static int
-display_selector (HANDLE thread, DWORD sel)
-{
-  LDT_ENTRY info;
-  BOOL ret = windows_process->with_context (nullptr, [&] (auto *context)
-    {
-      return get_thread_selector_entry (context, thread, sel, &info);
-    });
-  if (ret)
-    {
-      int base, limit;
-      gdb_printf ("0x%03x: ", (unsigned) sel);
-      if (!info.HighWord.Bits.Pres)
-	{
-	  gdb_puts ("Segment not present\n");
-	  return 0;
-	}
-      base = (info.HighWord.Bits.BaseHi << 24) +
-	     (info.HighWord.Bits.BaseMid << 16)
-	     + info.BaseLow;
-      limit = (info.HighWord.Bits.LimitHi << 16) + info.LimitLow;
-      if (info.HighWord.Bits.Granularity)
-	limit = (limit << 12) | 0xfff;
-      gdb_printf ("base=0x%08x limit=0x%08x", base, limit);
-      if (info.HighWord.Bits.Default_Big)
-	gdb_puts(" 32-bit ");
-      else
-	gdb_puts(" 16-bit ");
-      switch ((info.HighWord.Bits.Type & 0xf) >> 1)
-	{
-	case 0:
-	  gdb_puts ("Data (Read-Only, Exp-up");
-	  break;
-	case 1:
-	  gdb_puts ("Data (Read/Write, Exp-up");
-	  break;
-	case 2:
-	  gdb_puts ("Unused segment (");
-	  break;
-	case 3:
-	  gdb_puts ("Data (Read/Write, Exp-down");
-	  break;
-	case 4:
-	  gdb_puts ("Code (Exec-Only, N.Conf");
-	  break;
-	case 5:
-	  gdb_puts ("Code (Exec/Read, N.Conf");
-	  break;
-	case 6:
-	  gdb_puts ("Code (Exec-Only, Conf");
-	  break;
-	case 7:
-	  gdb_puts ("Code (Exec/Read, Conf");
-	  break;
-	default:
-	  gdb_printf ("Unknown type 0x%lx",
-		      (unsigned long) info.HighWord.Bits.Type);
-	}
-      if ((info.HighWord.Bits.Type & 0x1) == 0)
-	gdb_puts(", N.Acc");
-      gdb_puts (")\n");
-      if ((info.HighWord.Bits.Type & 0x10) == 0)
-	gdb_puts("System selector ");
-      gdb_printf ("Privilege level = %ld. ",
-		  (unsigned long) info.HighWord.Bits.Dpl);
-      if (info.HighWord.Bits.Granularity)
-	gdb_puts ("Page granular.\n");
-      else
-	gdb_puts ("Byte granular.\n");
-      return 1;
-    }
-  else
-    {
-      DWORD err = GetLastError ();
-      if (err == ERROR_NOT_SUPPORTED)
-	gdb_printf ("Function not supported\n");
-      else
-	gdb_printf ("Invalid selector 0x%x.\n", (unsigned) sel);
-      return 0;
-    }
-}
-
-static void
-display_selectors (const char * args, int from_tty)
-{
-  if (inferior_ptid == null_ptid)
-    {
-      gdb_puts ("Impossible to display selectors now.\n");
-      return;
-    }
-
-  windows_thread_info *current_windows_thread
-    = windows_process->thread_rec (inferior_ptid, DONT_INVALIDATE_CONTEXT);
-
-  if (!args)
-    {
-      windows_process->with_context (current_windows_thread, [&] (auto *context)
-	{
-	  gdb_puts ("Selector $cs\n");
-	  display_selector (current_windows_thread->h, context->SegCs);
-	  gdb_puts ("Selector $ds\n");
-	  display_selector (current_windows_thread->h, context->SegDs);
-	  gdb_puts ("Selector $es\n");
-	  display_selector (current_windows_thread->h, context->SegEs);
-	  gdb_puts ("Selector $ss\n");
-	  display_selector (current_windows_thread->h, context->SegSs);
-	  gdb_puts ("Selector $fs\n");
-	  display_selector (current_windows_thread->h, context->SegFs);
-	  gdb_puts ("Selector $gs\n");
-	  display_selector (current_windows_thread->h, context->SegGs);
-	});
-    }
-  else
-    {
-      int sel;
-      sel = parse_and_eval_long (args);
-      gdb_printf ("Selector \"%s\"\n",args);
-      display_selector (current_windows_thread->h, sel);
-    }
-}
-
 /* See nat/windows-nat.h.  */
 
 bool
@@ -2723,10 +2602,6 @@ Show whether to display kernel exceptions in child process."), NULL,
 			   &setlist, &showlist);
 
   init_w32_command_list ();
-
-  add_cmd ("selector", class_info, display_selectors,
-	   _("Display selectors infos."),
-	   &info_w32_cmdlist);
 
   if (!initialize_loadable ())
     {
