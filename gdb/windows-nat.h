@@ -211,6 +211,9 @@ struct windows_nat_target : public inf_child_target
   virtual void store_one_register (const struct regcache *regcache,
 				   windows_thread_info *th, int r) = 0;
 
+  /* Determine if EXCEPTION_RECORD contains a software-breakpoint.  */
+  virtual bool is_sw_breakpoint (EXCEPTION_RECORD *er) = 0;
+
 private:
 
   windows_thread_info *add_thread (ptid_t ptid, HANDLE h, void *tlb,

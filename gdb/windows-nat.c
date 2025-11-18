@@ -1144,10 +1144,7 @@ windows_nat_target::get_windows_debug_event
 		    thread_id, windows_process->desired_stop_thread_id);
 
       if (current_event->dwDebugEventCode == EXCEPTION_DEBUG_EVENT
-	  && ((current_event->u.Exception.ExceptionRecord.ExceptionCode
-	       == EXCEPTION_BREAKPOINT)
-	      || (current_event->u.Exception.ExceptionRecord.ExceptionCode
-		  == STATUS_WX86_BREAKPOINT))
+	  && is_sw_breakpoint (&current_event->u.Exception.ExceptionRecord)
 	  && windows_process->windows_initialization_done)
 	{
 	  ptid_t ptid = ptid_t (current_event->dwProcessId, thread_id, 0);
@@ -1198,10 +1195,8 @@ windows_nat_target::wait (ptid_t ptid, struct target_waitstatus *ourstatus,
 		  th->stopped_at_software_breakpoint = false;
 		  if (windows_process->current_event.dwDebugEventCode
 		      == EXCEPTION_DEBUG_EVENT
-		      && ((windows_process->current_event.u.Exception.ExceptionRecord.ExceptionCode
-			   == EXCEPTION_BREAKPOINT)
-			  || (windows_process->current_event.u.Exception.ExceptionRecord.ExceptionCode
-			      == STATUS_WX86_BREAKPOINT))
+		      && is_sw_breakpoint (&windows_process->current_event
+					   .u.Exception.ExceptionRecord)
 		      && windows_process->windows_initialization_done)
 		    {
 		      th->stopped_at_software_breakpoint = true;
