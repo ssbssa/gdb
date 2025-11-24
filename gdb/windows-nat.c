@@ -1366,18 +1366,15 @@ windows_nat_target::resume (ptid_t ptid, int step, enum gdb_signal sig)
 
   /* Get context for currently selected thread.  */
   th = windows_process.thread_rec (inferior_ptid, DONT_INVALIDATE_CONTEXT);
-  if (th)
+  if (th && step)
     {
+      /* Single step by setting t bit.  */
+      regcache *regcache = get_thread_regcache (inferior_thread ());
+      struct gdbarch *gdbarch = regcache->arch ();
+      fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
       windows_process.with_context (th, [&] (auto *context)
 	{
-	  if (step)
-	    {
-	      /* Single step by setting t bit.  */
-	      regcache *regcache = get_thread_regcache (inferior_thread ());
-	      struct gdbarch *gdbarch = regcache->arch ();
-	      fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
-	      context->EFlags |= FLAG_TRACE_BIT;
-	    }
+	  context->EFlags |= FLAG_TRACE_BIT;
 	});
     }
 
