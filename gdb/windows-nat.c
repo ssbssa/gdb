@@ -1378,22 +1378,6 @@ windows_nat_target::resume (ptid_t ptid, int step, enum gdb_signal sig)
 	      fetch_registers (regcache, gdbarch_ps_regnum (gdbarch));
 	      context->EFlags |= FLAG_TRACE_BIT;
 	    }
-
-	  if (context->ContextFlags)
-	    {
-	      if (th->debug_registers_changed)
-		{
-		  context->Dr0 = windows_process.dr[0];
-		  context->Dr1 = windows_process.dr[1];
-		  context->Dr2 = windows_process.dr[2];
-		  context->Dr3 = windows_process.dr[3];
-		  context->Dr6 = DR6_CLEAR_VALUE;
-		  context->Dr7 = windows_process.dr[7];
-		  th->debug_registers_changed = false;
-		}
-	      CHECK (set_thread_context (th->h, context));
-	      context->ContextFlags = 0;
-	    }
 	});
     }
 
