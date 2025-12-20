@@ -1,0 +1,18 @@
+--- Makefile.in	2021-01-31 12:25:14.000000000 +0100
++++ Makefile.in	2025-09-17 13:48:08.504400000 +0200
+@@ -33,7 +33,6 @@ all : lib/localcharset.h force
+ 	cd lib && $(MAKE) all
+ 	cd srclib && $(MAKE) all
+ 	cd src && $(MAKE) all
+-	cd po && $(MAKE) all
+ 	cd man && $(MAKE) all
+ 	if test -d tests; then cd tests && $(MAKE) all; fi
+ 
+@@ -54,7 +53,6 @@ install : lib/localcharset.h force
+ 	cd src && $(MAKE) install prefix='$(prefix)' exec_prefix='$(exec_prefix)' libdir='$(libdir)'
+ 	if [ ! -d $(DESTDIR)$(includedir) ] ; then $(mkinstalldirs) $(DESTDIR)$(includedir) ; fi
+ 	$(INSTALL_DATA) include/iconv.h.inst $(DESTDIR)$(includedir)/iconv.h
+-	cd po && $(MAKE) install prefix='$(prefix)' exec_prefix='$(exec_prefix)' datarootdir='$(datarootdir)' datadir='$(datadir)'
+ 	cd man && $(MAKE) install prefix='$(prefix)' exec_prefix='$(exec_prefix)' datarootdir='$(datarootdir)' datadir='$(datadir)' mandir='$(mandir)'
+ 
+ install-strip : lib/localcharset.h force

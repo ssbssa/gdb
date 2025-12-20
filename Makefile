@@ -3,9 +3,9 @@ MYPKG=ssbssa-1
 BUILD_BITS=32
 
 SOURCE_DIR=src
-SOURCE_DIR_ABS=$(abspath $(SOURCE_DIR))
+SOURCE_DIR_ABS:=$(abspath $(SOURCE_DIR))
 BUILD_DIR=build$(BUILD_BITS)
-BUILD_DIR_ABS=$(abspath $(BUILD_DIR))
+BUILD_DIR_ABS:=$(abspath $(BUILD_DIR))
 
 GDB_LIBS=$(abspath gdb-libs$(BUILD_BITS))
 GDB_DIR=$(abspath gdb$(BUILD_BITS))
@@ -14,11 +14,32 @@ BINUTILS_DIR=$(abspath binutils$(BUILD_BITS))
 ifeq ($(BUILD_BITS),32)
   MYBUILD=i686-w64-mingw32
   MYTARGET=i686-w64-mingw32
-  CROSS_CONF=
+  CROSS_CONF=CC="gcc -std=gnu17"
+  GMP_ASSEMBLY=
+  LIBIPT_DEP=$(BUILD_DIR)/libipt-05-install.done
+  WINIPT_DEP=$(BUILD_DIR)/winipt-05-install.done
+  PYTHON_I686_ENV=
+  PYBUILD=$(MYTARGET)
 else ifeq ($(BUILD_BITS),64)
   MYBUILD=i686-w64-mingw32
   MYTARGET=x86_64-w64-mingw32
+  CROSS_CONF="CC=$(MYTARGET)-gcc -std=gnu17" CXX=$(MYTARGET)-g++ LIBEXE=$(MYTARGET)-ar
+  GMP_ASSEMBLY=
+  LIBIPT_DEP=$(BUILD_DIR)/libipt-05-install.done
+  WINIPT_DEP=$(BUILD_DIR)/winipt-05-install.done
+  PYTHON_I686_ENV=
+  PYBUILD=$(MYTARGET)
+else ifeq ($(BUILD_BITS),64a)
+  MYBUILD=i686-w64-mingw32
+  MYTARGET=aarch64-w64-mingw32
   CROSS_CONF=CC=$(MYTARGET)-gcc CXX=$(MYTARGET)-g++ LIBEXE=$(MYTARGET)-ar
+  SOURCE_DIR_ABS:=$(shell cygpath -m $(abspath $(SOURCE_DIR)))
+  BUILD_DIR_ABS:=$(shell cygpath -m $(abspath $(BUILD_DIR)))
+  GMP_ASSEMBLY=--disable-assembly
+  LIBIPT_DEP=
+  WINIPT_DEP=
+  PYTHON_I686_ENV:=export PATH="$(PATH):$(abspath gdb-libs32)/Python3/bin";
+  PYBUILD=$(MYBUILD)
 else
   $(error BUILD_BITS is $(BUILD_BITS))
 endif
@@ -43,6 +64,7 @@ ICONV_SRC_DIR=libiconv-$(ICONV_VER)
 ICONV_FILE=$(ICONV_SRC_DIR).tar.gz
 ICONV_CONF=$(SOURCE_DIR_ABS)/$(ICONV_SRC_DIR)/configure \
 	   --build=$(MYBUILD) --host=$(MYTARGET) \
+	   $(CROSS_CONF) \
 	   --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
 PYTHON_VER=2.7.13
@@ -58,7 +80,9 @@ SOURCE_HIGHLIGHT_SRC_DIR=source-highlight-$(SOURCE_HIGHLIGHT_VER)
 SOURCE_HIGHLIGHT_FILE=$(SOURCE_HIGHLIGHT_SRC_DIR).tar.gz
 SOURCE_HIGHLIGHT_CONF=$(SOURCE_DIR_ABS)/$(SOURCE_HIGHLIGHT_SRC_DIR)/configure \
 		      --build=$(MYBUILD) --host=$(MYTARGET) \
+		      $(CROSS_CONF) \
 		      --with-boost=$(GDB_LIBS) \
+		      CXXFLAGS="-g -O2 -Wno-register" \
 		      --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
 LZMA_VER=5.2.5
@@ -73,6 +97,7 @@ GMP_SRC_DIR=gmp-$(GMP_VER)
 GMP_FILE=$(GMP_SRC_DIR).tar.xz
 GMP_CONF=$(SOURCE_DIR_ABS)/$(GMP_SRC_DIR)/configure \
 	 --build=$(MYBUILD) --host=$(MYTARGET) \
+	 $(GMP_ASSEMBLY) \
 	 --enable-static --disable-shared --prefix=$(GDB_LIBS)
 
 MPFR_VER=3.1.6
@@ -116,9 +141,10 @@ FFI_CONF=$(SOURCE_DIR_ABS)/$(FFI_SRC_DIR)/configure \
 
 PYTHON3_GIT_DIR=c:/src/repos/cpython.git
 PYTHON3_GIT_CONF=$(PYTHON3_GIT_DIR)/configure \
-		 --build=$(MYTARGET) --host=$(MYTARGET) \
+		 --build=$(PYBUILD) --host=$(MYTARGET) \
 		 --prefix=$(shell cygpath -m $(GDB_LIBS)/Python3) \
-		 CPPFLAGS="-I$(GDB_LIBS)/include" LDFLAGS="-L$(GDB_LIBS)/lib" \
+		 CPPFLAGS="-I$(GDB_LIBS)/include -D_CRT_NON_CONFORMING_WCSTOK" \
+		 LDFLAGS="-L$(GDB_LIBS)/lib" \
 		 --disable-test-modules \
 		 --without-ensurepip --without-c-locale-coercion \
 		 --with-system-expat --with-system-ffi
@@ -137,11 +163,12 @@ GDB_CONF=$(SOURCE_DIR_ABS)/$(GDB_SRC_DIR)/configure \
 GDB_ENV=export \
 	PKG_CONFIG_PATH="$(GDB_LIBS)/lib/pkgconfig" \
 	CPPFLAGS="-I$(GDB_LIBS)/include -DUSE_RELATIVE_SRC_HIGHLIGHT -D__MINGW_USE_VC2005_COMPAT=1" \
-	LDFLAGS="-L$(GDB_LIBS)/lib" \
+	LDFLAGS="-L$(GDB_LIBS)/lib -static-libgcc -static-libstdc++" \
 	;
 GDB_GIT_DIR=/c/src/repos/binutils-gdb.git
 GDB_GIT_CONF=$(GDB_GIT_DIR)/configure \
 	 --build=$(MYBUILD) --host=$(MYTARGET) --target=$(MYTARGET) \
+	 $(CROSS_CONF) \
 	 --enable-static --disable-shared \
 	 --disable-nls \
 	 --enable-curses --enable-tui \
@@ -195,10 +222,10 @@ all: $(BUILD_DIR)/gdb-05-make-install.done
 
 
 $(SOURCE_DIR):
-	@mkdir $@
+	@mkdir -p $@
 
 $(BUILD_DIR):
-	@mkdir $@
+	@mkdir -p $@
 
 
 # expat
@@ -309,7 +336,11 @@ $(SOURCE_DIR)/iconv-02-patch-02-regen.done: $(SOURCE_DIR)/iconv-02-patch-01-cp65
 	$(MAKE) -j1 -C $(SOURCE_DIR)/$(ICONV_SRC_DIR) -f Makefile.devel
 	@touch $@
 
-$(BUILD_DIR)/iconv-03-configure.done: | $(BUILD_DIR)/expat-03-configure.done $(BUILD_DIR)/pdcurses-04-make-install.done $(SOURCE_DIR)/iconv-02-patch-02-regen.done
+$(SOURCE_DIR)/iconv-02-patch-03-disable-po-build.done: $(SOURCE_DIR)/iconv-02-patch-02-regen.done
+	patch -d $(SOURCE_DIR)/$(ICONV_SRC_DIR) -p0 <patches/iconv/disable-po-build.patch
+	@touch $@
+
+$(BUILD_DIR)/iconv-03-configure.done: | $(BUILD_DIR)/expat-03-configure.done $(BUILD_DIR)/pdcurses-04-make-install.done $(SOURCE_DIR)/iconv-02-patch-03-disable-po-build.done
 	@mkdir -p $(BUILD_DIR)/iconv
 	cd $(BUILD_DIR)/iconv && $(ICONV_CONF)
 	@touch $@
@@ -335,12 +366,16 @@ $(SOURCE_DIR)/boost-01-extract.done: | pkg/$(BOOST_FILE) $(SOURCE_DIR)/iconv-01-
 	tar -C $(SOURCE_DIR) -xjf pkg/$(BOOST_FILE)
 	@touch $@
 
-$(BUILD_DIR)/boost-02-headers.done: | $(SOURCE_DIR)/boost-01-extract.done
+$(SOURCE_DIR)/boost-02-patch-01-hash-clang.done: $(SOURCE_DIR)/boost-01-extract.done
+	patch -d $(SOURCE_DIR)/$(BOOST_SRC_DIR) -p0 <patches/boost/hash-clang.patch
+	@touch $@
+
+$(BUILD_DIR)/boost-03-headers.done: | $(SOURCE_DIR)/boost-02-patch-01-hash-clang.done $(BUILD_DIR)
 	@mkdir -p $(GDB_LIBS)/include
 	cp -R $(SOURCE_DIR)/$(BOOST_SRC_DIR)/boost $(GDB_LIBS)/include/boost
 	@touch $@
 
-$(BUILD_DIR)/boost-03-regex.done: | $(BUILD_DIR)/boost-02-headers.done
+$(BUILD_DIR)/boost-04-regex.done: | $(BUILD_DIR)/boost-03-headers.done
 	@mkdir -p $(BUILD_DIR)/boost-regex $(GDB_LIBS)/lib
 	cp patches/boost/regex.mk $(BUILD_DIR)/boost-regex/Makefile
 	$(MAKE) -C $(BUILD_DIR)/boost-regex $(CROSS_CONF) SRC_DIR=$(SOURCE_DIR_ABS)/$(BOOST_SRC_DIR)/libs/regex/src INC_DIR=$(GDB_LIBS)/include
@@ -350,7 +385,7 @@ $(BUILD_DIR)/boost-03-regex.done: | $(BUILD_DIR)/boost-02-headers.done
 
 # source-highlight
 
-$(SOURCE_DIR)/source-highlight-01-extract.done: | pkg/$(SOURCE_HIGHLIGHT_FILE) $(SOURCE_DIR)/boost-01-extract.done $(BUILD_DIR)/boost-03-regex.done
+$(SOURCE_DIR)/source-highlight-01-extract.done: | pkg/$(SOURCE_HIGHLIGHT_FILE) $(SOURCE_DIR)/boost-01-extract.done
 	tar -C $(SOURCE_DIR) -xzf pkg/$(SOURCE_HIGHLIGHT_FILE)
 	@touch $@
 
@@ -366,7 +401,11 @@ $(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done: | $(SOURCE_DIR)/sour
 	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p1 <patches/source-hightlight/Add-heuristic-to-handle-long-lines-better.patch
 	@touch $@
 
-$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done $(BUILD_DIR)/boost-03-regex.done
+$(SOURCE_DIR)/source-highlight-02-patch-04-disable-doc-build.done: | $(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done
+	patch -d $(SOURCE_DIR)/$(SOURCE_HIGHLIGHT_SRC_DIR) -p0 <patches/source-hightlight/disable-doc-build.patch
+	@touch $@
+
+$(BUILD_DIR)/source-highlight-03-configure.done: | $(SOURCE_DIR)/source-highlight-02-patch-04-disable-doc-build.done $(BUILD_DIR)/boost-04-regex.done
 	@mkdir -p $(BUILD_DIR)/source-highlight
 	cd $(BUILD_DIR)/source-highlight && $(SOURCE_HIGHLIGHT_CONF)
 	@touch $@
@@ -406,7 +445,11 @@ $(SOURCE_DIR)/gmp-01-extract.done: | pkg/$(GMP_FILE) $(SOURCE_DIR)/lzma-01-extra
 	tar -C $(SOURCE_DIR) -xJf pkg/$(GMP_FILE)
 	@touch $@
 
-$(BUILD_DIR)/gmp-03-configure.done: | $(SOURCE_DIR)/gmp-01-extract.done
+$(SOURCE_DIR)/gmp-02-patch-01-c23.done: | $(SOURCE_DIR)/gmp-01-extract.done
+	patch -d $(SOURCE_DIR)/$(GMP_SRC_DIR) -p0 <patches/gmp/c23.patch
+	@touch $@
+
+$(BUILD_DIR)/gmp-03-configure.done: | $(SOURCE_DIR)/gmp-02-patch-01-c23.done
 	@mkdir -p $(BUILD_DIR)/gmp
 	cd $(BUILD_DIR)/gmp && $(GMP_CONF)
 	@touch $@
@@ -426,7 +469,11 @@ $(SOURCE_DIR)/mpfr-01-extract.done: | pkg/$(MPFR_FILE) $(SOURCE_DIR)/gmp-01-extr
 	tar -C $(SOURCE_DIR) -xJf pkg/$(MPFR_FILE)
 	@touch $@
 
-$(BUILD_DIR)/mpfr-03-configure.done: | $(SOURCE_DIR)/mpfr-01-extract.done $(BUILD_DIR)/gmp-04-make.done
+$(SOURCE_DIR)/mpfr-02-patch-01-detect-win-path.done: | $(SOURCE_DIR)/mpfr-01-extract.done
+	patch -d $(SOURCE_DIR)/$(MPFR_SRC_DIR) -p0 <patches/mpfr/detect-win-path.patch
+	@touch $@
+
+$(BUILD_DIR)/mpfr-03-configure.done: | $(SOURCE_DIR)/mpfr-02-patch-01-detect-win-path.done $(BUILD_DIR)/gmp-04-make.done
 	@mkdir -p $(BUILD_DIR)/mpfr
 	cd $(BUILD_DIR)/mpfr && $(MPFR_CONF)
 	@touch $@
@@ -464,17 +511,17 @@ $(BUILD_DIR)/ffi-05-make-install.done: | $(BUILD_DIR)/ffi-04-make.done
 
 $(BUILD_DIR)/python3-03-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/python3
-	cd $(BUILD_DIR)/python3 && $(PYTHON3_GIT_CONF)
+	$(PYTHON_I686_ENV) cd $(BUILD_DIR)/python3 && $(PYTHON3_GIT_CONF)
 	@touch $@
 
 $(BUILD_DIR)/python3-04-make.done: | $(BUILD_DIR)/python3-03-configure.done
-	$(MAKE) -C $(BUILD_DIR)/python3 python.exe
-	$(MAKE) -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe gdb.exe
-	$(MAKE) -C $(BUILD_DIR)/python3
+	$(PYTHON_I686_ENV) $(MAKE) -C $(BUILD_DIR)/python3 python.exe
+	$(PYTHON_I686_ENV) $(MAKE) -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe gdb.exe
+	$(PYTHON_I686_ENV) $(MAKE) -C $(BUILD_DIR)/python3
 	@touch $@
 
 $(BUILD_DIR)/python3-05-make-install.done: | $(BUILD_DIR)/python3-04-make.done
-	$(MAKE) -j1 -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe install
+	$(PYTHON_I686_ENV) $(MAKE) -j1 -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe install
 	#mv $(GDB_LIBS)/Python3/bin/python3.exe $(GDB_LIBS)/Python3/bin/python.exe
 	#mv $(GDB_LIBS)/Python3/bin/python3-config $(GDB_LIBS)/Python3/bin/python-config
 	#rm -f $(GDB_LIBS)/Python3/bin/python3*
@@ -686,7 +733,7 @@ $(BUILD_DIR)/gdb-python-04-python.done: | $(BUILD_DIR)/gdb-python-03-make-instal
 
 # gdb-git
 
-$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(BUILD_DIR)/libipt-05-install.done $(BUILD_DIR)/winipt-05-install.done
+$(BUILD_DIR)/gdb-git-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-04-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(LIBIPT_DEP) $(WINIPT_DEP)
 	@mkdir -p $(BUILD_DIR)/gdb-git
 	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git --with-system-gdbinit=$(GDB_DIR)-git/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-git/etc/gdbinit.d
 	@touch $@
@@ -730,7 +777,7 @@ $(BUILD_DIR)/gdb-git-05-licenses.done: | $(BUILD_DIR)/gdb-git-04-source-highligh
 
 # gdb-git-python
 
-$(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done
+$(BUILD_DIR)/gdb-git-python-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(GDB_LIBS)/$(PYTHON_DIR) $(BUILD_DIR)/boost-04-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-git-python
 	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python --with-python=$(GDB_LIBS)/$(PYTHON_DIR)/python
 	@touch $@
@@ -778,9 +825,9 @@ $(BUILD_DIR)/gdb-git-python-06-licenses.done: | $(BUILD_DIR)/gdb-git-python-05-s
 
 # gdb-git-python3
 
-$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done $(BUILD_DIR)/libipt-05-install.done $(BUILD_DIR)/winipt-05-install.done
+$(BUILD_DIR)/gdb-git-python3-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-04-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done $(BUILD_DIR)/lzma-05-make-install.done $(BUILD_DIR)/gmp-05-make-install.done $(BUILD_DIR)/mpfr-05-make-install.done $(BUILD_DIR)/ffi-05-make-install.done $(BUILD_DIR)/python3-05-make-install.done $(BUILD_DIR)/xxHash-05-install.done $(SOURCE_DIR)/arpeggio-01-extract.done $(LIBIPT_DEP) $(WINIPT_DEP)
 	@mkdir -p $(BUILD_DIR)/gdb-git-python3
-	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-system-gdbinit=$(GDB_DIR)-git-python3/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-git-python3/etc/gdbinit.d --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-git-python3/lib --enable-targets=all
+	$(GDB_ENV) cd $(BUILD_DIR)/gdb-git-python3 && $(GDB_GIT_CONF) --prefix=$(GDB_DIR)-git-python3 --with-system-gdbinit=$(GDB_DIR)-git-python3/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-git-python3/etc/gdbinit.d --with-python=$(GDB_LIBS)/Python3/bin/python3-config --with-python-libdir=$(GDB_DIR)-git-python3/lib --enable-targets=all
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-02-make.done: | $(BUILD_DIR)/gdb-git-python3-01-configure.done
@@ -793,8 +840,11 @@ $(BUILD_DIR)/gdb-git-python3-03-make-install.done: | $(BUILD_DIR)/gdb-git-python
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-04-python.done: | $(BUILD_DIR)/gdb-git-python3-03-make-install.done
-	$(MAKE) -j1 -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe prefix=$(shell cygpath -m $(GDB_DIR)-git-python3) libinstall sharedinstall
+	$(PYTHON_I686_ENV) $(MAKE) -j1 -C $(BUILD_DIR)/python3 BUILDPYTHON=gdb.exe prefix=$(shell cygpath -m $(GDB_DIR)-git-python3) libinstall sharedinstall
 	rm -f $(GDB_DIR)-git-python3/bin/{2to3-3.10,idle3.10,pydoc3.10}
+ifeq ($(BUILD_BITS),64a)
+	cd $(GDB_DIR)-git-python3/lib/python3.10/lib-dynload && rename _i686 _aarch64 *mingw_i686.pyd
+endif
 	@touch $@
 
 $(BUILD_DIR)/gdb-git-python3-05-source-highlight.done: | $(BUILD_DIR)/gdb-git-python3-04-python.done
@@ -856,7 +906,7 @@ $(BUILD_DIR)/binutils-git-02-make.done: | $(BUILD_DIR)/binutils-git-01-configure
 
 # gdb-testsuite
 
-$(BUILD_DIR)/gdb-test-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+$(BUILD_DIR)/gdb-test-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-04-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-test
 	$(GDB_ENV) cd $(BUILD_DIR)/gdb-test && $(GDB_TEST_CONF) --prefix=$(GDB_DIR)-test --with-system-gdbinit=$(GDB_DIR)-test/etc/gdbinit --with-system-gdbinit-dir=$(GDB_DIR)-test/etc/gdbinit.d --with-python=$(GDB_LIBS)/Python3/bin/python3 --with-python-libdir=$(GDB_DIR)-test/lib
 	@touch $@
@@ -868,7 +918,7 @@ $(BUILD_DIR)/gdb-test-02-make.done: | $(BUILD_DIR)/gdb-test-01-configure.done
 
 # redhat64-gdb
 
-$(BUILD_DIR)/gdb-redhat64-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+$(BUILD_DIR)/gdb-redhat64-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-04-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-redhat64
 	$(GDB_ENV) cd $(BUILD_DIR)/gdb-redhat64 && $(GDB_REDHAT64_CONF) --prefix=$(GDB_DIR)-redhat64
 	@touch $@
@@ -880,7 +930,7 @@ $(BUILD_DIR)/gdb-redhat64-02-make.done: | $(BUILD_DIR)/gdb-redhat64-01-configure
 
 # redhat32-host-gdb
 
-$(BUILD_DIR)/gdb-redhat32-host-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-03-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
+$(BUILD_DIR)/gdb-redhat32-host-01-configure.done: | $(BUILD_DIR)/expat-05-make-install.done $(BUILD_DIR)/pdcurses-04-make-install.done $(BUILD_DIR)/iconv-05-make-install.done $(BUILD_DIR)/boost-04-regex.done $(BUILD_DIR)/source-highlight-05-make-install.done
 	@mkdir -p $(BUILD_DIR)/gdb-redhat32-host
 	$(GDB_ENV) cd $(BUILD_DIR)/gdb-redhat32-host && $(GDB_REDHAT32_HOST_CONF) --prefix=$(GDB_DIR)-redhat32-host
 	@touch $@
@@ -908,21 +958,25 @@ extract-all: | \
 
 patch-all: | \
   $(SOURCE_DIR)/pdcurses-02-patch-14-resize-console.done \
-  $(SOURCE_DIR)/source-highlight-02-patch-03-long-lines.done \
+  $(SOURCE_DIR)/iconv-02-patch-03-disable-po-build.done \
+  $(SOURCE_DIR)/boost-02-patch-01-hash-clang.done \
+  $(SOURCE_DIR)/source-highlight-02-patch-04-disable-doc-build.done \
+  $(SOURCE_DIR)/gmp-02-patch-01-c23.done \
+  $(SOURCE_DIR)/mpfr-02-patch-01-detect-win-path.done \
 
 
 build-expat: | $(BUILD_DIR)/expat-05-make-install.done
 build-pdcurses: | $(BUILD_DIR)/pdcurses-04-make-install.done
 build-iconv: | $(BUILD_DIR)/iconv-05-make-install.done
-build-boost: | $(BUILD_DIR)/boost-03-regex.done
+build-boost: | $(BUILD_DIR)/boost-04-regex.done
 build-source-highlight: | $(BUILD_DIR)/source-highlight-05-make-install.done
 build-lzma: | $(BUILD_DIR)/lzma-05-make-install.done
 build-gmp: | $(BUILD_DIR)/gmp-05-make-install.done
 build-mpfr: | $(BUILD_DIR)/mpfr-05-make-install.done
 build-python: | $(BUILD_DIR)/python3-05-make-install.done
 build-xxhash: | $(BUILD_DIR)/xxHash-05-install.done
-build-libipt: | $(BUILD_DIR)/libipt-05-install.done
-build-winipt: | $(BUILD_DIR)/winipt-05-install.done
+build-libipt: | $(LIBIPT_DEP)
+build-winipt: | $(WINIPT_DEP)
 build-gdb: | $(BUILD_DIR)/gdb-git-05-licenses.done
 build-gdb-python: | $(BUILD_DIR)/gdb-git-python3-08-licenses.done
 build-binutils: | $(BUILD_DIR)/binutils-git-02-make.done
@@ -941,18 +995,25 @@ gdb$(BUILD_BITS)-python.7z: | build-gdb-python
 package-gdb: gdb$(BUILD_BITS).7z
 package-gdb-python: gdb$(BUILD_BITS)-python.7z
 
-ifeq ($(BUILD_BITS),32)
-gdb64.7z gdb64-python.7z:
-	$(MAKE) BUILD_BITS=64 $@
-else
+ifneq ($(BUILD_BITS),32)
 gdb32.7z gdb32-python.7z:
 	$(MAKE) BUILD_BITS=32 $@
+endif
+ifneq ($(BUILD_BITS),64)
+gdb64.7z gdb64-python.7z:
+	$(MAKE) BUILD_BITS=64 $@
+endif
+ifneq ($(BUILD_BITS),64a)
+gdb64a.7z gdb64a-python.7z:
+	$(MAKE) BUILD_BITS=64a $@
 endif
 
 packages: gdb32.7z
 packages: gdb32-python.7z
 packages: gdb64.7z
 packages: gdb64-python.7z
+packages: gdb64a.7z
+packages: gdb64a-python.7z
 
 
 info:

@@ -1,0 +1,10 @@
+--- configure	2017-09-07 13:47:06.000000000 +0200
++++ configure	2025-09-17 13:36:58.141200000 +0200
+@@ -3627,6 +3627,7 @@ if test "${with_gmp_build+set}" = set; t
+          GMP_SOURCE=`$SED -n 's/^srcdir = *//p' $withval/Makefile`
+          case "$GMP_SOURCE" in
+            .)  GMP_SOURCE="" ;;
++           [A-Za-z]:/*) ;;
+            /*) ;;
+            ?*) GMP_SOURCE="$withval/$GMP_SOURCE" ;;
+          esac

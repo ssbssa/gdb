@@ -1,0 +1,21 @@
+--- Makefile.in	2019-06-02 19:18:24.000000000 +0200
++++ Makefile.in	2025-09-28 14:21:00.680000000 +0200
+@@ -795,7 +795,7 @@ target_alias = @target_alias@
+ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+-SUBDIRS = m4 gl lib src doc tests
++SUBDIRS = m4 gl lib src tests
+ EXTRA_DIST = \
+ 	source-highlight.spec.in \
+ 	source-highlight.spec \
+--- src/Makefile.in	2019-06-02 19:18:25.000000000 +0200
++++ src/Makefile.in	2025-09-28 14:20:47.186000000 +0200
+@@ -896,7 +896,6 @@ $(STYLEFILES) \
+ default.style style2.style style3.style \
+ javalog.style \
+ lang.map outlang.map \
+-default.css \
+ style.defaults
+ 
+ noinst_HEADERS = cmdline.h check-regexp_cmd.h          
