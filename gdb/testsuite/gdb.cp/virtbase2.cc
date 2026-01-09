@@ -34,6 +34,8 @@ struct base : superbase {
 typedef base tbase;
 struct derived: virtual super, virtual tbase
 {
+  int y;
+  derived() : y(42) {}
   void func_d() { }
 };
 

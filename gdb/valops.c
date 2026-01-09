@@ -3504,34 +3504,27 @@ compare_parameters (struct type *t1, struct type *t2, int skip_artificial)
 
 static bool
 get_baseclass_offset (struct type *vt, struct type *cls,
-		      struct value *v, int *boffs, bool *isvirt)
+		      struct value *v, int *boffs, int voffs)
 {
   value *vi = value_ind (v);
+  const gdb_byte *adr = vi->contents_for_printing ().data ();
+  LONGEST vaddr = value_as_long (v);
   for (int i = 0; i < TYPE_N_BASECLASSES (vt); i++)
     {
+      int offs = baseclass_offset (vt, i, adr, vi->offset () + voffs,
+				   vaddr, vi);
+
       struct type *t = vt->field (i).type ();
       if (types_equal (t, cls))
 	{
-	  if (BASETYPE_VIA_VIRTUAL (vt, i))
-	    {
-	      const gdb_byte *adr = vi->contents_for_printing ().data ();
-	      *boffs = baseclass_offset (vt, i, adr, vi->offset (),
-					 value_as_long (v), vi);
-	      *isvirt = true;
-	    }
-	  else
-	    *isvirt = false;
+	  *boffs = offs;
 	  return true;
 	}
 
-      if (get_baseclass_offset (check_typedef (t), cls, v, boffs, isvirt))
+      if (get_baseclass_offset (check_typedef (t), cls, v, boffs,
+				voffs + offs))
 	{
-	  if (*isvirt == false)	/* Add non-virtual base offset.  */
-	    {
-	      const gdb_byte *adr = vi->contents_for_printing ().data ();
-	      *boffs += baseclass_offset (vt, i, adr, vi->offset (),
-					  value_as_long (v), vi);
-	    }
+	  *boffs += offs;
 	  return true;
 	}
     }
@@ -3608,16 +3601,14 @@ value_struct_elt_for_reference (struct type *domain, int offset,
 		      /* Find class offset of type CURTYPE from either its
 			 parent type DOMAIN or the type of implied this.  */
 		      int boff = 0;
-		      bool isvirt = false;
-		      if (get_baseclass_offset (domain, curtype, v, &boff,
-						&isvirt))
+		      if (get_baseclass_offset (domain, curtype, v, &boff, 0))
 			mem_offset += boff;
 		      else
 			{
 			  struct type *p = check_typedef (this_v->type ());
 			  p = check_typedef (p->target_type ());
 			  if (get_baseclass_offset (p, curtype, this_v,
-						    &boff, &isvirt))
+						    &boff, 0))
 			    mem_offset += boff;
 			}
 		    }

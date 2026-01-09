@@ -87,6 +87,14 @@ proc test_variables_in_super { scopes } {
   }
 }
 
+proc test_variables_in_derived { scopes } {
+  with_test_prefix "$scopes" {
+      foreach scope [make_scope_list $scopes] {
+	  gdb_test "print ${scope}y" " = 42"
+      }
+  }
+}
+
 with_test_prefix "derived::func_d" {
     gdb_breakpoint "derived::func_d"
     gdb_continue_to_breakpoint "continue to derived::func_d"
@@ -113,4 +121,5 @@ with_test_prefix "foo::func_f" {
     test_variables_in_super {super}
     test_variables_in_super {foo super}
     test_variables_in_super {foo derived super}
+    test_variables_in_derived {foo derived}
 }
