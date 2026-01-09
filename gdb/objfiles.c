@@ -47,6 +47,7 @@
 #include "gdb_bfd.h"
 #include "btrace.h"
 #include "gdbsupport/pathstuff.h"
+#include "stack.h"
 
 #include <algorithm>
 
@@ -502,6 +503,13 @@ objfile::~objfile ()
   /* Check to see if the current_source_symtab belongs to this objfile,
      and if so, call clear_current_source_symtab_and_line.  */
   clear_current_source_symtab_and_line (this);
+
+  /* Check if last_displayed_symtab_info belongs to this objfile,
+     and if so, call clear_last_displayed_sal.  */
+  if (symtab *last_displayed_symtab = get_last_displayed_symtab ();
+      last_displayed_symtab != nullptr
+      && last_displayed_symtab->compunit ()->objfile () == this)
+    clear_last_displayed_sal ();
 
   /* Rebuild section map next time we need it.  */
   auto info = objfiles_pspace_data.get (pspace ());
