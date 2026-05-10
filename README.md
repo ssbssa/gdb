@@ -6,4 +6,5 @@ Custom Windows build of gdb with these features:
   - `info proc`
   - `record btrace pt`
   - access to AVX registers
+  - support for native TLS variables
 - experimental aarch64 builds
