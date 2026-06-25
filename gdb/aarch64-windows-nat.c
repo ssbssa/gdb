@@ -168,8 +168,6 @@ aarch64_windows_nat_target::initialize_windows_arch (bool attaching)
 {
   memset (&aarch64_windows_process.dr_state, 0,
 	  sizeof (aarch64_windows_process.dr_state));
-
-  aarch64_windows_process.mappings = aarch64_mappings;
 }
 
 /* See windows-nat.h.  */
@@ -264,7 +262,7 @@ aarch64_windows_nat_target::fetch_one_register (struct regcache *regcache,
   gdb_assert (r >= 0);
 
   char *context_ptr = (char *) th->context;
-  char *context_offset = context_ptr + aarch64_windows_process.mappings[r];
+  char *context_offset = context_ptr + aarch64_mappings[r];
   struct gdbarch *gdbarch = regcache->arch ();
 
   gdb_assert (!gdbarch_read_pc_p (gdbarch));
@@ -296,7 +294,7 @@ aarch64_windows_nat_target::store_one_register (const struct regcache *regcache,
 
   char *context_ptr = (char *) th->context;
 
-  regcache->raw_collect (r, context_ptr + aarch64_windows_process.mappings[r]);
+  regcache->raw_collect (r, context_ptr + aarch64_mappings[r]);
 }
 
 /* See windows-nat.h.  */

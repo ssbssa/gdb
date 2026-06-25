@@ -139,24 +139,6 @@ struct windows_per_inferior : public windows_nat::windows_process_info
   void *wow64_dbgbreak = nullptr;
 #endif
 
-  /* This vector maps GDB's idea of a register's number into an offset
-     in the windows exception context vector.
-
-     It also contains the bit mask needed to load the register in question.
-
-     The contents of this table can only be computed by the units
-     that provide CPU-specific support for Windows native debugging.
-
-     One day we could read a reg, we could inspect the context we
-     already have loaded, if it doesn't have the bit set that we need,
-     we read that set of registers in using GetThreadContext.  If the
-     context already contains what we need, we just unpack it.  Then to
-     write a register, first we have to ensure that the context contains
-     the other regs of the group, and then we copy the info in and set
-     out bit.  */
-
-  const int *mappings = nullptr;
-
   std::vector<windows_solib> solibs;
 
 #ifdef __CYGWIN__

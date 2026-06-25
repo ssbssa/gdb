@@ -85,16 +85,10 @@ x86_windows_nat_target::initialize_windows_arch (bool attaching)
     = !attaching && x86_windows_process.wow64_process;
 
   if (!x86_windows_process.wow64_process)
-    {
-      x86_windows_process.mappings = amd64_mappings;
-      x86_windows_process.segment_register_p = amd64_windows_segment_register_p;
-    }
+    x86_windows_process.segment_register_p = amd64_windows_segment_register_p;
   else
 #endif
-    {
-      x86_windows_process.mappings = i386_mappings;
-      x86_windows_process.segment_register_p = i386_windows_segment_register_p;
-    }
+    x86_windows_process.segment_register_p = i386_windows_segment_register_p;
 }
 
 /* See windows-nat.h.  */
@@ -242,7 +236,15 @@ x86_windows_nat_target::fetch_one_register (struct regcache *regcache,
       return (char *) context;
     });
 
-  char *context_offset = context_ptr + x86_windows_process.mappings[r];
+  const int *mappings;
+#ifdef __x86_64__
+  if (!x86_windows_process.wow64_process)
+    mappings = amd64_mappings;
+  else
+#endif
+    mappings = i386_mappings;
+
+  char *context_offset = context_ptr + mappings[r];
   struct gdbarch *gdbarch = regcache->arch ();
   i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
 
@@ -308,6 +310,14 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
       return (char *) context;
     });
 
+  const int *mappings;
+#ifdef __x86_64__
+  if (!x86_windows_process.wow64_process)
+    mappings = amd64_mappings;
+  else
+#endif
+    mappings = i386_mappings;
+
   struct gdbarch *gdbarch = regcache->arch ();
   i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
 
@@ -319,7 +329,7 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
     {
       gdb_byte bytes[4];
       regcache->raw_collect (r, bytes);
-      memcpy (context_ptr + x86_windows_process.mappings[r], bytes, 2);
+      memcpy (context_ptr + mappings[r], bytes, 2);
     }
   else if (r == I387_FOP_REGNUM (tdep))
     {
@@ -328,10 +338,10 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
       /* The value of FOP occupies the top two bytes in the context,
 	 so write the two low-order bytes from the cache into the
 	 appropriate spot.  */
-      memcpy (context_ptr + x86_windows_process.mappings[r] + 2, bytes, 2);
+      memcpy (context_ptr + mappings[r] + 2, bytes, 2);
     }
   else
-    regcache->raw_collect (r, context_ptr + x86_windows_process.mappings[r]);
+    regcache->raw_collect (r, context_ptr + mappings[r]);
 }
 
 /* See windows-nat.h.  */
