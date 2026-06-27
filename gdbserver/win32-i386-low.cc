@@ -473,22 +473,44 @@ is_segment_register (int r)
     return r >= I386_CS_REGNUM && r <= I386_GS_REGNUM;
 }
 
+/* Get pointer to register R inside CONTEXT.  */
+
+template<typename Context>
+static char *
+get_context_reg_ptr (Context *context, int r)
+{
+  const int *mappings;
+  int mappings_count;
+#ifdef __x86_64__
+  if (!windows_process.wow64_process)
+    {
+      mappings = amd64_mappings;
+      mappings_count = sizeof (amd64_mappings) / sizeof (amd64_mappings[0]);
+    }
+  else
+#endif
+    {
+      mappings = i386_mappings;
+      mappings_count = sizeof (i386_mappings) / sizeof (i386_mappings[0]);
+    }
+
+  char *context_offset;
+  if (r < mappings_count)
+    context_offset = (char *) context + mappings[r];
+  else
+    gdb_assert_not_reached ("invalid register number %d", r);
+
+  return context_offset;
+}
+
 /* Fetch register from gdbserver regcache data.  */
 static void
 i386_fetch_inferior_register (struct regcache *regcache,
 			      windows_thread_info *th, int r)
 {
-  const int *mappings;
-#ifdef __x86_64__
-  if (!windows_process.wow64_process)
-    mappings = amd64_mappings;
-  else
-#endif
-    mappings = i386_mappings;
-
   char *context_offset = windows_process.with_context (th, [&] (auto *context)
     {
-      return (char *) context + mappings[r];
+      return get_context_reg_ptr (context, r);
     });
 
   /* GDB treats some registers as 32-bit, where they are in fact only
@@ -514,17 +536,9 @@ static void
 i386_store_inferior_register (struct regcache *regcache,
 			      windows_thread_info *th, int r)
 {
-  const int *mappings;
-#ifdef __x86_64__
-  if (!windows_process.wow64_process)
-    mappings = amd64_mappings;
-  else
-#endif
-    mappings = i386_mappings;
-
   char *context_offset = windows_process.with_context (th, [&] (auto *context)
     {
-      return (char *) context + mappings[r];
+      return get_context_reg_ptr (context, r);
     });
 
   /* GDB treats some registers as 32-bit, where they are in fact only

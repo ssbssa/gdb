@@ -86,6 +86,9 @@ const int amd64_mappings[] =
 };
 #undef context_offset
 
+const int amd64_mappings_count
+  = sizeof (amd64_mappings) / sizeof (amd64_mappings[0]);
+
 /* segment_register_p_ftype implementation for amd64.  */
 
 int

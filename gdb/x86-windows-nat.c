@@ -223,6 +223,36 @@ x86_windows_nat_target::thread_context_step (windows_thread_info *th,
     });
 }
 
+/* Get pointer to register R inside CONTEXT.  */
+
+template<typename Context>
+static char *
+get_context_reg_ptr (Context *context, int r)
+{
+  const int *mappings;
+  int mappings_count;
+#ifdef __x86_64__
+  if (!x86_windows_process.wow64_process)
+    {
+      mappings = amd64_mappings;
+      mappings_count = amd64_mappings_count;
+    }
+  else
+#endif
+    {
+      mappings = i386_mappings;
+      mappings_count = i386_mappings_count;
+    }
+
+  char *context_offset;
+  if (r < mappings_count)
+    context_offset = (char *) context + mappings[r];
+  else
+    gdb_assert_not_reached ("invalid register number %d", r);
+
+  return context_offset;
+}
+
 /* See windows-nat.h.  */
 
 void
@@ -231,22 +261,14 @@ x86_windows_nat_target::fetch_one_register (struct regcache *regcache,
 {
   gdb_assert (r >= 0);
 
-  char *context_ptr = x86_windows_process.with_context (th, [] (auto *context)
-    {
-      return (char *) context;
-    });
-
-  const int *mappings;
-#ifdef __x86_64__
-  if (!x86_windows_process.wow64_process)
-    mappings = amd64_mappings;
-  else
-#endif
-    mappings = i386_mappings;
-
-  char *context_offset = context_ptr + mappings[r];
   struct gdbarch *gdbarch = regcache->arch ();
   i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
+
+  char *context_offset
+    = x86_windows_process.with_context (th, [&] (auto *context)
+    {
+      return get_context_reg_ptr (context, r);
+    });
 
   gdb_assert (!gdbarch_read_pc_p (gdbarch));
   gdb_assert (gdbarch_pc_regnum (gdbarch) >= 0);
@@ -304,22 +326,15 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
 {
   gdb_assert (r >= 0);
 
-  char *context_ptr = x86_windows_process.with_context (th, [] (auto *context)
-    {
-      gdb_assert (context->ContextFlags != 0);
-      return (char *) context;
-    });
-
-  const int *mappings;
-#ifdef __x86_64__
-  if (!x86_windows_process.wow64_process)
-    mappings = amd64_mappings;
-  else
-#endif
-    mappings = i386_mappings;
-
   struct gdbarch *gdbarch = regcache->arch ();
   i386_gdbarch_tdep *tdep = gdbarch_tdep<i386_gdbarch_tdep> (gdbarch);
+
+  char *context_offset
+    = x86_windows_process.with_context (th, [&] (auto *context)
+    {
+      gdb_assert (context->ContextFlags != 0);
+      return get_context_reg_ptr (context, r);
+    });
 
   /* GDB treats some registers as 32-bit, where they are in fact only
      16 bits long.  These cases must be handled specially to avoid
@@ -329,7 +344,7 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
     {
       gdb_byte bytes[4];
       regcache->raw_collect (r, bytes);
-      memcpy (context_ptr + mappings[r], bytes, 2);
+      memcpy (context_offset, bytes, 2);
     }
   else if (r == I387_FOP_REGNUM (tdep))
     {
@@ -338,10 +353,10 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
       /* The value of FOP occupies the top two bytes in the context,
 	 so write the two low-order bytes from the cache into the
 	 appropriate spot.  */
-      memcpy (context_ptr + mappings[r] + 2, bytes, 2);
+      memcpy (context_offset + 2, bytes, 2);
     }
   else
-    regcache->raw_collect (r, context_ptr + mappings[r]);
+    regcache->raw_collect (r, context_offset);
 }
 
 /* See windows-nat.h.  */
