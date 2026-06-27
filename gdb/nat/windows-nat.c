@@ -73,6 +73,19 @@ InitializeProcThreadAttributeList_ftype *InitializeProcThreadAttributeList;
 UpdateProcThreadAttribute_ftype *UpdateProcThreadAttribute;
 DeleteProcThreadAttributeList_ftype *DeleteProcThreadAttributeList;
 
+#if defined __i386__ || defined __x86_64__
+GetEnabledXStateFeatures_ftype *GetEnabledXStateFeatures;
+InitializeContext_ftype *InitializeContext;
+GetXStateFeaturesMask_ftype *GetXStateFeaturesMask;
+SetXStateFeaturesMask_ftype *SetXStateFeaturesMask;
+LocateXStateFeature_ftype *LocateXStateFeature;
+#ifdef __x86_64__
+RtlGetExtendedFeaturesMask_ftype *RtlGetExtendedFeaturesMask;
+RtlSetExtendedFeaturesMask_ftype *RtlSetExtendedFeaturesMask;
+RtlLocateExtendedFeature_ftype *RtlLocateExtendedFeature;
+#endif
+#endif
+
 /* Note that 'debug_events' must be locally defined in the relevant
    functions.  */
 #define DEBUG_EVENTS(fmt, ...) \
@@ -1194,6 +1207,14 @@ initialize_loadable ()
       GPA (hm, InitializeProcThreadAttributeList);
       GPA (hm, UpdateProcThreadAttribute);
       GPA (hm, DeleteProcThreadAttributeList);
+
+#if defined __i386__ || defined __x86_64__
+      GPA (hm, GetEnabledXStateFeatures);
+      GPA (hm, InitializeContext);
+      GPA (hm, GetXStateFeaturesMask);
+      GPA (hm, SetXStateFeaturesMask);
+      GPA (hm, LocateXStateFeature);
+#endif
     }
 
   /* Set variables to dummy versions of these processes if the function
@@ -1258,6 +1279,16 @@ initialize_loadable ()
       if (hm)
 	GPA (hm, GetThreadDescription);
     }
+
+#ifdef __x86_64__
+  hm = LoadLibrary (TEXT ("ntdll.dll"));
+  if (hm)
+    {
+      GPA (hm, RtlGetExtendedFeaturesMask);
+      GPA (hm, RtlSetExtendedFeaturesMask);
+      GPA (hm, RtlLocateExtendedFeature);
+    }
+#endif
 
 #undef GPA
 

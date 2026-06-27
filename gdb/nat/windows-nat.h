@@ -35,6 +35,9 @@
 #define CONTEXT_EXTENDED_REGISTERS 0
 #endif
 
+#define CONTEXT_EXTENDED_REGISTERS_FLAG	0x20
+#define CONTEXT_XSTATE_FLAG		0x40
+
 namespace windows_nat
 {
 
@@ -446,6 +449,14 @@ extern BOOL create_process (const wchar_t *image, wchar_t *command_line,
 #define InitializeProcThreadAttributeList dyn_InitializeProcThreadAttributeList
 #define UpdateProcThreadAttribute dyn_UpdateProcThreadAttribute
 #define DeleteProcThreadAttributeList dyn_DeleteProcThreadAttributeList
+#define GetEnabledXStateFeatures	dyn_GetEnabledXStateFeatures
+#define InitializeContext		dyn_InitializeContext
+#define GetXStateFeaturesMask		dyn_GetXStateFeaturesMask
+#define SetXStateFeaturesMask		dyn_SetXStateFeaturesMask
+#define LocateXStateFeature		dyn_LocateXStateFeature
+#define RtlGetExtendedFeaturesMask	dyn_RtlGetExtendedFeaturesMask
+#define RtlSetExtendedFeaturesMask	dyn_RtlSetExtendedFeaturesMask
+#define RtlLocateExtendedFeature	dyn_RtlLocateExtendedFeature
 
 typedef BOOL WINAPI (AdjustTokenPrivileges_ftype) (HANDLE, BOOL,
 						   PTOKEN_PRIVILEGES,
@@ -540,6 +551,35 @@ extern DeleteProcThreadAttributeList_ftype *DeleteProcThreadAttributeList;
 
 extern bool disable_randomization_available ();
 
+#if defined __i386__ || defined __x86_64__
+typedef DWORD64 (WINAPI GetEnabledXStateFeatures_ftype) ();
+extern GetEnabledXStateFeatures_ftype *GetEnabledXStateFeatures;
+
+typedef BOOL (WINAPI InitializeContext_ftype) (PVOID, DWORD,
+					       PCONTEXT*, PDWORD);
+extern InitializeContext_ftype *InitializeContext;
+
+typedef BOOL (WINAPI GetXStateFeaturesMask_ftype) (PCONTEXT, PDWORD64);
+extern GetXStateFeaturesMask_ftype *GetXStateFeaturesMask;
+
+typedef BOOL (WINAPI SetXStateFeaturesMask_ftype) (PCONTEXT, DWORD64);
+extern SetXStateFeaturesMask_ftype *SetXStateFeaturesMask;
+
+typedef PVOID (WINAPI LocateXStateFeature_ftype) (PCONTEXT, DWORD, PDWORD);
+extern LocateXStateFeature_ftype *LocateXStateFeature;
+
+#ifdef __x86_64__
+typedef DWORD64 (WINAPI RtlGetExtendedFeaturesMask_ftype) (PVOID);
+extern RtlGetExtendedFeaturesMask_ftype *RtlGetExtendedFeaturesMask;
+
+typedef VOID (WINAPI RtlSetExtendedFeaturesMask_ftype) (PVOID, DWORD64);
+extern RtlSetExtendedFeaturesMask_ftype *RtlSetExtendedFeaturesMask;
+
+typedef PVOID (WINAPI RtlLocateExtendedFeature_ftype) (PVOID, DWORD, PDWORD);
+extern RtlLocateExtendedFeature_ftype *RtlLocateExtendedFeature;
+#endif
+#endif
+
 /* Helper classes to get the correct ContextFlags values based on the
    used type (CONTEXT or WOW64_CONTEXT).  */
 
@@ -605,16 +645,69 @@ enum_process_modules (CONTEXT *, HANDLE process,
   return EnumProcessModules (process, modules, size, needed);
 }
 
+#if defined __i386__ || defined __x86_64__
+static inline BOOL
+get_xstate_features_mask (CONTEXT *context, DWORD64 *mask)
+{
+  return GetXStateFeaturesMask (context, mask);
+}
+
+static inline BOOL
+set_xstate_features_mask (CONTEXT *context, DWORD64 mask)
+{
+  return SetXStateFeaturesMask (context, mask);
+}
+
+static inline PVOID
+locate_xstate_feature (CONTEXT *context, DWORD feature, DWORD *length)
+{
+  return LocateXStateFeature (context, feature, length);
+}
+#endif
+
 #ifdef __x86_64__
 static inline BOOL
 get_thread_context (HANDLE h, WOW64_CONTEXT *context)
 {
+  if ((context->ContextFlags & CONTEXT_XSTATE_FLAG) != 0)
+    {
+      /* Wow64GetThreadContext doesn't handle CONTEXT_EXTENDED_REGISTERS and
+	 CONTEXT_XSTATE combined correctly, but separate they work fine.  */
+      DWORD flags = context->ContextFlags;
+      context->ContextFlags &= ~CONTEXT_EXTENDED_REGISTERS_FLAG;
+      BOOL ret = Wow64GetThreadContext (h, context);
+      context->ContextFlags = flags;
+      if (!ret)
+	return FALSE;
+
+      context->ContextFlags &= ~CONTEXT_XSTATE_FLAG;
+      ret = Wow64GetThreadContext (h, context);
+      context->ContextFlags = flags;
+      return ret;
+    }
+
   return Wow64GetThreadContext (h, context);
 }
 
 static inline BOOL
 set_thread_context (HANDLE h, WOW64_CONTEXT *context)
 {
+  if ((context->ContextFlags & CONTEXT_XSTATE_FLAG) != 0)
+    {
+      /* Same limitation as Wow64GetThreadContext above.  */
+      DWORD flags = context->ContextFlags;
+      context->ContextFlags &= ~CONTEXT_EXTENDED_REGISTERS_FLAG;
+      BOOL ret = Wow64SetThreadContext (h, context);
+      context->ContextFlags = flags;
+      if (!ret)
+	return FALSE;
+
+      context->ContextFlags &= ~CONTEXT_XSTATE_FLAG;
+      ret = Wow64SetThreadContext (h, context);
+      context->ContextFlags = flags;
+      return ret;
+    }
+
   return Wow64SetThreadContext (h, context);
 }
 
@@ -631,6 +724,29 @@ enum_process_modules (WOW64_CONTEXT *, HANDLE process,
 {
   return EnumProcessModulesEx (process, modules, size, needed,
 			       LIST_MODULES_32BIT);
+}
+
+static inline BOOL
+get_xstate_features_mask (WOW64_CONTEXT *context, DWORD64 *mask)
+{
+  /* Use lower level function, since there is no Wow64GetXStateFeaturesMask.  */
+  *mask = RtlGetExtendedFeaturesMask (context + 1);
+  return TRUE;
+}
+
+static inline BOOL
+set_xstate_features_mask (WOW64_CONTEXT *context, DWORD64 mask)
+{
+  /* Use lower level function, since there is no Wow64SetXStateFeaturesMask.  */
+  RtlSetExtendedFeaturesMask (context + 1, mask);
+  return TRUE;
+}
+
+static inline PVOID
+locate_xstate_feature (WOW64_CONTEXT *context, DWORD feature, DWORD *length)
+{
+  /* Use lower level function, since there is no Wow64LocateXStateFeature.  */
+  return RtlLocateExtendedFeature (context + 1, feature, length);
 }
 #endif
 
