@@ -20,6 +20,7 @@
 #include "gdbsupport/common-debug.h"
 #include "gdbsupport/gdb_signals.h"
 #include "gdbsupport/gdb_wait.h"
+#include "gdbsupport/x86-xstate.h"
 #include "target/target.h"
 
 #undef GetModuleFileNameEx
@@ -84,6 +85,8 @@ RtlGetExtendedFeaturesMask_ftype *RtlGetExtendedFeaturesMask;
 RtlSetExtendedFeaturesMask_ftype *RtlSetExtendedFeaturesMask;
 RtlLocateExtendedFeature_ftype *RtlLocateExtendedFeature;
 #endif
+
+DWORD64 xstate_features;
 #endif
 
 /* Note that 'debug_events' must be locally defined in the relevant
@@ -99,12 +102,41 @@ windows_thread_info::windows_thread_info (windows_process_info *proc_,
     h (h_),
     thread_local_base (tlb)
 {
+#if defined __i386__ || defined __x86_64__
+  if (xstate_features != 0)
+    {
+      DWORD context_flags = proc->with_context (nullptr, [] (auto *context)
+	{
+	  return WindowsContext<decltype(context)>::all;
+	});
+      context_flags |= CONTEXT_XSTATE_FLAG;
+      DWORD xstate_size = 0;
+      InitializeContext (NULL, context_flags, NULL, &xstate_size);
+      context_buffer.reset (xmalloc (xstate_size));
+      CONTEXT *c = nullptr;
+      if (!InitializeContext (context_buffer.get (),
+			      context_flags, &c, &xstate_size))
+	{
+	  unsigned err = (unsigned) GetLastError ();
+	  throw_winerror_with_name (_("InitializeContext failed"), err);
+	}
 #ifdef __x86_64__
-  if (proc->wow64_process)
+      /* InitializeContext actually initializes a WOW64_CONTEXT when
+	 context_flags contains a WOW64_CONTEXT_* value, so a cast is needed.
+	 */
+      if (proc->wow64_process)
+	wow64_context = (WOW64_CONTEXT *) c;
+      else
+#endif
+	context = c;
+    }
+#ifdef __x86_64__
+  else if (proc->wow64_process)
     {
       context_buffer.reset (xmalloc (sizeof (WOW64_CONTEXT)));
       wow64_context = (WOW64_CONTEXT *) context_buffer.get ();
     }
+#endif
   else
 #endif
     {
@@ -1291,6 +1323,29 @@ initialize_loadable ()
 #endif
 
 #undef GPA
+
+#if defined __i386__ || defined __x86_64__
+  if (GetEnabledXStateFeatures != nullptr
+      && InitializeContext != nullptr
+      && GetXStateFeaturesMask != nullptr
+      && SetXStateFeaturesMask != nullptr
+      && LocateXStateFeature != nullptr
+#ifdef __x86_64__
+      && RtlGetExtendedFeaturesMask != nullptr
+      && RtlSetExtendedFeaturesMask != nullptr
+      && RtlLocateExtendedFeature != nullptr
+#endif
+  )
+    {
+      /* Available XState features masked with implemented features.  */
+      xstate_features = (GetEnabledXStateFeatures ()
+			 & X86_XSTATE_SSE_MASK);
+      /* The extended XState functions are only needed if the available
+	 features exceed SSE.  */
+      if ((xstate_features & ~X86_XSTATE_SSE_MASK) == 0)
+	xstate_features = 0;
+    }
+#endif
 
   return result;
 }

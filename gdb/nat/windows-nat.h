@@ -750,6 +750,11 @@ locate_xstate_feature (WOW64_CONTEXT *context, DWORD feature, DWORD *length)
 }
 #endif
 
+#if defined __i386__ || defined __x86_64__
+/* Available XState features.  */
+extern DWORD64 xstate_features;
+#endif
+
 /* This is available starting with Windows 10.  */
 #ifndef DBG_REPLY_LATER
 # define DBG_REPLY_LATER 0x40010001L
