@@ -138,6 +138,7 @@ private:
       m_stack (false),
       m_is_zero (false),
       m_in_history (false),
+      m_fetch_lazy_failed (false),
       m_type (type_),
       m_enclosing_type (type_)
   {
@@ -279,7 +280,13 @@ public:
   { return m_lazy; }
 
   void set_lazy (bool val)
-  { m_lazy = val; }
+  {
+    m_lazy = val;
+    m_fetch_lazy_failed = false;
+  }
+
+  bool fetch_lazy_failed () const
+  { return m_fetch_lazy_failed; }
 
   /* If a value represents a C++ object, then the `type' field gives the
      object's compile-time type.  If the object actually belongs to some
@@ -688,6 +695,9 @@ private:
 
   /* True if this a value recorded in value history; false otherwise.  */
   bool m_in_history : 1;
+
+  /* True if fetch_lazy () did not finish successfully.  */
+  bool m_fetch_lazy_failed : 1;
 
   /* Location of value (if lval).  */
   union

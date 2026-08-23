@@ -1552,6 +1552,7 @@ value::copy () const
   val->m_bitpos = m_bitpos;
   val->m_bitsize = m_bitsize;
   val->m_lazy = m_lazy;
+  val->m_fetch_lazy_failed = m_fetch_lazy_failed;
   val->m_embedded_offset = embedded_offset ();
   val->m_pointed_to_offset = m_pointed_to_offset;
   val->m_modifiable = m_modifiable;
@@ -4119,6 +4120,8 @@ value::fetch_lazy ()
      value.  */
   gdb_assert (m_optimized_out.empty ());
   gdb_assert (m_unavailable.empty ());
+  /* Will be reset with set_lazy () at the end if successful.  */
+  m_fetch_lazy_failed = true;
   if (m_is_zero)
     {
       /* Nothing.  */
