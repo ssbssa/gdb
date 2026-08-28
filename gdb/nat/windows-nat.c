@@ -271,6 +271,40 @@ windows_thread_info::xfer_siginfo (gdb_byte *readbuf,
   return true;
 }
 
+#if defined __i386__ || defined __x86_64__
+/* See nat/windows-nat.h.  */
+
+void
+windows_thread_info::zero_xstate_features ()
+{
+  if (xstate_features == 0)
+    return;
+
+  proc->with_context (this, [] (auto *context)
+    {
+      DWORD64 features = 0;
+      if (!get_xstate_features_mask (context, &features))
+	return;
+
+      DWORD64 zeroed_features = xstate_features & ~features;
+      if (zeroed_features == 0)
+	return;
+
+      for (int f = X86_XSTATE_AVX_ID; f <= X86_XSTATE_AVX_ID; f++)
+	{
+	  DWORD64 flag = 1ULL << f;
+	  if ((zeroed_features & flag) != 0)
+	    {
+	      DWORD size = 0;
+	      void *loc = locate_xstate_feature (context, f, &size);
+	      if (loc != nullptr && size > 0)
+		memset (loc, 0, size);
+	    }
+	}
+    });
+}
+#endif
+
 /* Try to determine the executable filename.
 
    EXE_NAME_RET is a pointer to a buffer whose size is EXE_NAME_MAX_LEN.
@@ -1339,7 +1373,7 @@ initialize_loadable ()
     {
       /* Available XState features masked with implemented features.  */
       xstate_features = (GetEnabledXStateFeatures ()
-			 & X86_XSTATE_SSE_MASK);
+			 & X86_XSTATE_AVX_MASK);
       /* The extended XState functions are only needed if the available
 	 features exceed SSE.  */
       if ((xstate_features & ~X86_XSTATE_SSE_MASK) == 0)

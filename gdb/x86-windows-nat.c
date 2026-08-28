@@ -27,6 +27,9 @@
 
 #include "i386-tdep.h"
 #include "i387-tdep.h"
+#ifdef __x86_64__
+#include "amd64-tdep.h"
+#endif
 
 using namespace windows_nat;
 
@@ -70,6 +73,8 @@ struct x86_windows_nat_target final : public x86_nat_target<windows_nat_target>
 			   windows_thread_info *th, int r) override;
 
   bool is_sw_breakpoint (const EXCEPTION_RECORD *er) const override;
+
+  const struct target_desc *read_description () override;
 };
 
 /* The current process.  */
@@ -109,7 +114,14 @@ x86_windows_per_inferior::fill_thread_context (windows_thread_info *th)
       if (context->ContextFlags == 0)
 	{
 	  context->ContextFlags = WindowsContext<decltype(context)>::all;
+	  if (xstate_features != 0)
+	    {
+	      context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+	      set_xstate_features_mask (context, xstate_features);
+	    }
 	  CHECK (get_thread_context (th->h, context));
+
+	  th->zero_xstate_features ();
 	}
     });
 }
@@ -198,6 +210,14 @@ x86_windows_nat_target::thread_context_continue (windows_thread_info *th,
 	  if (GetExitCodeThread (th->h, &ec)
 	      && ec == STILL_ACTIVE)
 	    {
+	      DWORD debug_registers = WindowsContext<decltype(context)>::debug;
+	      if (xstate_features != 0
+		  && (context->ContextFlags & ~debug_registers) != 0)
+		{
+		  context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+		  set_xstate_features_mask (context, xstate_features);
+		}
+
 	      BOOL status = set_thread_context (th->h, context);
 
 	      if (!killed)
@@ -227,7 +247,7 @@ x86_windows_nat_target::thread_context_step (windows_thread_info *th,
 
 template<typename Context>
 static char *
-get_context_reg_ptr (Context *context, int r)
+get_context_reg_ptr (Context *context, int r, i386_gdbarch_tdep *tdep)
 {
   const int *mappings;
   int mappings_count;
@@ -247,6 +267,14 @@ get_context_reg_ptr (Context *context, int r)
   char *context_offset;
   if (r < mappings_count)
     context_offset = (char *) context + mappings[r];
+  else if ((xstate_features & X86_XSTATE_AVX) != 0
+	   && I387_YMM0H_REGNUM (tdep) > 0 && r >= I387_YMM0H_REGNUM (tdep)
+	   && r < I387_YMMENDH_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_AVX_ID, nullptr);
+      context_offset += 16 * (r - I387_YMM0H_REGNUM (tdep));
+    }
   else
     gdb_assert_not_reached ("invalid register number %d", r);
 
@@ -267,7 +295,7 @@ x86_windows_nat_target::fetch_one_register (struct regcache *regcache,
   char *context_offset
     = x86_windows_process.with_context (th, [&] (auto *context)
     {
-      return get_context_reg_ptr (context, r);
+      return get_context_reg_ptr (context, r, tdep);
     });
 
   gdb_assert (!gdbarch_read_pc_p (gdbarch));
@@ -333,7 +361,7 @@ x86_windows_nat_target::store_one_register (const struct regcache *regcache,
     = x86_windows_process.with_context (th, [&] (auto *context)
     {
       gdb_assert (context->ContextFlags != 0);
-      return get_context_reg_ptr (context, r);
+      return get_context_reg_ptr (context, r, tdep);
     });
 
   /* GDB treats some registers as 32-bit, where they are in fact only
@@ -366,6 +394,23 @@ x86_windows_nat_target::is_sw_breakpoint (const EXCEPTION_RECORD *er) const
 {
   return (er->ExceptionCode == EXCEPTION_BREAKPOINT
 	  || er->ExceptionCode == STATUS_WX86_BREAKPOINT);
+}
+
+const struct target_desc *
+x86_windows_nat_target::read_description ()
+{
+  if (inferior_ptid == null_ptid)
+    return this->beneath ()->read_description ();
+
+  if (xstate_features == 0)
+    return nullptr;
+
+#ifdef __x86_64__
+  if (!x86_windows_process.wow64_process)
+    return amd64_target_description (xstate_features, false);
+  else
+#endif
+    return i386_target_description (xstate_features, false);
 }
 
 /* Hardware watchpoint support, adapted from go32-nat.c code.  */

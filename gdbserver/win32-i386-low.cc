@@ -253,6 +253,11 @@ i386_get_thread_context (windows_thread_info *th)
 			       | WindowsContext<decltype(context)>::floating
 			       | WindowsContext<decltype(context)>::debug
 			       | extended_registers);
+      if (xstate_features != 0)
+	{
+	  context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+	  set_xstate_features_mask (context, xstate_features);
+	}
 
       BOOL ret = get_thread_context (th->h, context);
       if (!ret)
@@ -267,6 +272,8 @@ i386_get_thread_context (windows_thread_info *th)
 
 	  error (_("GetThreadContext failure %ld\n"), (long) e);
 	}
+
+      th->zero_xstate_features ();
     });
 }
 
@@ -292,6 +299,17 @@ i386_prepare_to_resume (windows_thread_info *th)
 
       th->debug_registers_changed = false;
     }
+
+  windows_process.with_context (th, [&] (auto *context)
+    {
+      DWORD debug_registers = WindowsContext<decltype(context)>::debug;
+      if (xstate_features != 0
+	  && (context->ContextFlags & ~debug_registers) != 0)
+	{
+	  context->ContextFlags |= CONTEXT_XSTATE_FLAG;
+	  set_xstate_features_mask (context, xstate_features);
+	}
+    });
 }
 
 static void
@@ -477,26 +495,40 @@ is_segment_register (int r)
 
 template<typename Context>
 static char *
-get_context_reg_ptr (Context *context, int r)
+get_context_reg_ptr (Context *context, int r, const target_desc *tdesc)
 {
   const int *mappings;
   int mappings_count;
+  bool amd64;
 #ifdef __x86_64__
   if (!windows_process.wow64_process)
     {
       mappings = amd64_mappings;
       mappings_count = sizeof (amd64_mappings) / sizeof (amd64_mappings[0]);
+      amd64 = true;
     }
   else
 #endif
     {
       mappings = i386_mappings;
       mappings_count = sizeof (i386_mappings) / sizeof (i386_mappings[0]);
+      amd64 = false;
     }
+
+  int ymm0h_regnum;
+  const int num_xmm_registers = amd64 ? 16 : 8;
 
   char *context_offset;
   if (r < mappings_count)
     context_offset = (char *) context + mappings[r];
+  else if ((xstate_features & X86_XSTATE_AVX) != 0
+	   && r >= (ymm0h_regnum = find_regno (tdesc, "ymm0h"))
+	   && r < ymm0h_regnum + num_xmm_registers)
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_AVX_ID, nullptr);
+      context_offset += 16 * (r - ymm0h_regnum);
+    }
   else
     gdb_assert_not_reached ("invalid register number %d", r);
 
@@ -510,7 +542,7 @@ i386_fetch_inferior_register (struct regcache *regcache,
 {
   char *context_offset = windows_process.with_context (th, [&] (auto *context)
     {
-      return get_context_reg_ptr (context, r);
+      return get_context_reg_ptr (context, r, regcache->tdesc);
     });
 
   /* GDB treats some registers as 32-bit, where they are in fact only
@@ -538,7 +570,7 @@ i386_store_inferior_register (struct regcache *regcache,
 {
   char *context_offset = windows_process.with_context (th, [&] (auto *context)
     {
-      return get_context_reg_ptr (context, r);
+      return get_context_reg_ptr (context, r, regcache->tdesc);
     });
 
   /* GDB treats some registers as 32-bit, where they are in fact only
@@ -571,14 +603,17 @@ i386_arch_setup (void)
 {
  target_desc_up tdesc;
 
+  DWORD64 xcr0 = xstate_features;
+  if (xcr0 == 0)
+    xcr0 = X86_XSTATE_SSE_MASK;
+
 #ifdef __x86_64__
-  tdesc = amd64_create_target_description (X86_XSTATE_SSE_MASK, false,
-					   false, false);
+  tdesc = amd64_create_target_description (xcr0, false, false, false);
   init_target_desc (tdesc.get (), amd64_expedite_regs, WINDOWS_OSABI);
   win32_tdesc = std::move (tdesc);
 #endif
 
-  tdesc = i386_create_target_description (X86_XSTATE_SSE_MASK, false, false);
+  tdesc = i386_create_target_description (xcr0, false, false);
   init_target_desc (tdesc.get (), i386_expedite_regs, WINDOWS_OSABI);
 #ifdef __x86_64__
   wow64_win32_tdesc = std::move (tdesc);

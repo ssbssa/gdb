@@ -90,6 +90,12 @@ struct windows_thread_info
 		     ULONGEST offset, ULONGEST len,
 		     ULONGEST *xfered_len);
 
+#if defined __i386__ || defined __x86_64__
+  /* Zero all XState feature areas that were not provided by
+     GetThreadContext.  */
+  void zero_xstate_features ();
+#endif
+
   /* The process this thread belongs to.  */
   windows_process_info *const proc;
 
