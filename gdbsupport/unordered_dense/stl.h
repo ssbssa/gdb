@@ -51,7 +51,7 @@
 // targeting Windows earlier than Vista (0x600).  GCC predefines
 // _REENTRANT when using the 'posix' model, and doesn't when using the
 // 'win32' model.
-#if defined __MINGW64__ && defined __GNUC__ && __GNUC__ >= 13 && !defined _REENTRANT
+#if defined __MINGW64__ && defined __GNUC__ && __GNUC__ >= 13 && !defined _REENTRANT && !defined __USING_MCFGTHREAD__
 // _WIN32_WINNT is guaranteed to be defined here because of the
 // <cstdint> inclusion above.
 #    ifndef _WIN32_WINNT
