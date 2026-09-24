@@ -515,8 +515,11 @@ get_context_reg_ptr (Context *context, int r, const target_desc *tdesc)
       amd64 = false;
     }
 
-  int ymm0h_regnum;
+  int ymm0h_regnum, zmm0h_regnum, k0_regnum;
+  int xmm16_regnum, ymm16h_regnum, zmm16h_regnum;
   const int num_xmm_registers = amd64 ? 16 : 8;
+  const int num_zmm_high_registers = amd64 ? 16 : 0;
+  const int num_avx512_k_registers = 8;
 
   char *context_offset;
   if (r < mappings_count)
@@ -528,6 +531,49 @@ get_context_reg_ptr (Context *context, int r, const target_desc *tdesc)
       context_offset = (char *) locate_xstate_feature
 	(context, X86_XSTATE_AVX_ID, nullptr);
       context_offset += 16 * (r - ymm0h_regnum);
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM_H) != 0
+	   && r >= (zmm0h_regnum = find_regno (tdesc, "zmm0h"))
+	   && r < zmm0h_regnum + num_xmm_registers)
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_H_ID, nullptr);
+      context_offset += 32 * (r - zmm0h_regnum);
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM) != 0
+	   && num_zmm_high_registers != 0
+	   && r >= (zmm16h_regnum = find_regno (tdesc, "zmm16h"))
+	   && r < zmm16h_regnum + num_zmm_high_registers)
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, nullptr);
+      context_offset += 32 + 64 * (r - zmm16h_regnum);
+    }
+  else if ((xstate_features & X86_XSTATE_K) != 0
+	   && r >= (k0_regnum = find_regno (tdesc, "k0"))
+	   && r < k0_regnum + num_avx512_k_registers)
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_K_ID, nullptr);
+      context_offset += 8 * (r - k0_regnum);
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM) != 0
+	   && num_zmm_high_registers != 0
+	   && r >= (ymm16h_regnum = find_regno (tdesc, "ymm16h"))
+	   && r < ymm16h_regnum + num_zmm_high_registers)
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, nullptr);
+      context_offset += 16 + 64 * (r - ymm16h_regnum);
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM) != 0
+	   && num_zmm_high_registers != 0
+	   && r >= (xmm16_regnum = find_regno (tdesc, "xmm16"))
+	   && r < xmm16_regnum + num_zmm_high_registers)
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, nullptr);
+      context_offset += 64 * (r - xmm16_regnum);
     }
   else
     gdb_assert_not_reached ("invalid register number %d", r);

@@ -290,7 +290,7 @@ windows_thread_info::zero_xstate_features ()
       if (zeroed_features == 0)
 	return;
 
-      for (int f = X86_XSTATE_AVX_ID; f <= X86_XSTATE_AVX_ID; f++)
+      for (int f = X86_XSTATE_AVX_ID; f <= X86_XSTATE_ZMM_ID; f++)
 	{
 	  DWORD64 flag = 1ULL << f;
 	  if ((zeroed_features & flag) != 0)
@@ -1373,7 +1373,7 @@ initialize_loadable ()
     {
       /* Available XState features masked with implemented features.  */
       xstate_features = (GetEnabledXStateFeatures ()
-			 & X86_XSTATE_AVX_MASK);
+			 & X86_XSTATE_AVX_AVX512_MASK);
       /* The extended XState functions are only needed if the available
 	 features exceed SSE.  */
       if ((xstate_features & ~X86_XSTATE_SSE_MASK) == 0)

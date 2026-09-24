@@ -275,6 +275,46 @@ get_context_reg_ptr (Context *context, int r, i386_gdbarch_tdep *tdep)
 	(context, X86_XSTATE_AVX_ID, nullptr);
       context_offset += 16 * (r - I387_YMM0H_REGNUM (tdep));
     }
+  else if ((xstate_features & X86_XSTATE_ZMM_H) != 0
+	   && I387_ZMM0H_REGNUM (tdep) > 0 && r >= I387_ZMM0H_REGNUM (tdep)
+	   && r < I387_ZMM16H_REGNUM (tdep) && r < I387_ZMMENDH_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_H_ID, nullptr);
+      context_offset += 32 * (r - I387_ZMM0H_REGNUM (tdep));
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM) != 0
+	   && I387_ZMM0H_REGNUM (tdep) > 0 && r >= I387_ZMM16H_REGNUM (tdep)
+	   && r < I387_ZMMENDH_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, nullptr);
+      context_offset += 32 + 64 * (r - I387_ZMM16H_REGNUM (tdep));
+    }
+  else if ((xstate_features & X86_XSTATE_K) != 0
+	   && I387_K0_REGNUM (tdep) > 0 && r >= I387_K0_REGNUM (tdep)
+	   && r < I387_KEND_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_K_ID, nullptr);
+      context_offset += 8 * (r - I387_K0_REGNUM (tdep));
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM) != 0
+	   && I387_YMM16H_REGNUM (tdep) > 0 && r >= I387_YMM16H_REGNUM (tdep)
+	   && r < I387_YMMH_AVX512_END_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, nullptr);
+      context_offset += 16 + 64 * (r - I387_YMM16H_REGNUM (tdep));
+    }
+  else if ((xstate_features & X86_XSTATE_ZMM) != 0
+	   && I387_XMM16_REGNUM (tdep) > 0 && r >= I387_XMM16_REGNUM (tdep)
+	   && r < I387_XMM_AVX512_END_REGNUM (tdep))
+    {
+      context_offset = (char *) locate_xstate_feature
+	(context, X86_XSTATE_ZMM_ID, nullptr);
+      context_offset += 64 * (r - I387_XMM16_REGNUM (tdep));
+    }
   else
     gdb_assert_not_reached ("invalid register number %d", r);
 
