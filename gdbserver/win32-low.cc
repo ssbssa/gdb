@@ -62,8 +62,6 @@ gdbserver_windows_process windows_process;
 
 int using_threads = 1;
 
-#define NUM_REGS (the_low_target.num_regs ())
-
 /* The current debug event from WaitForDebugEvent.  */
 static ptid_t
 debug_event_ptid (DEBUG_EVENT *event)

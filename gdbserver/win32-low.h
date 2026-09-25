@@ -37,9 +37,6 @@ struct win32_target_ops
   /* Architecture-specific setup.  */
   void (*arch_setup) (void);
 
-  /* The number of target registers.  */
-  int (*num_regs) (void);
-
   /* Perform initializations on startup.  */
   void (*initial_stuff) (process_info *proc);
 

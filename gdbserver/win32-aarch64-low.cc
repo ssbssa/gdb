@@ -394,15 +394,6 @@ aarch64_arch_setup ()
   aarch64_tdesc = std::move (tdesc);
 }
 
-/* Implement win32_target_ops "num_regs" method.  */
-
-static int
-aarch64_win32_num_regs ()
-{
-  int num_regs = sizeof (aarch64_mappings) / sizeof (aarch64_mappings[0]);
-  return num_regs;
-}
-
 /* Implement win32_target_ops "get_pc" method.  */
 
 static CORE_ADDR
@@ -438,7 +429,6 @@ aarch64_is_sw_breakpoint (const EXCEPTION_RECORD *er)
 
 struct win32_target_ops the_low_target = {
   aarch64_arch_setup,
-  aarch64_win32_num_regs,
   aarch64_initial_stuff,
   aarch64_get_thread_context,
   aarch64_prepare_to_resume,

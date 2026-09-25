@@ -668,21 +668,6 @@ i386_arch_setup (void)
 #endif
 }
 
-/* Implement win32_target_ops "num_regs" method.  */
-
-static int
-i386_win32_num_regs (void)
-{
-  int num_regs;
-#ifdef __x86_64__
-  if (!windows_process.wow64_process)
-    num_regs = sizeof (amd64_mappings) / sizeof (amd64_mappings[0]);
-  else
-#endif
-    num_regs = sizeof (i386_mappings) / sizeof (i386_mappings[0]);
-  return num_regs;
-}
-
 /* Implement win32_target_ops "get_pc" method.  */
 
 static CORE_ADDR
@@ -738,7 +723,6 @@ i386_is_sw_breakpoint (const EXCEPTION_RECORD *er)
 
 struct win32_target_ops the_low_target = {
   i386_arch_setup,
-  i386_win32_num_regs,
   i386_initial_stuff,
   i386_get_thread_context,
   i386_prepare_to_resume,
